@@ -16,6 +16,7 @@ class TestNormalise:
 
     def _make_client(self, server: str = "biorxiv"):
         from pipeline.ingest.biorxiv import BiorxivClient
+
         return BiorxivClient(server=server, request_delay=0)
 
     def test_basic_field_mapping(self):
@@ -46,7 +47,9 @@ class TestNormalise:
     def test_html_entity_decoding_in_abstract(self):
         client = self._make_client()
         raw = make_raw_record(
-            abstract="The 1.8 &Aring; structure of ACE2 shows &lt;50% occupancy &amp; high B-factors."
+            abstract=(
+                "The 1.8 &Aring; structure of ACE2 shows &lt;50% occupancy &amp; high B-factors."
+            )
         )
         result = client._normalise(raw)
         assert "\u00c5" in result["abstract"]  # Angstrom symbol decoded
@@ -75,7 +78,10 @@ class TestNormalise:
             jatsxml="https://www.biorxiv.org/content/10.1101/2026.03.15.500001v1.source.xml"
         )
         result = client._normalise(raw)
-        assert result["full_text_url"] == "https://www.biorxiv.org/content/10.1101/2026.03.15.500001v1.source.xml"
+        assert (
+            result["full_text_url"]
+            == "https://www.biorxiv.org/content/10.1101/2026.03.15.500001v1.source.xml"
+        )
 
     def test_missing_jatsxml_gives_none(self):
         client = self._make_client()
@@ -193,6 +199,7 @@ class TestRetry:
             ]
         )
         from pipeline.ingest.biorxiv import BiorxivClient
+
         async with BiorxivClient(server="biorxiv", request_delay=0) as client:
             papers = [p async for p in client.fetch_papers(date(2026, 3, 1), date(2026, 3, 1))]
         assert len(papers) == 1
@@ -210,6 +217,7 @@ class TestRetry:
             ]
         )
         from pipeline.ingest.biorxiv import BiorxivClient
+
         async with BiorxivClient(server="biorxiv", request_delay=0) as client:
             papers = [p async for p in client.fetch_papers(date(2026, 3, 1), date(2026, 3, 1))]
         assert len(papers) == 1
@@ -227,6 +235,7 @@ class TestRetry:
             ]
         )
         from pipeline.ingest.biorxiv import BiorxivClient
+
         async with BiorxivClient(server="biorxiv", request_delay=0) as client:
             papers = [p async for p in client.fetch_papers(date(2026, 3, 1), date(2026, 3, 1))]
         assert len(papers) == 1
@@ -237,6 +246,7 @@ class TestRetry:
         url = "https://api.biorxiv.org/details/biorxiv/2026-03-01/2026-03-01/0"
         respx.get(url).mock(return_value=httpx.Response(429))
         from pipeline.ingest.biorxiv import BiorxivClient
+
         async with BiorxivClient(server="biorxiv", request_delay=0, max_retries=2) as client:
             with pytest.raises(RuntimeError, match="Failed after 2 retries"):
                 _ = [p async for p in client.fetch_papers(date(2026, 3, 1), date(2026, 3, 1))]
@@ -246,6 +256,7 @@ class TestRetry:
         url = "https://api.biorxiv.org/details/biorxiv/2026-03-01/2026-03-01/0"
         route = respx.get(url).mock(return_value=httpx.Response(404))
         from pipeline.ingest.biorxiv import BiorxivClient
+
         async with BiorxivClient(server="biorxiv", request_delay=0) as client:
             with pytest.raises(httpx.HTTPStatusError):
                 _ = [p async for p in client.fetch_papers(date(2026, 3, 1), date(2026, 3, 1))]

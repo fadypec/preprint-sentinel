@@ -10,8 +10,9 @@ from __future__ import annotations
 
 import asyncio
 import html
+from collections.abc import AsyncGenerator
 from datetime import date
-from typing import TYPE_CHECKING, AsyncGenerator, Literal
+from typing import TYPE_CHECKING, Literal
 
 import httpx
 import structlog
@@ -50,9 +51,7 @@ class BiorxivClient:
 
     # -- Public API ----------------------------------------------------------
 
-    async def fetch_papers(
-        self, from_date: date, to_date: date
-    ) -> AsyncGenerator[dict, None]:
+    async def fetch_papers(self, from_date: date, to_date: date) -> AsyncGenerator[dict, None]:
         """Yield normalised paper dicts, paginating through all results."""
         cursor = 0
         while True:
@@ -82,9 +81,7 @@ class BiorxivClient:
 
     # -- Internal ------------------------------------------------------------
 
-    async def _fetch_page(
-        self, from_date: date, to_date: date, cursor: int
-    ) -> dict:
+    async def _fetch_page(self, from_date: date, to_date: date, cursor: int) -> dict:
         """Fetch a single page from the API with retry and backoff."""
         assert self._client is not None, "Use BiorxivClient as async context manager"
         url = f"{self.BASE_URL}/{self.server}/{from_date}/{to_date}/{cursor}"
@@ -119,9 +116,7 @@ class BiorxivClient:
     def _normalise(self, raw: dict) -> dict:
         """Map a raw CSHL API record to the common metadata schema."""
         authors_str = raw.get("authors", "")
-        authors_list = [
-            {"name": a.strip()} for a in authors_str.split(";") if a.strip()
-        ]
+        authors_list = [{"name": a.strip()} for a in authors_str.split(";") if a.strip()]
 
         return {
             "doi": raw.get("doi"),

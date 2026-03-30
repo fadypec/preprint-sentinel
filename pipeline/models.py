@@ -42,7 +42,7 @@ class Base(DeclarativeBase):
 # ---------------------------------------------------------------------------
 
 
-class SourceServer(str, enum.Enum):
+class SourceServer(enum.StrEnum):
     BIORXIV = "biorxiv"
     MEDRXIV = "medrxiv"
     EUROPEPMC = "europepmc"
@@ -54,7 +54,7 @@ class SourceServer(str, enum.Enum):
     SSRN = "ssrn"
 
 
-class PipelineStage(str, enum.Enum):
+class PipelineStage(enum.StrEnum):
     INGESTED = "ingested"
     COARSE_FILTERED = "coarse_filtered"
     FULLTEXT_RETRIEVED = "fulltext_retrieved"
@@ -62,21 +62,21 @@ class PipelineStage(str, enum.Enum):
     ADJUDICATED = "adjudicated"
 
 
-class RiskTier(str, enum.Enum):
+class RiskTier(enum.StrEnum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
     CRITICAL = "critical"
 
 
-class RecommendedAction(str, enum.Enum):
+class RecommendedAction(enum.StrEnum):
     ARCHIVE = "archive"
     MONITOR = "monitor"
     REVIEW = "review"
     ESCALATE = "escalate"
 
 
-class ReviewStatus(str, enum.Enum):
+class ReviewStatus(enum.StrEnum):
     UNREVIEWED = "unreviewed"
     UNDER_REVIEW = "under_review"
     CONFIRMED_CONCERN = "confirmed_concern"
@@ -84,7 +84,7 @@ class ReviewStatus(str, enum.Enum):
     ARCHIVED = "archived"
 
 
-class DedupRelationship(str, enum.Enum):
+class DedupRelationship(enum.StrEnum):
     DUPLICATE = "duplicate"
     PUBLISHED_VERSION = "published_version"
     UPDATED_VERSION = "updated_version"
@@ -181,9 +181,7 @@ class PaperGroup(Base):
         server_default=func.now(),
     )
 
-    __table_args__ = (
-        UniqueConstraint("canonical_id", "member_id", name="uq_paper_group_pair"),
-    )
+    __table_args__ = (UniqueConstraint("canonical_id", "member_id", name="uq_paper_group_pair"),)
 
 
 class AssessmentLog(Base):

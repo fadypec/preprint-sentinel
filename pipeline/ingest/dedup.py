@@ -139,9 +139,8 @@ class DedupEngine:
         date_from = posted_date - timedelta(days=window_days)
         date_to = posted_date + timedelta(days=window_days)
 
-        stmt = (
-            select(Paper.id, Paper.title, Paper.authors)
-            .where(Paper.posted_date.between(date_from, date_to))
+        stmt = select(Paper.id, Paper.title, Paper.authors).where(
+            Paper.posted_date.between(date_from, date_to)
         )
         result = await self._session.execute(stmt)
         candidates = result.all()

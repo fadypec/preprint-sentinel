@@ -1,9 +1,8 @@
 """Tests for pipeline.models — SQLAlchemy ORM models."""
 
 import uuid
-from datetime import date, datetime
+from datetime import date
 
-import pytest
 import pytest_asyncio
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -52,7 +51,9 @@ async def test_paper_insert_and_read(model_session: AsyncSession):
     model_session.add(paper)
     await model_session.flush()
 
-    result = await model_session.execute(select(Paper).where(Paper.doi == "10.1101/2026.03.01.123456"))
+    result = await model_session.execute(
+        select(Paper).where(Paper.doi == "10.1101/2026.03.01.123456")
+    )
     row = result.scalar_one()
 
     assert isinstance(row.id, uuid.UUID)
@@ -97,9 +98,7 @@ async def test_paper_group_insert(model_session: AsyncSession):
     model_session.add(group)
     await model_session.flush()
 
-    result = await model_session.execute(
-        select(PaperGroup).where(PaperGroup.canonical_id == p1.id)
-    )
+    result = await model_session.execute(select(PaperGroup).where(PaperGroup.canonical_id == p1.id))
     row = result.scalar_one()
     assert row.member_id == p2.id
     assert row.relationship == DedupRelationship.DUPLICATE

@@ -22,12 +22,14 @@ class TestDoiMatch:
         )
 
         engine = DedupEngine(db_session)
-        result = await engine.check({
-            "doi": "10.1101/2026.03.01.123456",
-            "title": "Original Paper (repost)",
-            "authors": [{"name": "Smith, J."}],
-            "posted_date": date(2026, 3, 1),
-        })
+        result = await engine.check(
+            {
+                "doi": "10.1101/2026.03.01.123456",
+                "title": "Original Paper (repost)",
+                "authors": [{"name": "Smith, J."}],
+                "posted_date": date(2026, 3, 1),
+            }
+        )
 
         assert result.is_duplicate is True
         assert result.duplicate_of == existing.id
@@ -41,12 +43,14 @@ class TestDoiMatch:
         await insert_paper(db_session, doi="10.1101/2026.03.01.111111")
 
         engine = DedupEngine(db_session)
-        result = await engine.check({
-            "doi": "10.1101/2026.03.01.999999",
-            "title": "Completely Different Paper",
-            "authors": [{"name": "Other, A."}],
-            "posted_date": date(2026, 3, 1),
-        })
+        result = await engine.check(
+            {
+                "doi": "10.1101/2026.03.01.999999",
+                "title": "Completely Different Paper",
+                "authors": [{"name": "Other, A."}],
+                "posted_date": date(2026, 3, 1),
+            }
+        )
 
         assert result.is_duplicate is False
         assert result.duplicate_of is None
@@ -59,12 +63,14 @@ class TestDoiMatch:
         await insert_paper(db_session, doi="10.1101/2026.03.01.111111")
 
         engine = DedupEngine(db_session)
-        result = await engine.check({
-            "doi": None,
-            "title": "Totally Unrelated Paper",
-            "authors": [{"name": "Nobody, X."}],
-            "posted_date": date(2026, 3, 1),
-        })
+        result = await engine.check(
+            {
+                "doi": None,
+                "title": "Totally Unrelated Paper",
+                "authors": [{"name": "Nobody, X."}],
+                "posted_date": date(2026, 3, 1),
+            }
+        )
 
         assert result.is_duplicate is False
 
@@ -85,12 +91,14 @@ class TestTitleAuthorSimilarity:
         )
 
         engine = DedupEngine(db_session)
-        result = await engine.check({
-            "doi": "10.1101/different.002",
-            "title": "A novel CRISPR approach to gene editing in primary T cells",
-            "authors": [{"name": "Smith, J."}],
-            "posted_date": date(2026, 3, 12),
-        })
+        result = await engine.check(
+            {
+                "doi": "10.1101/different.002",
+                "title": "A novel CRISPR approach to gene editing in primary T cells",
+                "authors": [{"name": "Smith, J."}],
+                "posted_date": date(2026, 3, 12),
+            }
+        )
 
         assert result.is_duplicate is True
         assert result.duplicate_of == existing.id
@@ -110,12 +118,14 @@ class TestTitleAuthorSimilarity:
         )
 
         engine = DedupEngine(db_session)
-        result = await engine.check({
-            "doi": "10.1101/different.003",
-            "title": "Traditional methods for gene therapy using viral vectors",
-            "authors": [{"name": "Smith, J."}],
-            "posted_date": date(2026, 3, 12),
-        })
+        result = await engine.check(
+            {
+                "doi": "10.1101/different.003",
+                "title": "Traditional methods for gene therapy using viral vectors",
+                "authors": [{"name": "Smith, J."}],
+                "posted_date": date(2026, 3, 12),
+            }
+        )
 
         assert result.is_duplicate is False
 
@@ -132,12 +142,14 @@ class TestTitleAuthorSimilarity:
         )
 
         engine = DedupEngine(db_session)
-        result = await engine.check({
-            "doi": "10.1101/different.004",
-            "title": "Population dynamics in temperate forests",
-            "authors": [{"name": "Johnson, K."}],
-            "posted_date": date(2026, 3, 12),
-        })
+        result = await engine.check(
+            {
+                "doi": "10.1101/different.004",
+                "title": "Population dynamics in temperate forests",
+                "authors": [{"name": "Johnson, K."}],
+                "posted_date": date(2026, 3, 12),
+            }
+        )
 
         assert result.is_duplicate is False
 
@@ -154,12 +166,14 @@ class TestTitleAuthorSimilarity:
         )
 
         engine = DedupEngine(db_session)
-        result = await engine.check({
-            "doi": "10.1101/different.005",
-            "title": "Novel CRISPR approach to gene editing",
-            "authors": [{"name": "Smith, J."}],
-            "posted_date": date(2026, 6, 1),  # 5 months later
-        })
+        result = await engine.check(
+            {
+                "doi": "10.1101/different.005",
+                "title": "Novel CRISPR approach to gene editing",
+                "authors": [{"name": "Smith, J."}],
+                "posted_date": date(2026, 6, 1),  # 5 months later
+            }
+        )
 
         assert result.is_duplicate is False
 
@@ -180,12 +194,14 @@ class TestDoiLessFallback:
         )
 
         engine = DedupEngine(db_session)
-        result = await engine.check({
-            "doi": None,
-            "title": "Novel findings in bat coronavirus ecology in Vietnamese caves",
-            "authors": [{"name": "Tran, V."}],
-            "posted_date": date(2026, 3, 3),  # within 7-day window
-        })
+        result = await engine.check(
+            {
+                "doi": None,
+                "title": "Novel findings in bat coronavirus ecology in Vietnamese caves",
+                "authors": [{"name": "Tran, V."}],
+                "posted_date": date(2026, 3, 3),  # within 7-day window
+            }
+        )
 
         assert result.is_duplicate is True
         assert result.duplicate_of == existing.id
@@ -204,12 +220,14 @@ class TestDoiLessFallback:
         )
 
         engine = DedupEngine(db_session)
-        result = await engine.check({
-            "doi": None,
-            "title": "Novel findings in bat coronavirus ecology",
-            "authors": [{"name": "Tran, V."}],
-            "posted_date": date(2026, 3, 20),  # outside 7-day window
-        })
+        result = await engine.check(
+            {
+                "doi": None,
+                "title": "Novel findings in bat coronavirus ecology",
+                "authors": [{"name": "Tran, V."}],
+                "posted_date": date(2026, 3, 20),  # outside 7-day window
+            }
+        )
 
         assert result.is_duplicate is False
 
@@ -235,6 +253,7 @@ class TestRecordDuplicate:
         await db_session.flush()
 
         from sqlalchemy import select
+
         stmt = select(PaperGroup).where(PaperGroup.canonical_id == p1.id)
         result = await db_session.execute(stmt)
         group = result.scalar_one()

@@ -1,9 +1,5 @@
 """Tests for pipeline.config — typed settings from env vars."""
 
-import os
-
-from pydantic import SecretStr
-
 
 def test_settings_loads_from_env(monkeypatch):
     """Settings reads DATABASE_URL and ANTHROPIC_API_KEY from env."""
