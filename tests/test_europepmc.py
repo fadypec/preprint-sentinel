@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from datetime import date
 
-from tests.conftest import make_europepmc_record
+import httpx
+import pytest
+import respx
+
+from tests.conftest import make_europepmc_record, make_europepmc_response
 
 
 class TestNormalise:
@@ -73,3 +77,167 @@ class TestNormalise:
         raw = make_europepmc_record(doi=None)
         result = client._normalise(raw)
         assert result["doi"] is None
+
+
+class TestFetch:
+    """Tests for EuropepmcClient.fetch_papers — HTTP fetch + pagination."""
+
+    SEARCH_URL = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
+
+    @respx.mock
+    async def test_fetch_single_page(self):
+        """Fetch results that fit in one page — no pagination needed."""
+        records = [
+            make_europepmc_record(ppr_id=f"PPR{i}", doi=f"10.1101/2026.03.01.{i}") for i in range(3)
+        ]
+        page1 = make_europepmc_response(records, hit_count=3, next_cursor="same_cursor")
+        page2 = make_europepmc_response([], hit_count=3, next_cursor="same_cursor")
+
+        respx.get(self.SEARCH_URL).mock(
+            side_effect=[
+                httpx.Response(200, json=page1),
+                httpx.Response(200, json=page2),
+            ]
+        )
+
+        from pipeline.ingest.europepmc import EuropepmcClient
+
+        async with EuropepmcClient(request_delay=0) as client:
+            papers = [p async for p in client.fetch_papers(date(2026, 3, 1), date(2026, 3, 1))]
+
+        assert len(papers) == 3
+        assert papers[0]["doi"] == "10.1101/2026.03.01.0"
+        assert papers[0]["source_server"] == "europepmc"
+
+    @respx.mock
+    async def test_fetch_cursor_pagination(self):
+        """Fetch results across two pages using cursor-based pagination."""
+        page1_records = [
+            make_europepmc_record(ppr_id=f"PPR{i}", doi=f"10.1101/2026.03.01.{i}") for i in range(3)
+        ]
+        page2_records = [
+            make_europepmc_record(ppr_id=f"PPR{i}", doi=f"10.1101/2026.03.01.{i}")
+            for i in range(3, 5)
+        ]
+        page1 = make_europepmc_response(page1_records, hit_count=5, next_cursor="cursor_page2")
+        page2 = make_europepmc_response(page2_records, hit_count=5, next_cursor="cursor_page2")
+
+        route = respx.get(self.SEARCH_URL).mock(
+            side_effect=[
+                httpx.Response(200, json=page1),
+                httpx.Response(200, json=page2),
+            ]
+        )
+
+        from pipeline.ingest.europepmc import EuropepmcClient
+
+        async with EuropepmcClient(request_delay=0) as client:
+            papers = [p async for p in client.fetch_papers(date(2026, 3, 1), date(2026, 3, 5))]
+
+        assert len(papers) == 5
+        assert route.call_count == 2
+
+    @respx.mock
+    async def test_fetch_empty_result(self):
+        """No papers found — yields nothing."""
+        response = make_europepmc_response([], hit_count=0)
+        respx.get(self.SEARCH_URL).mock(return_value=httpx.Response(200, json=response))
+
+        from pipeline.ingest.europepmc import EuropepmcClient
+
+        async with EuropepmcClient(request_delay=0) as client:
+            papers = [p async for p in client.fetch_papers(date(2026, 1, 1), date(2026, 1, 1))]
+
+        assert len(papers) == 0
+
+
+class TestRetry:
+    """Tests for EuropepmcClient retry and error handling."""
+
+    SEARCH_URL = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
+
+    @respx.mock
+    async def test_429_retries_then_succeeds(self):
+        records = [make_europepmc_record()]
+        ok_response = make_europepmc_response(records, next_cursor="done")
+        empty_response = make_europepmc_response([], next_cursor="done")
+
+        route = respx.get(self.SEARCH_URL).mock(
+            side_effect=[
+                httpx.Response(429),
+                httpx.Response(200, json=ok_response),
+                httpx.Response(200, json=empty_response),
+            ]
+        )
+
+        from pipeline.ingest.europepmc import EuropepmcClient
+
+        async with EuropepmcClient(request_delay=0) as client:
+            papers = [p async for p in client.fetch_papers(date(2026, 3, 1), date(2026, 3, 1))]
+
+        assert len(papers) == 1
+        assert route.call_count >= 2
+
+    @respx.mock
+    async def test_503_retries_then_succeeds(self):
+        records = [make_europepmc_record()]
+        ok_response = make_europepmc_response(records, next_cursor="done")
+        empty_response = make_europepmc_response([], next_cursor="done")
+
+        respx.get(self.SEARCH_URL).mock(
+            side_effect=[
+                httpx.Response(503),
+                httpx.Response(200, json=ok_response),
+                httpx.Response(200, json=empty_response),
+            ]
+        )
+
+        from pipeline.ingest.europepmc import EuropepmcClient
+
+        async with EuropepmcClient(request_delay=0) as client:
+            papers = [p async for p in client.fetch_papers(date(2026, 3, 1), date(2026, 3, 1))]
+
+        assert len(papers) == 1
+
+    @respx.mock
+    async def test_timeout_retries_then_succeeds(self):
+        records = [make_europepmc_record()]
+        ok_response = make_europepmc_response(records, next_cursor="done")
+        empty_response = make_europepmc_response([], next_cursor="done")
+
+        respx.get(self.SEARCH_URL).mock(
+            side_effect=[
+                httpx.TimeoutException("connect timeout"),
+                httpx.Response(200, json=ok_response),
+                httpx.Response(200, json=empty_response),
+            ]
+        )
+
+        from pipeline.ingest.europepmc import EuropepmcClient
+
+        async with EuropepmcClient(request_delay=0) as client:
+            papers = [p async for p in client.fetch_papers(date(2026, 3, 1), date(2026, 3, 1))]
+
+        assert len(papers) == 1
+
+    @respx.mock
+    async def test_all_retries_exhausted_raises(self):
+        respx.get(self.SEARCH_URL).mock(return_value=httpx.Response(429))
+
+        from pipeline.ingest.europepmc import EuropepmcClient
+
+        async with EuropepmcClient(request_delay=0, max_retries=2) as client:
+            with pytest.raises(RuntimeError, match="failed after 2 retries"):
+                _ = [p async for p in client.fetch_papers(date(2026, 3, 1), date(2026, 3, 1))]
+
+    @respx.mock
+    async def test_non_retryable_error_raises_immediately(self):
+        route = respx.get(self.SEARCH_URL).mock(return_value=httpx.Response(404))
+
+        from pipeline.ingest.europepmc import EuropepmcClient
+
+        async with EuropepmcClient(request_delay=0) as client:
+            with pytest.raises(httpx.HTTPStatusError):
+                _ = [p async for p in client.fetch_papers(date(2026, 3, 1), date(2026, 3, 1))]
+
+        assert route.call_count == 1
