@@ -8,6 +8,7 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncGenerator
 from datetime import date
 
@@ -74,7 +75,129 @@ class PubmedClient:
 
     async def fetch_papers(self, from_date: date, to_date: date) -> AsyncGenerator[dict, None]:
         """Search PubMed and yield normalised paper dicts."""
-        raise NotImplementedError  # Implemented in Task 7
+        webenv, query_key, count = await self._search(from_date, to_date)
+        if count == 0:
+            return
+
+        log.info("pubmed_search_complete", count=count, query_mode=self.query_mode)
+
+        for retstart in range(0, count, self.FETCH_BATCH_SIZE):
+            articles = await self._fetch_batch(webenv, query_key, retstart)
+            for article in articles:
+                yield article
+
+            if retstart + self.FETCH_BATCH_SIZE < count:
+                log.info(
+                    "pubmed_batch_fetched",
+                    retstart=retstart,
+                    batch_size=len(articles),
+                    total=count,
+                )
+
+    # -- HTTP helpers --------------------------------------------------------
+
+    async def _search(self, from_date: date, to_date: date) -> tuple[str, str, int]:
+        """Run esearch and return (webenv, query_key, count)."""
+        params: dict = {
+            "db": "pubmed",
+            "retmode": "json",
+            "retmax": 0,
+            "usehistory": "y",
+            "datetype": "pdat",
+            "mindate": from_date.strftime("%Y/%m/%d"),
+            "maxdate": to_date.strftime("%Y/%m/%d"),
+        }
+        if self.query_mode == "mesh_filtered":
+            params["term"] = self.mesh_query
+        if self.api_key:
+            params["api_key"] = self.api_key
+
+        data = await self._request_json(self.ESEARCH_URL, params)
+        result = data.get("esearchresult", {})
+        return (
+            result.get("webenv", ""),
+            result.get("querykey", ""),
+            int(result.get("count", 0)),
+        )
+
+    async def _fetch_batch(self, webenv: str, query_key: str, retstart: int) -> list[dict]:
+        """Fetch a batch of articles via efetch and parse XML."""
+        params: dict = {
+            "db": "pubmed",
+            "rettype": "xml",
+            "retmode": "xml",
+            "retmax": self.FETCH_BATCH_SIZE,
+            "retstart": retstart,
+            "webenv": webenv,
+            "query_key": query_key,
+        }
+        if self.api_key:
+            params["api_key"] = self.api_key
+
+        xml_bytes = await self._request_xml(self.EFETCH_URL, params)
+        return self._parse_articles(xml_bytes)
+
+    async def _request_json(self, url: str, params: dict) -> dict:
+        """Make a request expecting JSON, with retry and backoff."""
+        assert self._client is not None, "Use PubmedClient as async context manager"
+
+        for attempt in range(1, self.max_retries + 1):
+            await asyncio.sleep(self.request_delay)
+            try:
+                resp = await self._client.get(url, params=params, timeout=30.0)
+                if resp.status_code == 200:
+                    return resp.json()
+                if resp.status_code in (429, 503):
+                    backoff = min(2**attempt, 30)
+                    log.warning(
+                        "rate_limited",
+                        source="pubmed",
+                        status=resp.status_code,
+                        attempt=attempt,
+                        backoff=backoff,
+                    )
+                    await asyncio.sleep(backoff)
+                    continue
+                resp.raise_for_status()
+            except httpx.TimeoutException:
+                if attempt == self.max_retries:
+                    raise
+                backoff = min(2**attempt, 30)
+                log.warning("timeout", source="pubmed", attempt=attempt, backoff=backoff)
+                await asyncio.sleep(backoff)
+
+        raise RuntimeError(f"PubMed failed after {self.max_retries} retries: {url}")
+
+    async def _request_xml(self, url: str, params: dict) -> bytes:
+        """Make a request expecting XML, with retry and backoff."""
+        assert self._client is not None, "Use PubmedClient as async context manager"
+
+        for attempt in range(1, self.max_retries + 1):
+            await asyncio.sleep(self.request_delay)
+            try:
+                resp = await self._client.get(url, params=params, timeout=30.0)
+                if resp.status_code == 200:
+                    return resp.content
+                if resp.status_code in (429, 503):
+                    backoff = min(2**attempt, 30)
+                    log.warning(
+                        "rate_limited",
+                        source="pubmed",
+                        status=resp.status_code,
+                        attempt=attempt,
+                        backoff=backoff,
+                    )
+                    await asyncio.sleep(backoff)
+                    continue
+                resp.raise_for_status()
+            except httpx.TimeoutException:
+                if attempt == self.max_retries:
+                    raise
+                backoff = min(2**attempt, 30)
+                log.warning("timeout", source="pubmed", attempt=attempt, backoff=backoff)
+                await asyncio.sleep(backoff)
+
+        raise RuntimeError(f"PubMed failed after {self.max_retries} retries: {url}")
 
     # -- XML parsing ---------------------------------------------------------
 

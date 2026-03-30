@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from datetime import date
 
+import httpx
+import pytest
+import respx
+
 # ---------------------------------------------------------------------------
 # XML helpers — build PubmedArticle fragments for targeted testing
 # ---------------------------------------------------------------------------
@@ -88,6 +92,18 @@ def _wrap_articles(*articles: str) -> bytes:
     """Wrap PubmedArticle XML strings in a PubmedArticleSet."""
     inner = "\n".join(articles)
     return f'<?xml version="1.0"?>\n<PubmedArticleSet>{inner}</PubmedArticleSet>'.encode()
+
+
+def _esearch_response(count: int = 5, webenv: str = "WEBENV_123", query_key: str = "1") -> dict:
+    """Build an esearch JSON response."""
+    return {
+        "esearchresult": {
+            "count": str(count),
+            "webenv": webenv,
+            "querykey": query_key,
+            "idlist": [],
+        }
+    }
 
 
 class TestXmlParsing:
@@ -255,3 +271,251 @@ class TestXmlParsing:
         articles = client._parse_articles(_wrap_articles(xml_str))
         assert len(articles) == 1
         assert articles[0]["posted_date"] == date.today()
+
+
+class TestSearch:
+    """Tests for PubmedClient._search — esearch query construction."""
+
+    ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
+
+    @respx.mock
+    async def test_search_parses_response(self):
+        """esearch returns webenv, query_key, count."""
+        respx.get(self.ESEARCH_URL).mock(
+            return_value=httpx.Response(200, json=_esearch_response(count=42))
+        )
+
+        from pipeline.ingest.pubmed import PubmedClient
+
+        async with PubmedClient(request_delay=0) as client:
+            webenv, query_key, count = await client._search(date(2026, 3, 1), date(2026, 3, 1))
+
+        assert webenv == "WEBENV_123"
+        assert query_key == "1"
+        assert count == 42
+
+    @respx.mock
+    async def test_query_mode_all_no_term(self):
+        """In 'all' mode, no term parameter is sent."""
+        route = respx.get(self.ESEARCH_URL).mock(
+            return_value=httpx.Response(200, json=_esearch_response())
+        )
+
+        from pipeline.ingest.pubmed import PubmedClient
+
+        async with PubmedClient(request_delay=0, query_mode="all") as client:
+            await client._search(date(2026, 3, 1), date(2026, 3, 1))
+
+        request = route.calls[0].request
+        assert "term" not in str(request.url)
+
+    @respx.mock
+    async def test_query_mode_mesh_filtered_includes_term(self):
+        """In 'mesh_filtered' mode, the MeSH query is included as term."""
+        route = respx.get(self.ESEARCH_URL).mock(
+            return_value=httpx.Response(200, json=_esearch_response())
+        )
+
+        from pipeline.ingest.pubmed import PubmedClient
+
+        async with PubmedClient(request_delay=0, query_mode="mesh_filtered") as client:
+            await client._search(date(2026, 3, 1), date(2026, 3, 1))
+
+        request = route.calls[0].request
+        assert "virology" in str(request.url)
+
+    @respx.mock
+    async def test_api_key_included_when_set(self):
+        """NCBI API key is passed as query parameter when configured."""
+        route = respx.get(self.ESEARCH_URL).mock(
+            return_value=httpx.Response(200, json=_esearch_response())
+        )
+
+        from pipeline.ingest.pubmed import PubmedClient
+
+        async with PubmedClient(request_delay=0, api_key="test_ncbi_key") as client:
+            await client._search(date(2026, 3, 1), date(2026, 3, 1))
+
+        request = route.calls[0].request
+        assert "test_ncbi_key" in str(request.url)
+
+    @respx.mock
+    async def test_date_format(self):
+        """Dates are formatted as YYYY/MM/DD for PubMed."""
+        route = respx.get(self.ESEARCH_URL).mock(
+            return_value=httpx.Response(200, json=_esearch_response())
+        )
+
+        from pipeline.ingest.pubmed import PubmedClient
+
+        async with PubmedClient(request_delay=0) as client:
+            await client._search(date(2026, 3, 1), date(2026, 3, 15))
+
+        request = route.calls[0].request
+        url_str = str(request.url)
+        assert "2026%2F03%2F01" in url_str or "2026/03/01" in url_str
+        assert "2026%2F03%2F15" in url_str or "2026/03/15" in url_str
+
+
+class TestFetch:
+    """Tests for PubmedClient.fetch_papers — full esearch+efetch pipeline."""
+
+    ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
+    EFETCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+
+    @respx.mock
+    async def test_fetch_single_batch(self):
+        """Fetch <200 results — single efetch call."""
+        respx.get(self.ESEARCH_URL).mock(
+            return_value=httpx.Response(200, json=_esearch_response(count=2))
+        )
+        xml = _wrap_articles(
+            _article_xml(pmid="1", title="Paper A", doi="10.1/a"),
+            _article_xml(pmid="2", title="Paper B", doi="10.1/b"),
+        )
+        respx.get(self.EFETCH_URL).mock(return_value=httpx.Response(200, content=xml))
+
+        from pipeline.ingest.pubmed import PubmedClient
+
+        async with PubmedClient(request_delay=0) as client:
+            papers = [p async for p in client.fetch_papers(date(2026, 3, 1), date(2026, 3, 1))]
+
+        assert len(papers) == 2
+        assert papers[0]["title"] == "Paper A"
+        assert papers[1]["title"] == "Paper B"
+
+    @respx.mock
+    async def test_fetch_multiple_batches(self):
+        """Fetch >200 results — multiple efetch calls paginating via retstart."""
+        respx.get(self.ESEARCH_URL).mock(
+            return_value=httpx.Response(200, json=_esearch_response(count=3))
+        )
+
+        batch1 = _wrap_articles(
+            _article_xml(pmid="1", title="Paper A"),
+            _article_xml(pmid="2", title="Paper B"),
+        )
+        batch2 = _wrap_articles(
+            _article_xml(pmid="3", title="Paper C"),
+        )
+        efetch_route = respx.get(self.EFETCH_URL).mock(
+            side_effect=[
+                httpx.Response(200, content=batch1),
+                httpx.Response(200, content=batch2),
+            ]
+        )
+
+        from pipeline.ingest.pubmed import PubmedClient
+
+        async with PubmedClient(request_delay=0) as client:
+            client.FETCH_BATCH_SIZE = 2  # Override for test
+            papers = [p async for p in client.fetch_papers(date(2026, 3, 1), date(2026, 3, 1))]
+
+        assert len(papers) == 3
+        assert efetch_route.call_count == 2
+
+    @respx.mock
+    async def test_fetch_zero_results(self):
+        """esearch returns count=0 — yields nothing, no efetch call."""
+        respx.get(self.ESEARCH_URL).mock(
+            return_value=httpx.Response(200, json=_esearch_response(count=0))
+        )
+        efetch_route = respx.get(self.EFETCH_URL).mock(
+            return_value=httpx.Response(200, content=b"<PubmedArticleSet/>")
+        )
+
+        from pipeline.ingest.pubmed import PubmedClient
+
+        async with PubmedClient(request_delay=0) as client:
+            papers = [p async for p in client.fetch_papers(date(2026, 3, 1), date(2026, 3, 1))]
+
+        assert len(papers) == 0
+        assert efetch_route.call_count == 0
+
+
+class TestRetry:
+    """Tests for PubmedClient retry and error handling."""
+
+    ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
+    EFETCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+
+    @respx.mock
+    async def test_esearch_429_retries(self):
+        route = respx.get(self.ESEARCH_URL).mock(
+            side_effect=[
+                httpx.Response(429),
+                httpx.Response(200, json=_esearch_response(count=0)),
+            ]
+        )
+
+        from pipeline.ingest.pubmed import PubmedClient
+
+        async with PubmedClient(request_delay=0) as client:
+            papers = [p async for p in client.fetch_papers(date(2026, 3, 1), date(2026, 3, 1))]
+
+        assert len(papers) == 0
+        assert route.call_count == 2
+
+    @respx.mock
+    async def test_efetch_503_retries(self):
+        respx.get(self.ESEARCH_URL).mock(
+            return_value=httpx.Response(200, json=_esearch_response(count=1))
+        )
+        xml = _wrap_articles(_article_xml(title="Recovered"))
+        efetch_route = respx.get(self.EFETCH_URL).mock(
+            side_effect=[
+                httpx.Response(503),
+                httpx.Response(200, content=xml),
+            ]
+        )
+
+        from pipeline.ingest.pubmed import PubmedClient
+
+        async with PubmedClient(request_delay=0) as client:
+            papers = [p async for p in client.fetch_papers(date(2026, 3, 1), date(2026, 3, 1))]
+
+        assert len(papers) == 1
+        assert papers[0]["title"] == "Recovered"
+        assert efetch_route.call_count == 2
+
+    @respx.mock
+    async def test_timeout_retries(self):
+        respx.get(self.ESEARCH_URL).mock(
+            return_value=httpx.Response(200, json=_esearch_response(count=1))
+        )
+        xml = _wrap_articles(_article_xml(title="After Timeout"))
+        respx.get(self.EFETCH_URL).mock(
+            side_effect=[
+                httpx.TimeoutException("read timeout"),
+                httpx.Response(200, content=xml),
+            ]
+        )
+
+        from pipeline.ingest.pubmed import PubmedClient
+
+        async with PubmedClient(request_delay=0) as client:
+            papers = [p async for p in client.fetch_papers(date(2026, 3, 1), date(2026, 3, 1))]
+
+        assert len(papers) == 1
+
+    @respx.mock
+    async def test_all_retries_exhausted_raises(self):
+        respx.get(self.ESEARCH_URL).mock(return_value=httpx.Response(429))
+
+        from pipeline.ingest.pubmed import PubmedClient
+
+        async with PubmedClient(request_delay=0, max_retries=2) as client:
+            with pytest.raises(RuntimeError, match="failed after 2 retries"):
+                _ = [p async for p in client.fetch_papers(date(2026, 3, 1), date(2026, 3, 1))]
+
+    @respx.mock
+    async def test_non_retryable_error_raises_immediately(self):
+        route = respx.get(self.ESEARCH_URL).mock(return_value=httpx.Response(400))
+
+        from pipeline.ingest.pubmed import PubmedClient
+
+        async with PubmedClient(request_delay=0) as client:
+            with pytest.raises(httpx.HTTPStatusError):
+                _ = [p async for p in client.fetch_papers(date(2026, 3, 1), date(2026, 3, 1))]
+
+        assert route.call_count == 1
