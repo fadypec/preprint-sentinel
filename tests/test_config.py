@@ -40,3 +40,16 @@ def test_secret_str_redacts_in_repr(monkeypatch):
     assert "sk-ant-super-secret" not in str(s.anthropic_api_key)
     # Database URL also protected — password never appears in repr
     assert "u:p@localhost" not in repr(s)
+
+
+def test_settings_phase2_defaults(monkeypatch):
+    """Phase 2 config fields have sensible defaults."""
+    monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://u:p@localhost/test")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-key")
+
+    from pipeline.config import Settings
+
+    s = Settings()
+    assert s.europepmc_request_delay == 1.0
+    assert s.pubmed_query_mode == "all"
+    assert "virology[MeSH]" in s.pubmed_mesh_query

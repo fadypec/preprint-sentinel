@@ -41,6 +41,30 @@ class Settings(BaseSettings):
     biorxiv_request_delay: float = 1.0
     pubmed_request_delay: float = 0.1
 
+    # Europe PMC
+    europepmc_request_delay: float = 1.0
+
+    # PubMed query mode
+    pubmed_query_mode: str = "all"  # "all" or "mesh_filtered"
+    pubmed_mesh_query: str = (
+        '(virology[MeSH] OR microbiology[MeSH] OR "synthetic biology"[MeSH] OR '
+        '"genetic engineering"[MeSH] OR "gain of function"[tiab] OR '
+        '"gain-of-function"[tiab] OR "directed evolution"[tiab] OR '
+        '"reverse genetics"[tiab] OR "gene drive"[tiab] OR "gene drives"[tiab] OR '
+        '"select agent"[tiab] OR "select agents"[tiab] OR '
+        '"dual use"[tiab] OR "dual-use"[tiab] OR '
+        '"pathogen enhancement"[tiab] OR "immune evasion"[tiab] OR '
+        '"host range"[tiab] OR "transmissibility"[tiab] OR '
+        '"virulence factor"[tiab] OR "virulence factors"[tiab] OR '
+        'toxins[MeSH] OR "biological warfare"[MeSH] OR "biodefense"[MeSH] OR '
+        'CRISPR[tiab] OR "base editing"[tiab] OR '
+        '"pandemic preparedness"[tiab] OR "pandemic pathogen"[tiab] OR '
+        '"biosafety level"[tiab] OR "BSL-3"[tiab] OR "BSL-4"[tiab] OR '
+        'prions[MeSH] OR "mirror life"[tiab] OR "xenobiology"[tiab] OR '
+        '"de novo protein design"[tiab] OR "protein design"[tiab] OR '
+        '"aerosol transmission"[tiab] OR "airborne transmission"[tiab])'
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:
