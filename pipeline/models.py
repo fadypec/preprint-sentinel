@@ -1,9 +1,10 @@
 """SQLAlchemy ORM models for the DURC triage pipeline.
 
-Three tables:
+Four tables:
 - papers: main record for each ingested paper
 - paper_groups: links duplicate/related paper records
 - assessment_logs: append-only audit trail of every LLM classification
+- pipeline_runs: tracks each pipeline execution with counters and cost
 """
 
 from __future__ import annotations
