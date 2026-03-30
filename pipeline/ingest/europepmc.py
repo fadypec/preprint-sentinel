@@ -16,6 +16,8 @@ from datetime import date
 import httpx
 import structlog
 
+from pipeline.models import SourceServer
+
 log = structlog.get_logger()
 
 
@@ -124,7 +126,7 @@ class EuropepmcClient:
             "corresponding_author": None,
             "corresponding_institution": None,
             "abstract": html.unescape(raw.get("abstractText", "")),
-            "source_server": "europepmc",
+            "source_server": SourceServer.EUROPEPMC,
             "posted_date": date.fromisoformat(raw["firstPublicationDate"]),
             "subject_category": None,
             "version": 1,
