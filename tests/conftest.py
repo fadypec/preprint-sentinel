@@ -104,6 +104,49 @@ def make_collection(n: int, start_idx: int = 0, server: str = "biorxiv") -> list
     ]
 
 
+# ---------------------------------------------------------------------------
+# Europe PMC record factories
+# ---------------------------------------------------------------------------
+
+
+def make_europepmc_record(
+    ppr_id: str = "PPR100001",
+    doi: str | None = "10.1101/2026.03.01.123456",
+    title: str = "Test Europe PMC Paper",
+    author_string: str = "Smith J, Jones A",
+    first_pub_date: str = "2026-03-01",
+    abstract: str = "A test abstract from Europe PMC.",
+    source: str = "PPR",
+) -> dict:
+    """Create a raw record matching the Europe PMC search API format."""
+    record: dict = {
+        "id": ppr_id,
+        "title": title,
+        "authorString": author_string,
+        "firstPublicationDate": first_pub_date,
+        "abstractText": abstract,
+        "source": source,
+    }
+    if doi is not None:
+        record["doi"] = doi
+    return record
+
+
+def make_europepmc_response(
+    results: list[dict],
+    hit_count: int | None = None,
+    next_cursor: str = "AoE_next",
+) -> dict:
+    """Wrap Europe PMC records in the API response envelope."""
+    if hit_count is None:
+        hit_count = len(results)
+    return {
+        "hitCount": hit_count,
+        "nextCursorMark": next_cursor,
+        "resultList": {"result": results},
+    }
+
+
 async def insert_paper(session: AsyncSession, **kwargs) -> Paper:
     """Insert a Paper into the test database and return it (flushed, with ID)."""
     defaults: dict = {

@@ -1,0 +1,58 @@
+{
+  "hitCount": 5,
+  "nextCursorMark": "AoE1234567",
+  "resultList": {
+    "result": [
+      {
+        "id": "PPR100001",
+        "doi": "10.1101/2026.03.01.123456",
+        "title": "Gain-of-function analysis of H5N1 transmissibility in ferrets",
+        "authorString": "Smith J, Jones A, Williams BC",
+        "firstPublicationDate": "2026-03-01",
+        "abstractText": "We describe experiments enhancing airborne transmissibility of H5N1 in ferret models.",
+        "source": "PPR",
+        "journalInfo": {"journal": {"title": "bioRxiv"}}
+      },
+      {
+        "id": "PPR100002",
+        "doi": "10.1101/2026.03.02.654321",
+        "title": "CRISPR-based gene drive for mosquito population suppression",
+        "authorString": "Chen W, Zhang L",
+        "firstPublicationDate": "2026-03-02",
+        "abstractText": "A self-limiting gene drive construct targeting <i>Anopheles gambiae</i> fertility genes.",
+        "source": "PPR",
+        "journalInfo": {"journal": {"title": "bioRxiv"}}
+      },
+      {
+        "id": "PPR100003",
+        "doi": "10.21203/rs.3.rs-9999999/v1",
+        "title": "Novel reverse genetics system for Nipah virus",
+        "authorString": "Patel S, Kumar R, Das A",
+        "firstPublicationDate": "2026-03-03",
+        "abstractText": "We report a simplified plasmid-based reverse genetics system for rescue of recombinant Nipah virus.",
+        "source": "PPR",
+        "journalInfo": {"journal": {"title": "Research Square"}}
+      },
+      {
+        "id": "PPR100004",
+        "doi": null,
+        "title": "Characterisation of a novel bat coronavirus with broad ACE2 tropism",
+        "authorString": "Lee H, Park J",
+        "firstPublicationDate": "2026-03-01",
+        "abstractText": "Metagenomic surveillance identified a novel betacoronavirus in Rhinolophus bats.",
+        "source": "PPR",
+        "journalInfo": {"journal": {"title": "Preprints.org"}}
+      },
+      {
+        "id": "PPR100005",
+        "doi": "10.1101/2026.03.05.111111",
+        "title": "Structural basis of immune evasion by engineered influenza neuraminidase",
+        "authorString": "Brown T",
+        "firstPublicationDate": "2026-03-05",
+        "abstractText": "Directed evolution of N1 neuraminidase yielded variants escaping all approved neuraminidase inhibitors.",
+        "source": "PPR",
+        "journalInfo": {"journal": {"title": "bioRxiv"}}
+      }
+    ]
+  }
+}
