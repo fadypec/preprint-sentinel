@@ -3,39 +3,17 @@
 import uuid
 from datetime import date
 
-import pytest_asyncio
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
-@pytest_asyncio.fixture
-async def model_session():
-    """Yield an async session backed by in-memory SQLite."""
-    from pipeline.models import Base
-
-    engine = create_async_engine(
-        "sqlite+aiosqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    async with factory() as session:
-        yield session
-
-    await engine.dispose()
-
-
-async def test_create_all_succeeds(model_session: AsyncSession):
+async def test_create_all_succeeds(db_session: AsyncSession):
     """Base.metadata.create_all works without errors on SQLite."""
-    result = await model_session.execute(select(1))
+    result = await db_session.execute(select(1))
     assert result.scalar() == 1
 
 
-async def test_paper_insert_and_read(model_session: AsyncSession):
+async def test_paper_insert_and_read(db_session: AsyncSession):
     """Insert a Paper row and read it back with correct field types."""
     from pipeline.models import Paper, PipelineStage, ReviewStatus, SourceServer
 
@@ -48,12 +26,10 @@ async def test_paper_insert_and_read(model_session: AsyncSession):
         abstract="We describe experiments enhancing airborne transmissibility...",
         subject_category="microbiology",
     )
-    model_session.add(paper)
-    await model_session.flush()
+    db_session.add(paper)
+    await db_session.flush()
 
-    result = await model_session.execute(
-        select(Paper).where(Paper.doi == "10.1101/2026.03.01.123456")
-    )
+    result = await db_session.execute(select(Paper).where(Paper.doi == "10.1101/2026.03.01.123456"))
     row = result.scalar_one()
 
     assert isinstance(row.id, uuid.UUID)
@@ -66,7 +42,7 @@ async def test_paper_insert_and_read(model_session: AsyncSession):
     assert row.is_duplicate_of is None
 
 
-async def test_paper_group_insert(model_session: AsyncSession):
+async def test_paper_group_insert(db_session: AsyncSession):
     """Insert a PaperGroup linking two papers."""
     from pipeline.models import DedupRelationship, Paper, PaperGroup, SourceServer
 
@@ -85,8 +61,8 @@ async def test_paper_group_insert(model_session: AsyncSession):
         posted_date=date(2026, 3, 1),
         is_duplicate_of=p1.id,
     )
-    model_session.add_all([p1, p2])
-    await model_session.flush()
+    db_session.add_all([p1, p2])
+    await db_session.flush()
 
     group = PaperGroup(
         canonical_id=p1.id,
@@ -95,17 +71,17 @@ async def test_paper_group_insert(model_session: AsyncSession):
         confidence=1.0,
         strategy_used="doi_match",
     )
-    model_session.add(group)
-    await model_session.flush()
+    db_session.add(group)
+    await db_session.flush()
 
-    result = await model_session.execute(select(PaperGroup).where(PaperGroup.canonical_id == p1.id))
+    result = await db_session.execute(select(PaperGroup).where(PaperGroup.canonical_id == p1.id))
     row = result.scalar_one()
     assert row.member_id == p2.id
     assert row.relationship == DedupRelationship.DUPLICATE
     assert row.strategy_used == "doi_match"
 
 
-async def test_assessment_log_insert(model_session: AsyncSession):
+async def test_assessment_log_insert(db_session: AsyncSession):
     """Insert an AssessmentLog entry and verify all fields persist."""
     from pipeline.models import AssessmentLog, Paper, SourceServer
 
@@ -116,8 +92,8 @@ async def test_assessment_log_insert(model_session: AsyncSession):
         source_server=SourceServer.BIORXIV,
         posted_date=date(2026, 3, 1),
     )
-    model_session.add(paper)
-    await model_session.flush()
+    db_session.add(paper)
+    await db_session.flush()
 
     log_entry = AssessmentLog(
         paper_id=paper.id,
@@ -131,10 +107,10 @@ async def test_assessment_log_insert(model_session: AsyncSession):
         output_tokens=25,
         cost_estimate_usd=0.0001,
     )
-    model_session.add(log_entry)
-    await model_session.flush()
+    db_session.add(log_entry)
+    await db_session.flush()
 
-    result = await model_session.execute(
+    result = await db_session.execute(
         select(AssessmentLog).where(AssessmentLog.paper_id == paper.id)
     )
     row = result.scalar_one()

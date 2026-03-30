@@ -139,15 +139,16 @@ class DedupEngine:
         date_from = posted_date - timedelta(days=window_days)
         date_to = posted_date + timedelta(days=window_days)
 
+        # Only fetch columns needed for matching; stream rows to avoid loading
+        # the entire date window into memory (can be tens of thousands of rows).
         stmt = select(Paper.id, Paper.title, Paper.authors).where(
             Paper.posted_date.between(date_from, date_to)
         )
-        result = await self._session.execute(stmt)
-        candidates = result.all()
+        result = await self._session.stream(stmt)
 
         normalised_title = normalise_title(title)
 
-        for cand_id, cand_title, cand_authors in candidates:
+        async for cand_id, cand_title, cand_authors in result:
             # Check surname match
             cand_surname = extract_first_author_surname(cand_authors or [])
             if cand_surname is None or cand_surname != first_author_surname:
@@ -164,6 +165,7 @@ class DedupEngine:
                     ratio=ratio,
                     threshold=threshold,
                 )
+                await result.close()
                 return (cand_id, ratio)
 
         return None

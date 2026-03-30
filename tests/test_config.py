@@ -9,7 +9,7 @@ def test_settings_loads_from_env(monkeypatch):
     from pipeline.config import Settings
 
     s = Settings()
-    assert s.database_url == "postgresql+asyncpg://u:p@localhost/test"
+    assert s.database_url.get_secret_value() == "postgresql+asyncpg://u:p@localhost/test"
     assert s.anthropic_api_key.get_secret_value() == "sk-ant-test-key-12345"
 
 
@@ -38,3 +38,5 @@ def test_secret_str_redacts_in_repr(monkeypatch):
     s = Settings()
     assert "sk-ant-super-secret" not in repr(s)
     assert "sk-ant-super-secret" not in str(s.anthropic_api_key)
+    # Database URL also protected — password never appears in repr
+    assert "u:p@localhost" not in repr(s)

@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     )
 
     # Database
-    database_url: str
+    database_url: SecretStr
 
     # Anthropic
     anthropic_api_key: SecretStr

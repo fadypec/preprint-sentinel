@@ -29,7 +29,7 @@ def make_engine(url: str | None = None):
         url: Database URL. If None, reads from Settings.
     """
     if url is None:
-        url = get_settings().database_url
+        url = get_settings().database_url.get_secret_value()
     # SQLite does not support connection pool sizing parameters.
     if url.startswith("sqlite"):
         return create_async_engine(url)

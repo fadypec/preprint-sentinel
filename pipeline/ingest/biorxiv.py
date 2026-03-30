@@ -12,13 +12,10 @@ import asyncio
 import html
 from collections.abc import AsyncGenerator
 from datetime import date
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
 import httpx
 import structlog
-
-if TYPE_CHECKING:
-    pass
 
 log = structlog.get_logger()
 

@@ -23,7 +23,7 @@ target_metadata = Base.metadata
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode -- emit SQL to stdout."""
-    url = get_settings().database_url
+    url = get_settings().database_url.get_secret_value()
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -43,7 +43,7 @@ def do_run_migrations(connection) -> None:
 async def run_async_migrations() -> None:
     """Run migrations in 'online' mode using an async engine."""
     cfg = config.get_section(config.config_ini_section, {})
-    cfg["sqlalchemy.url"] = get_settings().database_url
+    cfg["sqlalchemy.url"] = get_settings().database_url.get_secret_value()
     connectable = async_engine_from_config(
         cfg,
         prefix="sqlalchemy.",
