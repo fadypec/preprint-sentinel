@@ -224,3 +224,34 @@ class TestXmlParsing:
         articles = client._parse_articles(xml)
         assert len(articles) == 3
         assert [a["title"] for a in articles] == ["Paper A", "Paper B", "Paper C"]
+
+    def test_malformed_article_skipped(self):
+        """A malformed PubmedArticle is skipped; valid ones still parsed."""
+        client = self._make_client()
+        malformed = "<PubmedArticle><Garbage/></PubmedArticle>"
+        valid = _article_xml(title="Valid Paper")
+        xml = _wrap_articles(malformed, valid)
+        articles = client._parse_articles(xml)
+        assert len(articles) == 1
+        assert articles[0]["title"] == "Valid Paper"
+
+    def test_date_fallback_to_today(self):
+        """Missing PubMedPubDate falls back to date.today()."""
+        client = self._make_client()
+        # Build article XML with no History/PubMedPubDate
+        xml_str = """<PubmedArticle>
+  <MedlineCitation>
+    <PMID>99999</PMID>
+    <Article>
+      <ArticleTitle>No Date Paper</ArticleTitle>
+      <Abstract><AbstractText>Abstract.</AbstractText></Abstract>
+      <AuthorList><Author><LastName>Doe</LastName><ForeName>Jane</ForeName></Author></AuthorList>
+    </Article>
+  </MedlineCitation>
+  <PubmedData>
+    <ArticleIdList><ArticleId IdType="doi">10.1/nodate</ArticleId></ArticleIdList>
+  </PubmedData>
+</PubmedArticle>"""
+        articles = client._parse_articles(_wrap_articles(xml_str))
+        assert len(articles) == 1
+        assert articles[0]["posted_date"] == date.today()

@@ -15,6 +15,8 @@ import httpx
 import structlog
 from lxml import etree
 
+from pipeline.models import SourceServer
+
 log = structlog.get_logger()
 
 DEFAULT_MESH_QUERY = (
@@ -78,7 +80,8 @@ class PubmedClient:
 
     def _parse_articles(self, xml_bytes: bytes) -> list[dict]:
         """Parse PubmedArticleSet XML into normalised dicts."""
-        root = etree.fromstring(xml_bytes)
+        parser = etree.XMLParser(resolve_entities=False, no_network=True)
+        root = etree.fromstring(xml_bytes, parser=parser)
         articles = []
         for elem in root.findall(".//PubmedArticle"):
             try:
@@ -91,7 +94,11 @@ class PubmedClient:
     def _normalise_article(self, elem) -> dict:
         """Extract fields from a single PubmedArticle element."""
         citation = elem.find("MedlineCitation")
+        if citation is None:
+            raise ValueError("PubmedArticle missing MedlineCitation element")
         article = citation.find("Article")
+        if article is None:
+            raise ValueError("MedlineCitation missing Article element")
 
         # Title — extract text only, strip inline XML markup like <i>, <sub>
         title_elem = article.find("ArticleTitle")
@@ -152,7 +159,7 @@ class PubmedClient:
             "corresponding_author": None,
             "corresponding_institution": first_affil,
             "abstract": abstract,
-            "source_server": "pubmed",
+            "source_server": SourceServer.PUBMED,
             "posted_date": posted_date,
             "subject_category": subject_category,
             "version": 1,
@@ -167,4 +174,5 @@ class PubmedClient:
                 month = int(pub_date.findtext("Month", "1"))
                 day = int(pub_date.findtext("Day", "1"))
                 return date(year, month, day)
+        log.warning("pubmed_date_fallback", msg="No PubMedPubDate with PubStatus=pubmed found")
         return date.today()
