@@ -8,7 +8,7 @@ Add author/institution enrichment from three external APIs (OpenAlex, Semantic S
 
 SP3 completes the pipeline backend. After SP3, the system can run end-to-end as `python -m pipeline.orchestrator` — ingesting papers, filtering, retrieving full text, analysing methods, enriching metadata, and adjudicating high-risk papers.
 
-The orchestrator is a pure async function with no scheduling dependency. Scheduling is handled externally via crontab or systemd timer. This keeps the orchestrator maximally testable and avoids unnecessary infrastructure dependencies.
+The orchestrator has two layers: a pure async `run_daily_pipeline()` function (testable, no dependencies) and an APScheduler wrapper that runs it on a configurable cron schedule. The scheduler runs as a long-lived process alongside the dashboard, enabling the dashboard to control the schedule (change time, trigger manual runs, pause/resume) without requiring shell access to the server.
 
 ```
 Papers at METHODS_ANALYSED
@@ -269,7 +269,9 @@ orcid_request_delay: float = 1.0
 adjudication_min_tier: str = "high"  # "low", "medium", "high", "critical"
 ```
 
-`openalex_email`, `semantic_scholar_api_key` already exist in config.
+`openalex_email`, `semantic_scholar_api_key`, `daily_run_hour` already exist in config.
+
+**New dependency:** `apscheduler>=4.0` (or `>=3.10` as fallback). Add to `pyproject.toml`.
 
 ### 8. Orchestrator (`pipeline/orchestrator.py`)
 
@@ -317,12 +319,114 @@ if __name__ == "__main__":
     print(stats)
 ```
 
-Invoked as: `python -m pipeline` or `uv run python -m pipeline`.
+Invoked as: `python -m pipeline` or `uv run python -m pipeline` for a one-shot run. For continuous scheduled operation, use the scheduler (below).
 
-### 9. Dashboard Configuration Note
+### 9. Scheduler (`pipeline/scheduler.py`)
 
-All configurable settings introduced in SP3 (and retroactively, SP2) should have corresponding UI elements in the dashboard when Phase 3 is implemented. Specifically:
+APScheduler-based wrapper that runs the orchestrator on a configurable cron schedule. This is the long-lived process that keeps the pipeline running daily without manual intervention.
 
+**Dependency:** `apscheduler>=4.0` (APScheduler v4 is async-native and supports asyncio natively).
+
+Note: APScheduler v4 is a major rewrite from v3. It uses `AsyncScheduler` with `CronTrigger` and is designed for async applications. If v4 is not stable at implementation time, fall back to `apscheduler>=3.10` with `AsyncIOScheduler`.
+
+**Interface:**
+```python
+class PipelineScheduler:
+    """Manages scheduled and on-demand pipeline runs."""
+
+    def __init__(self, settings: Settings) -> None: ...
+
+    async def start(self) -> None:
+        """Start the scheduler with the configured daily cron."""
+
+    async def stop(self) -> None:
+        """Gracefully shut down the scheduler."""
+
+    async def trigger_run(self) -> PipelineRunStats:
+        """Trigger an immediate pipeline run (for dashboard 'Run Now' button)."""
+
+    async def update_schedule(self, hour: int, minute: int = 0) -> None:
+        """Change the daily run time (for dashboard schedule config)."""
+
+    async def pause(self) -> None:
+        """Pause scheduled runs (manual runs still allowed)."""
+
+    async def resume(self) -> None:
+        """Resume scheduled runs."""
+
+    def get_status(self) -> dict:
+        """Return scheduler state for the dashboard.
+
+        Returns:
+            {
+                "running": bool,
+                "paused": bool,
+                "next_run_time": "ISO datetime or null",
+                "last_run_time": "ISO datetime or null",
+                "last_run_stats": PipelineRunStats or null,
+            }
+        """
+```
+
+**Config:** Uses the existing `daily_run_hour: int = 6` setting for the initial schedule. The dashboard can change this at runtime via `update_schedule()`.
+
+**State tracking:** The scheduler stores `last_run_stats` (the most recent `PipelineRunStats`) in memory. The dashboard reads this to show pipeline health. For persistence across restarts, the stats are also logged to the database (a simple `pipeline_runs` table — see schema changes below).
+
+**Process model:** The scheduler runs in the same process as the dashboard backend. When the dashboard is deployed (Phase 3), the Next.js frontend calls a Python API backend (FastAPI or similar) that hosts both the scheduler and the API endpoints. For SP3, the scheduler can run standalone:
+
+```python
+# pipeline/__main__.py with --schedule flag
+if __name__ == "__main__":
+    import asyncio
+    import sys
+    if "--schedule" in sys.argv:
+        from pipeline.scheduler import PipelineScheduler
+        from pipeline.config import get_settings
+        scheduler = PipelineScheduler(get_settings())
+        asyncio.run(scheduler.start())  # Blocks forever, runs daily
+    else:
+        from pipeline.orchestrator import run_daily_pipeline
+        stats = asyncio.run(run_daily_pipeline())
+        print(stats)
+```
+
+### 10. Schema Addition: Pipeline Run Log
+
+Add a `PipelineRun` model to track run history (used by the dashboard to show pipeline health):
+
+```python
+class PipelineRun(Base):
+    __tablename__ = "pipeline_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    papers_ingested: Mapped[int] = mapped_column(Integer, default=0)
+    papers_after_dedup: Mapped[int] = mapped_column(Integer, default=0)
+    papers_coarse_passed: Mapped[int] = mapped_column(Integer, default=0)
+    papers_fulltext_retrieved: Mapped[int] = mapped_column(Integer, default=0)
+    papers_methods_analysed: Mapped[int] = mapped_column(Integer, default=0)
+    papers_enriched: Mapped[int] = mapped_column(Integer, default=0)
+    papers_adjudicated: Mapped[int] = mapped_column(Integer, default=0)
+    errors: Mapped[list | None] = mapped_column(PlatformJSON)
+    total_cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    trigger: Mapped[str] = mapped_column(String(50))  # "scheduled" | "manual"
+```
+
+The orchestrator writes a `PipelineRun` row at the start (with `started_at` and `trigger`) and updates it at the end (with stats and `finished_at`). This gives the dashboard a complete run history independent of the scheduler's in-memory state.
+
+### 11. Dashboard Configuration Note
+
+All configurable settings introduced in SP3 (and retroactively, SP2) must have corresponding UI elements in the dashboard when Phase 3 is implemented:
+
+**Pipeline schedule (from scheduler):**
+- Daily run time — time picker, calls `update_schedule()`
+- Pause/resume toggle — calls `pause()` / `resume()`
+- "Run Now" button — calls `trigger_run()`
+- Pipeline status display — shows `get_status()` (next run, last run, health)
+- Run history table — reads from `pipeline_runs` table
+
+**Pipeline tuning:**
 - `adjudication_min_tier` — dropdown or radio button
 - `use_batch_api` — toggle switch
 - `coarse_filter_threshold` — slider (0.0-1.0)
@@ -357,6 +461,14 @@ This note will be saved to project memory and referenced during Phase 3 dashboar
 - Test stage failure isolation: one stage errors, others still process eligible papers.
 - Test empty pipeline (no new papers): completes without error.
 - Test date range calculation.
+- Test PipelineRun row created and updated with stats.
+
+### Scheduler
+- Test scheduler starts and schedules a job at the configured hour.
+- Test `trigger_run()` executes immediately.
+- Test `update_schedule()` changes the cron time.
+- Test `pause()` / `resume()` toggle.
+- Test `get_status()` returns correct state.
 
 ## File Structure
 
@@ -371,10 +483,11 @@ pipeline/
 ├── triage/
 │   ├── prompts.py           # Modified: add adjudication prompt + tool schema
 │   └── adjudication.py      # Stage 5: Opus contextual review
-├── models.py                # Modified: add enrichment_data column
+├── models.py                # Modified: add enrichment_data + PipelineRun
 ├── config.py                # Modified: add enrichment/adjudication settings
-├── orchestrator.py          # Daily pipeline orchestrator
-└── __main__.py              # Entry point for `python -m pipeline`
+├── orchestrator.py          # Daily pipeline orchestrator (pure async)
+├── scheduler.py             # APScheduler wrapper (long-lived process)
+└── __main__.py              # Entry point: one-shot or --schedule mode
 
 tests/
 ├── test_openalex.py
@@ -382,5 +495,6 @@ tests/
 ├── test_orcid.py
 ├── test_enricher.py
 ├── test_adjudication.py
-└── test_orchestrator.py
+├── test_orchestrator.py
+└── test_scheduler.py
 ```
