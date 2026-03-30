@@ -7,10 +7,12 @@ Falls back gracefully if all sources fail — the paper still advances.
 
 from __future__ import annotations
 
+import asyncio
 import re
 
 import httpx
 import structlog
+from lxml import etree
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pipeline.fulltext.html_parser import extract_methods as html_extract
@@ -80,10 +82,11 @@ async def _try_biorxiv(http: httpx.AsyncClient, doi: str, delay: float) -> tuple
     """Source 1: bioRxiv/medRxiv TDM XML."""
     url = f"https://www.biorxiv.org/content/{doi}.full.xml"
     try:
+        await asyncio.sleep(delay)
         resp = await http.get(url, timeout=30.0)
         if resp.status_code == 200:
             return jats_extract(resp.content)
-    except (httpx.HTTPError, Exception) as exc:
+    except (httpx.HTTPError, etree.Error, ValueError) as exc:
         log.debug("biorxiv_fulltext_error", doi=doi, error=str(exc))
     return None
 
@@ -94,6 +97,7 @@ async def _try_europepmc(http: httpx.AsyncClient, doi: str, delay: float) -> tup
     search_url = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
     params = {"query": f"DOI:{doi}", "format": "json", "resultType": "core", "pageSize": 1}
     try:
+        await asyncio.sleep(delay)
         resp = await http.get(search_url, params=params, timeout=30.0)
         if resp.status_code != 200:
             return None
@@ -109,10 +113,11 @@ async def _try_europepmc(http: httpx.AsyncClient, doi: str, delay: float) -> tup
         ft_url = (
             f"https://www.ebi.ac.uk/europepmc/webservices/rest/{source}/{record_id}/fullTextXML"
         )
+        await asyncio.sleep(delay)
         resp = await http.get(ft_url, timeout=30.0)
         if resp.status_code == 200 and resp.content:
             return jats_extract(resp.content)
-    except (httpx.HTTPError, Exception) as exc:
+    except (httpx.HTTPError, etree.Error, ValueError) as exc:
         log.debug("europepmc_fulltext_error", doi=doi, error=str(exc))
     return None
 
@@ -126,10 +131,11 @@ async def _try_pmc(
     if api_key:
         params["api_key"] = api_key
     try:
+        await asyncio.sleep(delay)
         resp = await http.get(url, params=params, timeout=30.0)
         if resp.status_code == 200 and resp.content:
             return jats_extract(resp.content)
-    except (httpx.HTTPError, Exception) as exc:
+    except (httpx.HTTPError, etree.Error, ValueError) as exc:
         log.debug("pmc_fulltext_error", pmc_id=pmc_id, error=str(exc))
     return None
 
@@ -158,6 +164,6 @@ async def _try_unpaywall(http: httpx.AsyncClient, doi: str, settings) -> tuple[s
             return jats_extract(resp.content)
         return html_extract(resp.content)
 
-    except (httpx.HTTPError, Exception) as exc:
+    except (httpx.HTTPError, etree.Error, ValueError) as exc:
         log.debug("unpaywall_fulltext_error", doi=doi, error=str(exc))
     return None

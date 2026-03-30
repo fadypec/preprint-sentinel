@@ -35,12 +35,12 @@ class UnpaywallResult:
 def _classify_url(url: str) -> str:
     """Classify a URL as xml, pdf, or html based on URL patterns."""
     lower = url.lower()
-    if lower.endswith(".xml") or "fulltext" in lower and "xml" in lower:
+    if lower.endswith(".xml") or ("fulltext" in lower and "xml" in lower):
         return "xml"
     if lower.endswith(".pdf") or "/pdf/" in lower:
         return "pdf"
     for host in _XML_HOSTS:
-        if host in lower and ("xml" in lower or "fullTextXML" in url):
+        if host in lower and "xml" in lower:
             return "xml"
     return "html"
 
