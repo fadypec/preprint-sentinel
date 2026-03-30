@@ -55,6 +55,9 @@ class PubmedClient:
         query_mode: str = "all",
         mesh_query: str = DEFAULT_MESH_QUERY,
     ) -> None:
+        if query_mode not in ("all", "mesh_filtered"):
+            msg = f"Invalid query_mode: {query_mode!r} (expected 'all' or 'mesh_filtered')"
+            raise ValueError(msg)
         self.api_key = api_key
         self.request_delay = request_delay
         self.max_retries = max_retries
@@ -112,7 +115,8 @@ class PubmedClient:
         if self.api_key:
             params["api_key"] = self.api_key
 
-        data = await self._request_json(self.ESEARCH_URL, params)
+        resp = await self._request(self.ESEARCH_URL, params)
+        data = resp.json()
         result = data.get("esearchresult", {})
         return (
             result.get("webenv", ""),
@@ -134,11 +138,11 @@ class PubmedClient:
         if self.api_key:
             params["api_key"] = self.api_key
 
-        xml_bytes = await self._request_xml(self.EFETCH_URL, params)
-        return self._parse_articles(xml_bytes)
+        resp = await self._request(self.EFETCH_URL, params)
+        return self._parse_articles(resp.content)
 
-    async def _request_json(self, url: str, params: dict) -> dict:
-        """Make a request expecting JSON, with retry and backoff."""
+    async def _request(self, url: str, params: dict) -> httpx.Response:
+        """Make a GET request with retry and exponential backoff."""
         assert self._client is not None, "Use PubmedClient as async context manager"
 
         for attempt in range(1, self.max_retries + 1):
@@ -146,38 +150,7 @@ class PubmedClient:
             try:
                 resp = await self._client.get(url, params=params, timeout=30.0)
                 if resp.status_code == 200:
-                    return resp.json()
-                if resp.status_code in (429, 503):
-                    backoff = min(2**attempt, 30)
-                    log.warning(
-                        "rate_limited",
-                        source="pubmed",
-                        status=resp.status_code,
-                        attempt=attempt,
-                        backoff=backoff,
-                    )
-                    await asyncio.sleep(backoff)
-                    continue
-                resp.raise_for_status()
-            except httpx.TimeoutException:
-                if attempt == self.max_retries:
-                    raise
-                backoff = min(2**attempt, 30)
-                log.warning("timeout", source="pubmed", attempt=attempt, backoff=backoff)
-                await asyncio.sleep(backoff)
-
-        raise RuntimeError(f"PubMed failed after {self.max_retries} retries: {url}")
-
-    async def _request_xml(self, url: str, params: dict) -> bytes:
-        """Make a request expecting XML, with retry and backoff."""
-        assert self._client is not None, "Use PubmedClient as async context manager"
-
-        for attempt in range(1, self.max_retries + 1):
-            await asyncio.sleep(self.request_delay)
-            try:
-                resp = await self._client.get(url, params=params, timeout=30.0)
-                if resp.status_code == 200:
-                    return resp.content
+                    return resp
                 if resp.status_code in (429, 503):
                     backoff = min(2**attempt, 30)
                     log.warning(
