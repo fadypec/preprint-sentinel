@@ -53,3 +53,16 @@ def test_settings_phase2_defaults(monkeypatch):
     assert s.europepmc_request_delay == 1.0
     assert s.pubmed_query_mode == "all"
     assert "virology[MeSH]" in s.pubmed_mesh_query
+
+
+def test_settings_sp2_defaults(monkeypatch):
+    """SP2 config fields have correct defaults."""
+    monkeypatch.setenv("DATABASE_URL", "postgresql://localhost/test")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+
+    from pipeline.config import Settings
+
+    s = Settings()
+    assert s.use_batch_api is False
+    assert s.unpaywall_request_delay == 0.1
+    assert s.fulltext_request_delay == 1.0

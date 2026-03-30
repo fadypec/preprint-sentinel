@@ -44,6 +44,15 @@ class Settings(BaseSettings):
     # Europe PMC
     europepmc_request_delay: float = 1.0
 
+    # Batch API toggle
+    use_batch_api: bool = False
+
+    # Unpaywall rate limiting
+    unpaywall_request_delay: float = 0.1
+
+    # Full-text retrieval rate limiting
+    fulltext_request_delay: float = 1.0
+
     # PubMed query mode
     pubmed_query_mode: str = "all"  # "all" or "mesh_filtered"
     pubmed_mesh_query: str = (
