@@ -10,10 +10,10 @@ from __future__ import annotations
 import re
 import uuid
 from dataclasses import dataclass
-from datetime import date, timedelta  # noqa: F401 (timedelta used in Task 10)
+from datetime import date, timedelta
 
 import structlog
-from rapidfuzz import fuzz  # noqa: F401 (fuzz used in Task 10)
+from rapidfuzz import fuzz
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -134,8 +134,38 @@ class DedupEngine:
         """Find a matching paper by fuzzy title + author within a date window.
 
         Returns (matching_paper_id, similarity_score) or None.
-        Implemented in Task 10.
         """
+        date_from = posted_date - timedelta(days=window_days)
+        date_to = posted_date + timedelta(days=window_days)
+
+        stmt = (
+            select(Paper.id, Paper.title, Paper.authors)
+            .where(Paper.posted_date.between(date_from, date_to))
+        )
+        result = await self._session.execute(stmt)
+        candidates = result.all()
+
+        normalised_title = normalise_title(title)
+
+        for cand_id, cand_title, cand_authors in candidates:
+            # Check surname match
+            cand_surname = extract_first_author_surname(cand_authors or [])
+            if cand_surname is None or cand_surname != first_author_surname:
+                continue
+
+            # Check title similarity
+            cand_normalised = normalise_title(cand_title)
+            ratio = fuzz.ratio(normalised_title, cand_normalised) / 100.0
+
+            if ratio >= threshold:
+                log.info(
+                    "dedup_title_match",
+                    candidate_id=str(cand_id),
+                    ratio=ratio,
+                    threshold=threshold,
+                )
+                return (cand_id, ratio)
+
         return None
 
     async def record_duplicate(

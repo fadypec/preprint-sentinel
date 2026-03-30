@@ -66,3 +66,98 @@ class TestDoiMatch:
         })
 
         assert result.is_duplicate is False
+
+
+class TestTitleAuthorSimilarity:
+    """Tier 2: fuzzy title + first-author surname match."""
+
+    async def test_similar_title_same_author(self, db_session):
+        """Nearly identical title + same first author surname = duplicate."""
+        from pipeline.ingest.dedup import DedupEngine
+
+        existing = await insert_paper(
+            db_session,
+            doi="10.1101/existing.001",
+            title="Novel CRISPR approach to gene editing in primary T cells",
+            authors=[{"name": "Smith, J."}, {"name": "Jones, A."}],
+            posted_date=date(2026, 3, 10),
+        )
+
+        engine = DedupEngine(db_session)
+        result = await engine.check({
+            "doi": "10.1101/different.002",
+            "title": "A novel CRISPR approach to gene editing in primary T cells",
+            "authors": [{"name": "Smith, J."}],
+            "posted_date": date(2026, 3, 12),
+        })
+
+        assert result.is_duplicate is True
+        assert result.duplicate_of == existing.id
+        assert result.strategy_used == "title_author_similarity"
+        assert result.confidence > 0.92
+
+    async def test_title_below_threshold(self, db_session):
+        """Title similarity below 0.92 threshold — not a duplicate."""
+        from pipeline.ingest.dedup import DedupEngine
+
+        await insert_paper(
+            db_session,
+            doi="10.1101/existing.001",
+            title="Novel CRISPR approach to gene editing in primary T cells",
+            authors=[{"name": "Smith, J."}],
+            posted_date=date(2026, 3, 10),
+        )
+
+        engine = DedupEngine(db_session)
+        result = await engine.check({
+            "doi": "10.1101/different.003",
+            "title": "Traditional methods for gene therapy using viral vectors",
+            "authors": [{"name": "Smith, J."}],
+            "posted_date": date(2026, 3, 12),
+        })
+
+        assert result.is_duplicate is False
+
+    async def test_same_title_different_author(self, db_session):
+        """Same title but different first author — not a duplicate."""
+        from pipeline.ingest.dedup import DedupEngine
+
+        await insert_paper(
+            db_session,
+            doi="10.1101/existing.001",
+            title="Population dynamics in temperate forests",
+            authors=[{"name": "Smith, J."}],
+            posted_date=date(2026, 3, 10),
+        )
+
+        engine = DedupEngine(db_session)
+        result = await engine.check({
+            "doi": "10.1101/different.004",
+            "title": "Population dynamics in temperate forests",
+            "authors": [{"name": "Johnson, K."}],
+            "posted_date": date(2026, 3, 12),
+        })
+
+        assert result.is_duplicate is False
+
+    async def test_date_window_respected(self, db_session):
+        """Matching title/author but outside +/-14 day window — not duplicate."""
+        from pipeline.ingest.dedup import DedupEngine
+
+        await insert_paper(
+            db_session,
+            doi="10.1101/existing.001",
+            title="Novel CRISPR approach to gene editing",
+            authors=[{"name": "Smith, J."}],
+            posted_date=date(2026, 1, 1),
+        )
+
+        engine = DedupEngine(db_session)
+        result = await engine.check({
+            "doi": "10.1101/different.005",
+            "title": "Novel CRISPR approach to gene editing",
+            "authors": [{"name": "Smith, J."}],
+            "posted_date": date(2026, 6, 1),  # 5 months later
+        })
+
+        assert result.is_duplicate is False
