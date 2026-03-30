@@ -10,15 +10,18 @@ from __future__ import annotations
 import re
 import uuid
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, timedelta  # noqa: F401 (timedelta used in Task 10)
 
-from rapidfuzz import fuzz
+import structlog
+from rapidfuzz import fuzz  # noqa: F401 (fuzz used in Task 10)
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pipeline.models import DedupRelationship, Paper, PaperGroup
-
-import structlog
+from pipeline.models import (  # noqa: F401 (PaperGroup used in Task 11)
+    DedupRelationship,
+    Paper,
+    PaperGroup,
+)
 
 log = structlog.get_logger()
 

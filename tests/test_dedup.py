@@ -4,9 +4,6 @@ from __future__ import annotations
 
 from datetime import date
 
-import pytest
-
-from pipeline.models import Paper, PaperGroup, SourceServer
 from tests.conftest import insert_paper
 
 
