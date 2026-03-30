@@ -54,9 +54,31 @@ class BiorxivClient:
         self, from_date: date, to_date: date
     ) -> AsyncGenerator[dict, None]:
         """Yield normalised paper dicts, paginating through all results."""
-        # Implemented in Task 7
-        raise NotImplementedError
-        yield  # Make this a generator  # noqa: E711
+        cursor = 0
+        while True:
+            data = await self._fetch_page(from_date, to_date, cursor)
+            messages = data.get("messages", [{}])
+            if not messages:
+                break
+
+            msg = messages[0]
+            total = msg.get("total", 0)
+            count = msg.get("count", 0)
+
+            for raw in data.get("collection", []):
+                yield self._normalise(raw)
+
+            cursor += self.PAGE_SIZE
+            if count < self.PAGE_SIZE or cursor >= total:
+                break
+
+            log.info(
+                "page_fetched",
+                server=self.server,
+                cursor=cursor,
+                total=total,
+                fetched_this_page=count,
+            )
 
     # -- Internal ------------------------------------------------------------
 
@@ -64,8 +86,35 @@ class BiorxivClient:
         self, from_date: date, to_date: date, cursor: int
     ) -> dict:
         """Fetch a single page from the API with retry and backoff."""
-        # Implemented in Task 7
-        raise NotImplementedError
+        assert self._client is not None, "Use BiorxivClient as async context manager"
+        url = f"{self.BASE_URL}/{self.server}/{from_date}/{to_date}/{cursor}"
+
+        for attempt in range(1, self.max_retries + 1):
+            await asyncio.sleep(self.request_delay)
+            try:
+                resp = await self._client.get(url, timeout=30.0)
+                if resp.status_code == 200:
+                    return resp.json()
+                if resp.status_code in (429, 503):
+                    backoff = min(2**attempt, 30)
+                    log.warning(
+                        "rate_limited",
+                        url=url,
+                        status=resp.status_code,
+                        attempt=attempt,
+                        backoff=backoff,
+                    )
+                    await asyncio.sleep(backoff)
+                    continue
+                resp.raise_for_status()
+            except httpx.TimeoutException:
+                if attempt == self.max_retries:
+                    raise
+                backoff = min(2**attempt, 30)
+                log.warning("timeout", url=url, attempt=attempt, backoff=backoff)
+                await asyncio.sleep(backoff)
+
+        raise RuntimeError(f"Failed after {self.max_retries} retries: {url}")
 
     def _normalise(self, raw: dict) -> dict:
         """Map a raw CSHL API record to the common metadata schema."""
