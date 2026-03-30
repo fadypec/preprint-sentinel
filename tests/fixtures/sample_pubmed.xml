@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PubmedArticleSet>
+  <PubmedArticle>
+    <MedlineCitation>
+      <PMID>38000001</PMID>
+      <Article>
+        <ArticleTitle>Novel reverse genetics system for influenza A virus</ArticleTitle>
+        <Abstract>
+          <AbstractText Label="BACKGROUND">Influenza A viruses remain a major pandemic threat.</AbstractText>
+          <AbstractText Label="METHODS">We developed a simplified eight-plasmid reverse genetics system.</AbstractText>
+          <AbstractText Label="RESULTS">The system achieved 10-fold higher rescue efficiency than existing methods.</AbstractText>
+          <AbstractText Label="CONCLUSIONS">This simplified system lowers technical barriers to influenza research.</AbstractText>
+        </Abstract>
+        <AuthorList>
+          <Author>
+            <LastName>Chen</LastName>
+            <ForeName>Wei</ForeName>
+            <AffiliationInfo>
+              <Affiliation>Department of Virology, Peking University, Beijing, China</Affiliation>
+            </AffiliationInfo>
+          </Author>
+          <Author>
+            <LastName>Zhang</LastName>
+            <ForeName>Li</ForeName>
+          </Author>
+        </AuthorList>
+      </Article>
+      <MeshHeadingList>
+        <MeshHeading><DescriptorName>Influenza A virus</DescriptorName></MeshHeading>
+        <MeshHeading><DescriptorName>Reverse Genetics</DescriptorName></MeshHeading>
+      </MeshHeadingList>
+    </MedlineCitation>
+    <PubmedData>
+      <History>
+        <PubMedPubDate PubStatus="pubmed">
+          <Year>2026</Year><Month>3</Month><Day>15</Day>
+        </PubMedPubDate>
+      </History>
+      <ArticleIdList>
+        <ArticleId IdType="doi">10.1234/journal.ppat.1234567</ArticleId>
+        <ArticleId IdType="pmc">PMC9876543</ArticleId>
+      </ArticleIdList>
+    </PubmedData>
+  </PubmedArticle>
+
+  <PubmedArticle>
+    <MedlineCitation>
+      <PMID>38000002</PMID>
+      <Article>
+        <ArticleTitle>Directed evolution of <i>Clostridium botulinum</i> neurotoxin variants</ArticleTitle>
+        <Abstract>
+          <AbstractText>We used directed evolution to generate botulinum neurotoxin variants with altered substrate specificity and enhanced catalytic activity.</AbstractText>
+        </Abstract>
+        <AuthorList>
+          <Author>
+            <LastName>Rodriguez</LastName>
+            <ForeName>Maria Elena</ForeName>
+            <AffiliationInfo>
+              <Affiliation>Institute of Toxicology, Universidad de Buenos Aires</Affiliation>
+            </AffiliationInfo>
+          </Author>
+          <Author>
+            <LastName>Kim</LastName>
+            <ForeName>Sung-Ho</ForeName>
+          </Author>
+          <Author>
+            <LastName>O'Brien</LastName>
+            <ForeName>Patrick</ForeName>
+          </Author>
+        </AuthorList>
+      </Article>
+      <MeshHeadingList>
+        <MeshHeading><DescriptorName>Botulinum Toxins</DescriptorName></MeshHeading>
+        <MeshHeading><DescriptorName>Directed Molecular Evolution</DescriptorName></MeshHeading>
+      </MeshHeadingList>
+    </MedlineCitation>
+    <PubmedData>
+      <History>
+        <PubMedPubDate PubStatus="pubmed">
+          <Year>2026</Year><Month>3</Month><Day>10</Day>
+        </PubMedPubDate>
+      </History>
+      <ArticleIdList>
+        <ArticleId IdType="doi">10.1038/s41586-026-00001-1</ArticleId>
+      </ArticleIdList>
+    </PubmedData>
+  </PubmedArticle>
+
+  <PubmedArticle>
+    <MedlineCitation>
+      <PMID>38000003</PMID>
+      <Article>
+        <ArticleTitle>Epidemiological surveillance of seasonal influenza in Southeast Asia</ArticleTitle>
+        <Abstract>
+          <AbstractText>Routine surveillance of circulating influenza strains during the 2025-2026 season across seven Southeast Asian countries.</AbstractText>
+        </Abstract>
+        <AuthorList>
+          <Author>
+            <LastName>Nguyen</LastName>
+            <ForeName>Thi</ForeName>
+            <AffiliationInfo>
+              <Affiliation>WHO Collaborating Centre, National Institute of Hygiene, Hanoi, Vietnam</Affiliation>
+            </AffiliationInfo>
+          </Author>
+        </AuthorList>
+      </Article>
+      <MeshHeadingList>
+        <MeshHeading><DescriptorName>Influenza, Human</DescriptorName></MeshHeading>
+        <MeshHeading><DescriptorName>Epidemiological Monitoring</DescriptorName></MeshHeading>
+      </MeshHeadingList>
+    </MedlineCitation>
+    <PubmedData>
+      <History>
+        <PubMedPubDate PubStatus="pubmed">
+          <Year>2026</Year><Month>3</Month><Day>12</Day>
+        </PubMedPubDate>
+      </History>
+      <ArticleIdList>
+        <ArticleId IdType="doi">10.1016/j.ijid.2026.01.005</ArticleId>
+        <ArticleId IdType="pmc">PMC9876544</ArticleId>
+      </ArticleIdList>
+    </PubmedData>
+  </PubmedArticle>
+
+  <PubmedArticle>
+    <MedlineCitation>
+      <PMID>38000004</PMID>
+      <Article>
+        <ArticleTitle>Metagenomic discovery of novel bat paramyxoviruses</ArticleTitle>
+        <Abstract>
+          <AbstractText>Deep sequencing of bat guano samples from caves in Yunnan Province revealed three novel paramyxoviruses with broad host range potential.</AbstractText>
+        </Abstract>
+        <AuthorList>
+          <Author>
+            <LastName>Li</LastName>
+            <ForeName>Xiang</ForeName>
+          </Author>
+        </AuthorList>
+      </Article>
+    </MedlineCitation>
+    <PubmedData>
+      <History>
+        <PubMedPubDate PubStatus="pubmed">
+          <Year>2026</Year><Month>3</Month><Day>20</Day>
+        </PubMedPubDate>
+      </History>
+      <ArticleIdList>
+      </ArticleIdList>
+    </PubmedData>
+  </PubmedArticle>
+
+  <PubmedArticle>
+    <MedlineCitation>
+      <PMID>38000005</PMID>
+      <Article>
+        <ArticleTitle>CRISPR-Cas13 targeting of SARS-CoV-2 RNA in human airway cells</ArticleTitle>
+        <Abstract>
+          <AbstractText Label="OBJECTIVE">To evaluate CRISPR-Cas13 as a therapeutic against SARS-CoV-2.</AbstractText>
+          <AbstractText Label="METHODS">We designed guide RNAs targeting conserved regions of the SARS-CoV-2 genome and delivered via lipid nanoparticles to human bronchial epithelial cells.</AbstractText>
+          <AbstractText Label="RESULTS">Viral RNA was reduced by 99.7% at 48 hours post-treatment.</AbstractText>
+        </Abstract>
+        <AuthorList>
+          <Author>
+            <LastName>Patel</LastName>
+            <ForeName>Sanjay</ForeName>
+            <AffiliationInfo>
+              <Affiliation>Broad Institute of MIT and Harvard, Cambridge, MA</Affiliation>
+            </AffiliationInfo>
+          </Author>
+          <Author>
+            <LastName>Wu</LastName>
+            <ForeName>Feng</ForeName>
+          </Author>
+        </AuthorList>
+      </Article>
+      <MeshHeadingList>
+        <MeshHeading><DescriptorName>CRISPR-Cas Systems</DescriptorName></MeshHeading>
+        <MeshHeading><DescriptorName>SARS-CoV-2</DescriptorName></MeshHeading>
+      </MeshHeadingList>
+    </MedlineCitation>
+    <PubmedData>
+      <History>
+        <PubMedPubDate PubStatus="pubmed">
+          <Year>2026</Year><Month>3</Month><Day>18</Day>
+        </PubMedPubDate>
+      </History>
+      <ArticleIdList>
+        <ArticleId IdType="doi">10.1126/science.abm9999</ArticleId>
+        <ArticleId IdType="pmc">PMC9876545</ArticleId>
+      </ArticleIdList>
+    </PubmedData>
+  </PubmedArticle>
+</PubmedArticleSet>
