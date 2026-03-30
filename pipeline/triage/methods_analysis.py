@@ -70,6 +70,8 @@ def _create_assessment_log(
 
 def _apply_result(paper: Paper, tool_input: dict) -> None:
     """Apply the LLM assessment result to the paper record."""
+    # stage2_result = second LLM stage (methods analysis);
+    # column naming is sequential (stage1/2/3), not by pipeline stage number.
     paper.stage2_result = tool_input
     paper.aggregate_score = tool_input.get("aggregate_score")
     paper.risk_tier = _RISK_TIER_MAP.get(tool_input.get("risk_tier", ""))
@@ -162,6 +164,21 @@ async def _run_batch(
         llm_result = results.get(custom_id)
         if llm_result is None:
             log.warning("methods_analysis_missing_result", paper_id=custom_id)
+            session.add(
+                AssessmentLog(
+                    paper_id=paper.id,
+                    stage="methods_analysis",
+                    model_used=model,
+                    prompt_version=METHODS_ANALYSIS_VERSION,
+                    prompt_text=user_msg,
+                    raw_response="",
+                    parsed_result=None,
+                    input_tokens=0,
+                    output_tokens=0,
+                    cost_estimate_usd=0.0,
+                    error="No result returned from batch",
+                )
+            )
             continue
 
         _create_assessment_log(session, paper, llm_result, model, user_msg)
