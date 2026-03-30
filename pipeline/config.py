@@ -66,6 +66,14 @@ class Settings(BaseSettings):
         '"aerosol transmission"[tiab] OR "airborne transmission"[tiab])'
     )
 
+    # Enrichment rate limits
+    openalex_request_delay: float = 0.1
+    semantic_scholar_request_delay: float = 1.0
+    orcid_request_delay: float = 1.0
+
+    # Adjudication
+    adjudication_min_tier: str = "high"  # "low", "medium", "high", "critical"
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -118,6 +118,7 @@ class Paper(Base):
     full_text_retrieved: Mapped[bool] = mapped_column(Boolean, default=False)
     full_text_content: Mapped[str | None] = mapped_column(Text)
     methods_section: Mapped[str | None] = mapped_column(Text)
+    enrichment_data: Mapped[dict | None] = mapped_column(PlatformJSON)
 
     # Pipeline state
     pipeline_stage: Mapped[PipelineStage] = mapped_column(
@@ -204,3 +205,21 @@ class AssessmentLog(Base):
         server_default=func.now(),
         index=True,
     )
+
+
+class PipelineRun(Base):
+    __tablename__ = "pipeline_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    papers_ingested: Mapped[int] = mapped_column(Integer, default=0)
+    papers_after_dedup: Mapped[int] = mapped_column(Integer, default=0)
+    papers_coarse_passed: Mapped[int] = mapped_column(Integer, default=0)
+    papers_fulltext_retrieved: Mapped[int] = mapped_column(Integer, default=0)
+    papers_methods_analysed: Mapped[int] = mapped_column(Integer, default=0)
+    papers_enriched: Mapped[int] = mapped_column(Integer, default=0)
+    papers_adjudicated: Mapped[int] = mapped_column(Integer, default=0)
+    errors: Mapped[list | None] = mapped_column(PlatformJSON)
+    total_cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    trigger: Mapped[str] = mapped_column(String(50))
