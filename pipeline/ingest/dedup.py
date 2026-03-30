@@ -39,6 +39,7 @@ class DedupResult:
 def normalise_title(title: str) -> str:
     """Lowercase, strip punctuation, collapse whitespace for fuzzy comparison."""
     title = title.lower().strip()
+    title = re.sub(r"[-/]", " ", title)  # split hyphenated/slashed words before stripping
     title = re.sub(r"[^\w\s]", "", title)
     title = re.sub(r"\s+", " ", title)
     return title
