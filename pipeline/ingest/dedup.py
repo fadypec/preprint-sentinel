@@ -17,7 +17,7 @@ from rapidfuzz import fuzz
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pipeline.models import (  # noqa: F401 (PaperGroup used in Task 11)
+from pipeline.models import (
     DedupRelationship,
     Paper,
     PaperGroup,
@@ -177,5 +177,24 @@ class DedupEngine:
         relationship: DedupRelationship = DedupRelationship.DUPLICATE,
     ) -> None:
         """Create a PaperGroup entry and set is_duplicate_of on the member."""
-        # Implemented in Task 11
-        pass
+        group = PaperGroup(
+            canonical_id=canonical_id,
+            member_id=member_id,
+            relationship=relationship,
+            confidence=result.confidence,
+            strategy_used=result.strategy_used,
+        )
+        self._session.add(group)
+
+        # Update the member paper's FK
+        stmt = select(Paper).where(Paper.id == member_id)
+        row = await self._session.execute(stmt)
+        member_paper = row.scalar_one()
+        member_paper.is_duplicate_of = canonical_id
+
+        log.info(
+            "dedup_recorded",
+            canonical_id=str(canonical_id),
+            member_id=str(member_id),
+            strategy=result.strategy_used,
+        )

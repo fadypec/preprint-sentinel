@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
+from pipeline.models import PaperGroup
 from tests.conftest import insert_paper
 
 
@@ -161,3 +162,110 @@ class TestTitleAuthorSimilarity:
         })
 
         assert result.is_duplicate is False
+
+
+class TestDoiLessFallback:
+    """Tier 3: DOI-less papers use tighter date window + lower threshold."""
+
+    async def test_doi_less_fallback_matches(self, db_session):
+        """Paper without DOI matches existing paper via title/author/date."""
+        from pipeline.ingest.dedup import DedupEngine
+
+        existing = await insert_paper(
+            db_session,
+            doi=None,
+            title="Novel findings on bat coronavirus ecology in Vietnamese caves",
+            authors=[{"name": "Tran, V."}],
+            posted_date=date(2026, 3, 1),
+        )
+
+        engine = DedupEngine(db_session)
+        result = await engine.check({
+            "doi": None,
+            "title": "Novel findings in bat coronavirus ecology in Vietnamese caves",
+            "authors": [{"name": "Tran, V."}],
+            "posted_date": date(2026, 3, 3),  # within 7-day window
+        })
+
+        assert result.is_duplicate is True
+        assert result.duplicate_of == existing.id
+        assert result.strategy_used == "title_author_date"
+
+    async def test_doi_less_outside_7_day_window(self, db_session):
+        """DOI-less paper outside +/-7 day window is not matched at tier 3."""
+        from pipeline.ingest.dedup import DedupEngine
+
+        await insert_paper(
+            db_session,
+            doi=None,
+            title="Novel findings in bat coronavirus ecology",
+            authors=[{"name": "Tran, V."}],
+            posted_date=date(2026, 3, 1),
+        )
+
+        engine = DedupEngine(db_session)
+        result = await engine.check({
+            "doi": None,
+            "title": "Novel findings in bat coronavirus ecology",
+            "authors": [{"name": "Tran, V."}],
+            "posted_date": date(2026, 3, 20),  # outside 7-day window
+        })
+
+        assert result.is_duplicate is False
+
+
+class TestRecordDuplicate:
+    """Recording duplicates in PaperGroup."""
+
+    async def test_record_creates_paper_group(self, db_session):
+        """record_duplicate creates a PaperGroup row with correct fields."""
+        from pipeline.ingest.dedup import DedupEngine, DedupResult
+
+        p1 = await insert_paper(db_session, doi="10.1101/canonical")
+        p2 = await insert_paper(db_session, doi="10.1101/duplicate")
+
+        engine = DedupEngine(db_session)
+        dedup_result = DedupResult(
+            is_duplicate=True,
+            duplicate_of=p1.id,
+            strategy_used="doi_match",
+            confidence=1.0,
+        )
+        await engine.record_duplicate(p1.id, p2.id, dedup_result)
+        await db_session.flush()
+
+        from sqlalchemy import select
+        stmt = select(PaperGroup).where(PaperGroup.canonical_id == p1.id)
+        result = await db_session.execute(stmt)
+        group = result.scalar_one()
+
+        assert group.member_id == p2.id
+        assert group.strategy_used == "doi_match"
+        assert group.confidence == 1.0
+
+    async def test_record_sets_is_duplicate_of(self, db_session):
+        """record_duplicate updates the member paper's is_duplicate_of FK."""
+        from pipeline.ingest.dedup import DedupEngine, DedupResult
+
+        p1 = await insert_paper(db_session, doi="10.1101/canonical.2")
+        p2 = await insert_paper(db_session, doi="10.1101/duplicate.2")
+
+        engine = DedupEngine(db_session)
+        dedup_result = DedupResult(
+            is_duplicate=True,
+            duplicate_of=p1.id,
+            strategy_used="doi_match",
+            confidence=1.0,
+        )
+        await engine.record_duplicate(p1.id, p2.id, dedup_result)
+        await db_session.flush()
+
+        # Re-fetch paper to verify FK was set
+        from sqlalchemy import select
+
+        from pipeline.models import Paper
+
+        stmt = select(Paper).where(Paper.id == p2.id)
+        result = await db_session.execute(stmt)
+        updated = result.scalar_one()
+        assert updated.is_duplicate_of == p1.id
