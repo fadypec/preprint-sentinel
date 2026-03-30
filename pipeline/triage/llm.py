@@ -121,3 +121,99 @@ class LLMClient:
                     await asyncio.sleep(backoff)
                     continue
                 raise
+
+    async def submit_batch(
+        self,
+        model: str,
+        system_prompt: str,
+        messages: list[tuple[str, str]],
+        tool: dict,
+    ) -> str:
+        """Submit a message batch. Returns batch_id."""
+        requests = [
+            {
+                "custom_id": custom_id,
+                "params": {
+                    "model": model,
+                    "max_tokens": 1024,
+                    "system": system_prompt,
+                    "tools": [tool],
+                    "tool_choice": {"type": "any"},
+                    "messages": [{"role": "user", "content": user_message}],
+                },
+            }
+            for custom_id, user_message in messages
+        ]
+        batch = await self._anthropic.messages.batches.create(requests=requests)
+        log.info("batch_submitted", batch_id=batch.id, count=len(requests))
+        return batch.id
+
+    async def collect_batch(
+        self,
+        batch_id: str,
+        model: str,
+        *,
+        poll_interval: float = 30.0,
+        batch: bool = True,
+    ) -> dict[str, LLMResult]:
+        """Poll until batch completes, then return {custom_id: LLMResult}."""
+        while True:
+            batch_obj = await self._anthropic.messages.batches.retrieve(batch_id)
+            if batch_obj.processing_status == "ended":
+                break
+            log.info(
+                "batch_polling",
+                batch_id=batch_id,
+                status=batch_obj.processing_status,
+            )
+            await asyncio.sleep(poll_interval)
+
+        results: dict[str, LLMResult] = {}
+        for item in self._anthropic.messages.batches.results(batch_id):
+            custom_id = item.custom_id
+            if item.result.type != "succeeded":
+                error_msg = getattr(
+                    getattr(item.result, "error", None), "message", "Unknown batch error"
+                )
+                results[custom_id] = LLMResult(
+                    tool_input={},
+                    raw_response="",
+                    input_tokens=0,
+                    output_tokens=0,
+                    cost_estimate_usd=0.0,
+                    error=error_msg,
+                )
+                log.warning("batch_item_error", custom_id=custom_id, error=error_msg)
+                continue
+
+            response = item.result.message
+            raw = response.model_dump_json()
+            in_tok = response.usage.input_tokens
+            out_tok = response.usage.output_tokens
+            cost = estimate_cost(model, in_tok, out_tok, batch=batch)
+
+            tool_block = next(
+                (b for b in response.content if isinstance(b, ToolUseBlock)),
+                None,
+            )
+            if tool_block is None:
+                results[custom_id] = LLMResult(
+                    tool_input={},
+                    raw_response=raw,
+                    input_tokens=in_tok,
+                    output_tokens=out_tok,
+                    cost_estimate_usd=cost,
+                    error="No tool_use block in batch response",
+                )
+                continue
+
+            results[custom_id] = LLMResult(
+                tool_input=tool_block.input,
+                raw_response=raw,
+                input_tokens=in_tok,
+                output_tokens=out_tok,
+                cost_estimate_usd=cost,
+            )
+
+        log.info("batch_collected", batch_id=batch_id, count=len(results))
+        return results

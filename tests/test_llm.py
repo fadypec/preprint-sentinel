@@ -258,3 +258,128 @@ class TestCallTool:
         assert result.error is not None
         assert "no tool_use block" in result.error.lower()
         assert result.tool_input == {}
+
+
+class TestBatchMode:
+    """Tests for LLMClient.submit_batch and collect_batch."""
+
+    async def test_submit_batch_returns_batch_id(self):
+        from pipeline.triage.llm import LLMClient
+
+        mock_batch = MagicMock()
+        mock_batch.id = "batch_abc123"
+
+        with patch("pipeline.triage.llm.AsyncAnthropic") as MockAnthropic:
+            mock_client = AsyncMock()
+            mock_client.messages.batches.create = AsyncMock(return_value=mock_batch)
+            MockAnthropic.return_value = mock_client
+
+            llm = LLMClient(api_key="test-key")
+            batch_id = await llm.submit_batch(
+                model="claude-haiku-4-5-20251001",
+                system_prompt="System",
+                messages=[("paper-1", "Message 1"), ("paper-2", "Message 2")],
+                tool=SAMPLE_TOOL,
+            )
+
+        assert batch_id == "batch_abc123"
+        call_kwargs = mock_client.messages.batches.create.call_args.kwargs
+        assert len(call_kwargs["requests"]) == 2
+        assert call_kwargs["requests"][0]["custom_id"] == "paper-1"
+
+    async def test_submit_batch_request_structure(self):
+        from pipeline.triage.llm import LLMClient
+
+        mock_batch = MagicMock()
+        mock_batch.id = "batch_xyz"
+
+        with patch("pipeline.triage.llm.AsyncAnthropic") as MockAnthropic:
+            mock_client = AsyncMock()
+            mock_client.messages.batches.create = AsyncMock(return_value=mock_batch)
+            MockAnthropic.return_value = mock_client
+
+            llm = LLMClient(api_key="test-key")
+            await llm.submit_batch(
+                model="claude-haiku-4-5-20251001",
+                system_prompt="System prompt",
+                messages=[("id1", "Hello")],
+                tool=SAMPLE_TOOL,
+            )
+
+        req = mock_client.messages.batches.create.call_args.kwargs["requests"][0]
+        assert req["custom_id"] == "id1"
+        params = req["params"]
+        assert params["model"] == "claude-haiku-4-5-20251001"
+        assert params["system"] == "System prompt"
+        assert params["tools"] == [SAMPLE_TOOL]
+        assert params["tool_choice"] == {"type": "any"}
+        assert params["messages"] == [{"role": "user", "content": "Hello"}]
+
+    async def test_collect_batch_polls_until_ended(self):
+        from anthropic.types.messages import MessageBatch
+
+        from pipeline.triage.llm import LLMClient
+
+        processing_batch = MagicMock(spec=MessageBatch)
+        processing_batch.processing_status = "in_progress"
+
+        ended_batch = MagicMock(spec=MessageBatch)
+        ended_batch.processing_status = "ended"
+
+        tool_input = {"relevant": True, "confidence": 0.9, "reason": "GoF"}
+        mock_response = _make_tool_use_message(tool_input)
+
+        mock_result = MagicMock()
+        mock_result.custom_id = "paper-1"
+        mock_result.result.type = "succeeded"
+        mock_result.result.message = mock_response
+
+        with patch("pipeline.triage.llm.AsyncAnthropic") as MockAnthropic:
+            mock_client = AsyncMock()
+            mock_client.messages.batches.retrieve = AsyncMock(
+                side_effect=[processing_batch, ended_batch]
+            )
+            mock_client.messages.batches.results = MagicMock(return_value=[mock_result])
+            MockAnthropic.return_value = mock_client
+
+            llm = LLMClient(api_key="test-key")
+            results = await llm.collect_batch(
+                "batch_123",
+                model="claude-haiku-4-5-20251001",
+                poll_interval=0,
+            )
+
+        assert "paper-1" in results
+        assert results["paper-1"].tool_input == tool_input
+        assert mock_client.messages.batches.retrieve.call_count == 2
+
+    async def test_collect_batch_handles_errored_result(self):
+        from anthropic.types.messages import MessageBatch
+
+        from pipeline.triage.llm import LLMClient
+
+        ended_batch = MagicMock(spec=MessageBatch)
+        ended_batch.processing_status = "ended"
+
+        mock_errored = MagicMock()
+        mock_errored.custom_id = "paper-err"
+        mock_errored.result.type = "errored"
+        mock_errored.result.error = MagicMock()
+        mock_errored.result.error.message = "Internal error"
+
+        with patch("pipeline.triage.llm.AsyncAnthropic") as MockAnthropic:
+            mock_client = AsyncMock()
+            mock_client.messages.batches.retrieve = AsyncMock(return_value=ended_batch)
+            mock_client.messages.batches.results = MagicMock(return_value=[mock_errored])
+            MockAnthropic.return_value = mock_client
+
+            llm = LLMClient(api_key="test-key")
+            results = await llm.collect_batch(
+                "batch_456",
+                model="claude-haiku-4-5-20251001",
+                poll_interval=0,
+            )
+
+        assert "paper-err" in results
+        assert results["paper-err"].error is not None
+        assert results["paper-err"].tool_input == {}
