@@ -66,6 +66,10 @@ async def test_status_rejects_wrong_secret(client):
 async def test_run_triggers_pipeline(client, mock_scheduler):
     resp = await client.post("/run", headers=HEADERS)
     assert resp.status_code == 200
+    data = resp.json()
+    assert data["papers_ingested"] == 10
+    assert data["papers_adjudicated"] == 2
+    assert data["errors"] == []
     mock_scheduler.trigger_run.assert_awaited_once()
 
 
@@ -89,4 +93,9 @@ async def test_update_schedule(client, mock_scheduler):
 
 async def test_update_schedule_validates_hour(client):
     resp = await client.put("/schedule", headers=HEADERS, json={"hour": 25})
+    assert resp.status_code == 422
+
+
+async def test_update_schedule_validates_minute(client):
+    resp = await client.put("/schedule", headers=HEADERS, json={"hour": 6, "minute": 60})
     assert resp.status_code == 422
