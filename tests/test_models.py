@@ -3,7 +3,9 @@
 import uuid
 from datetime import date
 
+import pytest
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -117,3 +119,51 @@ async def test_assessment_log_insert(db_session: AsyncSession):
     assert row.stage == "coarse_filter"
     assert row.parsed_result == {"relevant": True, "confidence": 0.95}
     assert row.input_tokens == 150
+
+
+async def test_user_default_role(db_session: AsyncSession):
+    """User.role defaults to ANALYST when not explicitly set."""
+    from pipeline.models import User, UserRole
+
+    user = User(
+        email="analyst@example.com",
+        name="Test Analyst",
+    )
+    db_session.add(user)
+    await db_session.flush()
+
+    result = await db_session.execute(select(User).where(User.email == "analyst@example.com"))
+    row = result.scalar_one()
+
+    assert row.role == UserRole.ANALYST
+
+
+async def test_user_email_unique(db_session: AsyncSession):
+    """Inserting two Users with the same email raises IntegrityError."""
+    from pipeline.models import User
+
+    user1 = User(email="duplicate@example.com", name="User One")
+    user2 = User(email="duplicate@example.com", name="User Two")
+
+    db_session.add(user1)
+    await db_session.flush()
+
+    db_session.add(user2)
+    with pytest.raises(IntegrityError):
+        await db_session.flush()
+
+
+async def test_pipeline_settings_insert_and_read(db_session: AsyncSession):
+    """PipelineSettings with id=1 and a settings dict can be inserted and read back."""
+    from pipeline.models import PipelineSettings
+
+    config = {"coarse_filter_threshold": 0.8, "daily_run_hour": 6}
+    settings = PipelineSettings(id=1, settings=config)
+    db_session.add(settings)
+    await db_session.flush()
+
+    result = await db_session.execute(select(PipelineSettings).where(PipelineSettings.id == 1))
+    row = result.scalar_one()
+
+    assert row.id == 1
+    assert row.settings == config

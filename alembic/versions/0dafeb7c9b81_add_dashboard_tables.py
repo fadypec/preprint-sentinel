@@ -39,6 +39,7 @@ def upgrade() -> None:
                 create_constraint=True,
             ),
             nullable=False,
+            server_default="analyst",
         ),
         sa.Column(
             "created_at",
@@ -55,7 +56,6 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("email"),
     )
-    op.create_index(op.f("ix_users_email"), "users", ["email"], unique=False)
 
     # --- pipeline_settings table ---
     op.create_table(
@@ -73,6 +73,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.PrimaryKeyConstraint("id"),
+        sa.CheckConstraint("id = 1", name="ck_pipeline_settings_singleton"),
     )
 
     # Full-text search index on papers
@@ -96,7 +97,6 @@ def downgrade() -> None:
 
     op.drop_table("pipeline_settings")
 
-    op.drop_index(op.f("ix_users_email"), table_name="users")
     op.drop_table("users")
 
     op.execute("DROP TYPE IF EXISTS user_role")

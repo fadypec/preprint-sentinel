@@ -18,6 +18,7 @@ from datetime import date, datetime
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     Float,
@@ -239,12 +240,13 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+    email: Mapped[str] = mapped_column(String(320), unique=True)
     name: Mapped[str | None] = mapped_column(String(255))
     image: Mapped[str | None] = mapped_column(Text)
     role: Mapped[UserRole] = mapped_column(
         SQLEnum(UserRole, name="user_role", create_constraint=True),
         default=UserRole.ANALYST,
+        server_default="analyst",
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -261,6 +263,9 @@ class PipelineSettings(Base):
     """Single-row table for dashboard-editable pipeline config."""
 
     __tablename__ = "pipeline_settings"
+    __table_args__ = (
+        CheckConstraint("id = 1", name="ck_pipeline_settings_singleton"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
     settings: Mapped[dict] = mapped_column(PlatformJSON, default=dict)
