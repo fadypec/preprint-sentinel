@@ -1,0 +1,93 @@
+import Link from "next/link";
+import type { Paper } from "@prisma/client";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import { riskStyle } from "@/lib/risk-colors";
+import { formatDate, sourceServerLabel } from "@/lib/utils";
+
+type Stage2Result = {
+  summary?: string;
+  dimensions?: Record<string, { score: number; justification: string }>;
+  aggregate_score?: number;
+};
+
+type PaperCardProps = {
+  paper: Paper;
+};
+
+export function PaperCard({ paper }: PaperCardProps) {
+  const style = riskStyle(paper.riskTier);
+  const stage2 = paper.stage2Result as Stage2Result | null;
+  const stage3 = paper.stage3Result as { summary?: string } | null;
+  const summary = stage3?.summary ?? stage2?.summary ?? null;
+
+  // Show risk dimensions scoring >= 2
+  const highDimensions = stage2?.dimensions
+    ? Object.entries(stage2.dimensions)
+        .filter(([, d]) => d.score >= 2)
+        .sort(([, a], [, b]) => b.score - a.score)
+    : [];
+
+  // Format author list
+  type AuthorEntry = { name?: string };
+  const authorList = Array.isArray(paper.authors)
+    ? (paper.authors as unknown as AuthorEntry[])
+    : null;
+  const authors = authorList
+    ? authorList
+        .slice(0, 3)
+        .map((a) => a.name ?? "Unknown")
+        .join(", ") + (authorList.length > 3 ? " et al." : "")
+    : paper.correspondingAuthor ?? "Unknown authors";
+
+  return (
+    <Link href={`/paper/${paper.id}`} className="block">
+      <Card
+        className={cn(
+          "border-l-4 p-4 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800",
+          style.border
+        )}
+        role="article"
+        aria-label={`${paper.title}. Risk tier: ${style.label}, score ${paper.aggregateScore ?? 0} out of 18`}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              {paper.title}
+            </h3>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              {authors} &middot; {paper.correspondingInstitution ?? ""} &middot;{" "}
+              {sourceServerLabel(paper.sourceServer)} &middot; {formatDate(paper.postedDate)}
+            </p>
+          </div>
+          <Badge className={cn("shrink-0", style.badge)} aria-label={`Risk tier: ${style.label}`}>
+            {style.label}
+          </Badge>
+        </div>
+
+        {summary && (
+          <p className="mt-2 line-clamp-2 text-xs text-slate-600 dark:text-slate-300">
+            {summary}
+          </p>
+        )}
+
+        {highDimensions.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {highDimensions.map(([name, dim]) => (
+              <span
+                key={name}
+                className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600 dark:bg-slate-700 dark:text-slate-300"
+              >
+                {name.replace(/_/g, " ")}: {dim.score}
+              </span>
+            ))}
+            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-700 dark:bg-slate-700 dark:text-slate-200">
+              Score: {paper.aggregateScore ?? 0}/18
+            </span>
+          </div>
+        )}
+      </Card>
+    </Link>
+  );
+}
