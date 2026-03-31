@@ -1,13 +1,9 @@
-import { prisma } from "@/lib/prisma";
-import { PipelineStage, Prisma, RiskTier, SourceServer, ReviewStatus } from "@prisma/client";
 import { PaperCard } from "@/components/paper-card";
 import { PaperFilters } from "@/components/paper-filters";
 import { buttonVariants } from "@/components/ui/button";
-import { buildSearchQuery } from "@/lib/search";
+import { queryPapers } from "@/lib/queries/papers";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-
-const PAGE_SIZE = 20;
 
 type Props = {
   searchParams: Promise<{
@@ -34,72 +30,20 @@ function buildPaginationHref(
 
 export default async function DailyFeedPage({ searchParams }: Props) {
   const params = await searchParams;
-  const page = Math.max(1, parseInt(params.page ?? "1", 10));
+  const page = parseInt(params.page ?? "1", 10) || 1;
   const tier = params.tier;
   const source = params.source;
   const status = params.status;
   const search = params.q?.trim();
 
-  const where: Prisma.PaperWhereInput = {
-    pipelineStage: { not: PipelineStage.ingested },
-    isDuplicateOf: null,
-  };
+  const { papers, total, totalPages } = await queryPapers({
+    page,
+    tier,
+    source,
+    status,
+    search,
+  });
 
-  if (tier && tier !== "all") {
-    where.riskTier = tier as RiskTier;
-  }
-  if (source && source !== "all") {
-    where.sourceServer = source as SourceServer;
-  }
-  if (status && status !== "all") {
-    where.reviewStatus = status as ReviewStatus;
-  }
-
-  let papers;
-  let total: number;
-
-  if (search) {
-    const tsquery = buildSearchQuery(search);
-    if (tsquery) {
-      const countResult = await prisma.$queryRaw<[{ count: bigint }]>`
-        SELECT COUNT(*) as count FROM papers
-        WHERE search_vector @@ to_tsquery('english', ${tsquery})
-          AND pipeline_stage != 'ingested'
-          AND is_duplicate_of IS NULL
-          ${tier && tier !== "all" ? Prisma.sql`AND risk_tier = ${tier}::risk_tier` : Prisma.empty}
-          ${source && source !== "all" ? Prisma.sql`AND source_server = ${source}::source_server` : Prisma.empty}
-          ${status && status !== "all" ? Prisma.sql`AND review_status = ${status}::review_status` : Prisma.empty}
-      `;
-      total = Number(countResult[0].count);
-      papers = await prisma.$queryRaw`
-        SELECT * FROM papers
-        WHERE search_vector @@ to_tsquery('english', ${tsquery})
-          AND pipeline_stage != 'ingested'
-          AND is_duplicate_of IS NULL
-          ${tier && tier !== "all" ? Prisma.sql`AND risk_tier = ${tier}::risk_tier` : Prisma.empty}
-          ${source && source !== "all" ? Prisma.sql`AND source_server = ${source}::source_server` : Prisma.empty}
-          ${status && status !== "all" ? Prisma.sql`AND review_status = ${status}::review_status` : Prisma.empty}
-        ORDER BY ts_rank(search_vector, to_tsquery('english', ${tsquery})) DESC
-        LIMIT ${PAGE_SIZE} OFFSET ${(page - 1) * PAGE_SIZE}
-      `;
-    } else {
-      papers = [];
-      total = 0;
-    }
-  } else {
-    total = await prisma.paper.count({ where });
-    papers = await prisma.paper.findMany({
-      where,
-      orderBy: [
-        { riskTier: { sort: "desc", nulls: "last" } },
-        { postedDate: "desc" },
-      ],
-      take: PAGE_SIZE,
-      skip: (page - 1) * PAGE_SIZE,
-    });
-  }
-
-  const totalPages = Math.ceil(total / PAGE_SIZE);
   const filterState = { tier, source, status, q: search };
 
   return (
@@ -125,10 +69,10 @@ export default async function DailyFeedPage({ searchParams }: Props) {
       </div>
 
       <div className="flex flex-col gap-3" role="feed" aria-label="Flagged papers">
-        {(papers as { id: string }[]).map((paper) => (
-          <PaperCard key={paper.id} paper={paper as Parameters<typeof PaperCard>[0]["paper"]} />
+        {papers.map((paper) => (
+          <PaperCard key={paper.id} paper={paper} />
         ))}
-        {(papers as unknown[]).length === 0 && (
+        {papers.length === 0 && (
           <p className="py-12 text-center text-sm text-slate-500 dark:text-slate-400">
             No papers match your filters.
           </p>
