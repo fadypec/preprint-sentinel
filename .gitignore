@@ -26,5 +26,6 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# Superpowers brainstorming artifacts
+# Superpowers
 .superpowers/
+.worktrees/
