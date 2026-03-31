@@ -70,6 +70,8 @@ export async function GET() {
       count: r._count.id,
     }));
 
+    const hasErrors = Array.isArray(lastRun?.errors) && lastRun.errors.length > 0;
+
     return Response.json({
       kpi: {
         papersToday,
@@ -79,11 +81,7 @@ export async function GET() {
           dailyAvg > 0
             ? Math.round(((papersToday - dailyAvg) / dailyAvg) * 100)
             : 0,
-        lastRunStatus: lastRun
-          ? (lastRun.errors as unknown[])?.length
-            ? "error"
-            : "success"
-          : "unknown",
+        lastRunStatus: lastRun ? (hasErrors ? "error" : "success") : "unknown",
       },
       topInstitutions,
       topCategories,

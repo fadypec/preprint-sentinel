@@ -125,7 +125,7 @@ async function getStats() {
         ? Math.round(((papersToday - dailyAvg) / dailyAvg) * 100)
         : 0,
     lastRunOk: lastRun
-      ? !(lastRun.errors as unknown[])?.length
+      ? !(Array.isArray(lastRun.errors) && lastRun.errors.length > 0)
       : null,
     papersOverTime,
     topInstitutions,
