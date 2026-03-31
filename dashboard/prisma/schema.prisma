@@ -1,0 +1,202 @@
+// dashboard/prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum SourceServer {
+  biorxiv
+  medrxiv
+  europepmc
+  pubmed
+  arxiv
+  research_square
+  chemrxiv
+  zenodo
+  ssrn
+
+  @@map("source_server")
+}
+
+enum PipelineStage {
+  ingested
+  coarse_filtered
+  fulltext_retrieved
+  methods_analysed
+  adjudicated
+
+  @@map("pipeline_stage")
+}
+
+enum RiskTier {
+  low
+  medium
+  high
+  critical
+
+  @@map("risk_tier")
+}
+
+enum RecommendedAction {
+  archive
+  monitor
+  review
+  escalate
+
+  @@map("recommended_action")
+}
+
+enum ReviewStatus {
+  unreviewed
+  under_review
+  confirmed_concern
+  false_positive
+  archived
+
+  @@map("review_status")
+}
+
+enum UserRole {
+  admin
+  analyst
+
+  @@map("user_role")
+}
+
+model Paper {
+  id                       String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  doi                      String?             @db.VarChar(255)
+  title                    String
+  authors                  Json?
+  correspondingAuthor      String?             @map("corresponding_author") @db.VarChar(512)
+  correspondingInstitution String?             @map("corresponding_institution") @db.VarChar(512)
+  abstract                 String?
+  sourceServer             SourceServer        @map("source_server")
+  postedDate               DateTime            @map("posted_date") @db.Date
+  subjectCategory          String?             @map("subject_category") @db.VarChar(255)
+  version                  Int                 @default(1)
+  fullTextUrl              String?             @map("full_text_url")
+  fullTextRetrieved        Boolean             @default(false) @map("full_text_retrieved")
+  fullTextContent          String?             @map("full_text_content")
+  methodsSection           String?             @map("methods_section")
+  enrichmentData           Json?               @map("enrichment_data")
+  pipelineStage            PipelineStage       @default(ingested) @map("pipeline_stage")
+  stage1Result             Json?               @map("stage1_result")
+  stage2Result             Json?               @map("stage2_result")
+  stage3Result             Json?               @map("stage3_result")
+  riskTier                 RiskTier?           @map("risk_tier")
+  recommendedAction        RecommendedAction?  @map("recommended_action")
+  aggregateScore           Int?                @map("aggregate_score")
+  reviewStatus             ReviewStatus        @default(unreviewed) @map("review_status")
+  analystNotes             String?             @map("analyst_notes")
+  isDuplicateOf            String?             @map("is_duplicate_of") @db.Uuid
+  createdAt                DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  assessmentLogs AssessmentLog[]
+
+  @@index([doi])
+  @@index([postedDate])
+  @@index([pipelineStage])
+  @@index([riskTier])
+  @@index([reviewStatus])
+  @@index([isDuplicateOf])
+  @@map("papers")
+}
+
+model AssessmentLog {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  paperId         String   @map("paper_id") @db.Uuid
+  stage           String   @db.VarChar(50)
+  modelUsed       String   @map("model_used") @db.VarChar(100)
+  promptVersion   String   @map("prompt_version") @db.VarChar(50)
+  promptText      String   @map("prompt_text")
+  rawResponse     String   @map("raw_response")
+  parsedResult    Json?    @map("parsed_result")
+  inputTokens     Int      @map("input_tokens")
+  outputTokens    Int      @map("output_tokens")
+  costEstimateUsd Float    @map("cost_estimate_usd")
+  error           String?
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  paper Paper @relation(fields: [paperId], references: [id])
+
+  @@index([paperId])
+  @@index([stage])
+  @@index([createdAt])
+  @@map("assessment_logs")
+}
+
+model PipelineRun {
+  id                      String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  startedAt               DateTime  @map("started_at") @db.Timestamptz
+  finishedAt              DateTime? @map("finished_at") @db.Timestamptz
+  papersIngested          Int       @default(0) @map("papers_ingested")
+  papersAfterDedup        Int       @default(0) @map("papers_after_dedup")
+  papersCoarsePassed      Int       @default(0) @map("papers_coarse_passed")
+  papersFulltextRetrieved Int       @default(0) @map("papers_fulltext_retrieved")
+  papersMethodsAnalysed   Int       @default(0) @map("papers_methods_analysed")
+  papersEnriched          Int       @default(0) @map("papers_enriched")
+  papersAdjudicated       Int       @default(0) @map("papers_adjudicated")
+  errors                  Json?
+  totalCostUsd            Float     @default(0) @map("total_cost_usd")
+  trigger                 String    @db.VarChar(50)
+
+  @@map("pipeline_runs")
+}
+
+model User {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email     String   @unique @db.VarChar(320)
+  name      String?  @db.VarChar(255)
+  image     String?
+  role      UserRole @default(analyst)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  accounts Account[]
+  sessions Session[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String  @map("user_id") @db.Uuid
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refreshToken      String? @map("refresh_token")
+  accessToken       String? @map("access_token")
+  expiresAt         Int?    @map("expires_at")
+  tokenType         String? @map("token_type")
+  scope             String?
+  idToken           String? @map("id_token")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id") @db.Uuid
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model PipelineSettings {
+  id        Int      @id @default(1)
+  settings  Json     @default("{}")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("pipeline_settings")
+}
