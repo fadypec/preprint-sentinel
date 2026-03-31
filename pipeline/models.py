@@ -1,10 +1,12 @@
 """SQLAlchemy ORM models for the DURC triage pipeline.
 
-Four tables:
+Six tables:
 - papers: main record for each ingested paper
 - paper_groups: links duplicate/related paper records
 - assessment_logs: append-only audit trail of every LLM classification
 - pipeline_runs: tracks each pipeline execution with counters and cost
+- users: dashboard users (created on OAuth login)
+- pipeline_settings: single-row table for dashboard-editable pipeline config
 """
 
 from __future__ import annotations
@@ -90,6 +92,11 @@ class DedupRelationship(enum.StrEnum):
     PUBLISHED_VERSION = "published_version"
     UPDATED_VERSION = "updated_version"
     CROSS_POSTED = "cross_posted"
+
+
+class UserRole(enum.StrEnum):
+    ADMIN = "admin"
+    ANALYST = "analyst"
 
 
 # ---------------------------------------------------------------------------
@@ -224,3 +231,41 @@ class PipelineRun(Base):
     errors: Mapped[list | None] = mapped_column(PlatformJSON)
     total_cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
     trigger: Mapped[str] = mapped_column(String(50))
+
+
+class User(Base):
+    """Dashboard user (created on OAuth login)."""
+
+    __tablename__ = "users"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+    name: Mapped[str | None] = mapped_column(String(255))
+    image: Mapped[str | None] = mapped_column(Text)
+    role: Mapped[UserRole] = mapped_column(
+        SQLEnum(UserRole, name="user_role", create_constraint=True),
+        default=UserRole.ANALYST,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+
+class PipelineSettings(Base):
+    """Single-row table for dashboard-editable pipeline config."""
+
+    __tablename__ = "pipeline_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    settings: Mapped[dict] = mapped_column(PlatformJSON, default=dict)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
