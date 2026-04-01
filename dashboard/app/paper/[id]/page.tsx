@@ -40,12 +40,45 @@ export default async function PaperDetailPage({ params }: Props) {
   } | null;
 
   type AuthorEntry = { name?: string };
+  type OpenAlexAuthor = { name?: string; orcid?: string | null };
   const authorList = Array.isArray(paper.authors)
     ? (paper.authors as unknown as AuthorEntry[])
     : null;
-  const authors = authorList
-    ? authorList.map((a) => a.name ?? "Unknown").join(", ")
-    : paper.correspondingAuthor ?? "Unknown";
+
+  // Extract per-author ORCIDs from OpenAlex enrichment data
+  const enrichment = paper.enrichmentData as {
+    openalex?: { authors?: OpenAlexAuthor[] };
+  } | null;
+  const oaAuthors = enrichment?.openalex?.authors ?? [];
+
+  // Build a name→ORCID map from OpenAlex (normalise to lowercase for matching)
+  const orcidMap = new Map<string, string>();
+  for (const oa of oaAuthors) {
+    if (oa.name && oa.orcid) {
+      orcidMap.set(oa.name.toLowerCase(), oa.orcid);
+    }
+  }
+
+  // Merge: for each paper author, try to find an ORCID match
+  type AuthorWithOrcid = { name: string; orcid: string | null };
+  const authorsWithOrcids: AuthorWithOrcid[] = authorList
+    ? authorList.map((a) => {
+        const name = a.name ?? "Unknown";
+        // Try exact match, then check if OpenAlex name contains the paper author name
+        let orcid = orcidMap.get(name.toLowerCase()) ?? null;
+        if (!orcid) {
+          for (const [oaName, oaOrcid] of orcidMap) {
+            if (oaName.includes(name.split(",")[0].toLowerCase())) {
+              orcid = oaOrcid;
+              break;
+            }
+          }
+        }
+        return { name, orcid };
+      })
+    : oaAuthors
+        .filter((a) => a.name)
+        .map((a) => ({ name: a.name!, orcid: a.orcid ?? null }));
 
   return (
     <div>
@@ -88,7 +121,32 @@ export default async function PaperDetailPage({ params }: Props) {
             <div className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
               <div>
                 <span className="text-slate-500 dark:text-slate-400">Authors: </span>
-                {authors}
+                {authorsWithOrcids.length > 0 ? (
+                  <span>
+                    {authorsWithOrcids.map((a, i) => (
+                      <span key={i}>
+                        {i > 0 && ", "}
+                        {a.name}
+                        {a.orcid && (
+                          <>
+                            {" "}
+                            <a
+                              href={`https://orcid.org/${a.orcid}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-0.5 rounded bg-green-50 px-1 py-0.5 text-[10px] font-medium text-green-700 no-underline hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
+                              title={`ORCID: ${a.orcid}`}
+                            >
+                              ORCID
+                            </a>
+                          </>
+                        )}
+                      </span>
+                    ))}
+                  </span>
+                ) : (
+                  paper.correspondingAuthor ?? "Unknown"
+                )}
               </div>
               {paper.correspondingInstitution && (
                 <div>

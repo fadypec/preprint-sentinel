@@ -22,11 +22,11 @@ type ProgressData = {
 };
 
 const STAGES = [
-  { key: "ingest", label: "Ingest", stat: "papersIngested" },
-  { key: "dedup", label: "Deduplicate", stat: "papersAfterDedup" },
+  { key: "ingest", label: "Ingestion", stat: "papersIngested" },
+  { key: "dedup", label: "Deduplication", stat: "papersAfterDedup" },
   { key: "translation", label: "Translation", stat: null },
-  { key: "coarse_filter", label: "Coarse Filter", stat: "papersCoarsePassed" },
-  { key: "fulltext", label: "Full Text", stat: "papersFulltextRetrieved" },
+  { key: "coarse_filter", label: "Coarse Filtering", stat: "papersCoarsePassed" },
+  { key: "fulltext", label: "Full-Text Retrieval", stat: "papersFulltextRetrieved" },
   { key: "fulltext_translation", label: "Full-Text Translation", stat: null },
   { key: "methods_analysis", label: "Methods Analysis", stat: "papersMethodsAnalysed" },
   { key: "enrichment", label: "Enrichment", stat: "papersEnriched" },

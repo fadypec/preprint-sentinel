@@ -32,6 +32,14 @@ from pipeline.triage.methods_analysis import run_methods_analysis
 log = structlog.get_logger()
 
 
+def _exc_str(exc: Exception) -> str:
+    """Format an exception for error logging. Includes class name so
+    exceptions with empty str() (e.g. httpx.ReadTimeout) are still useful."""
+    msg = str(exc)
+    name = type(exc).__name__
+    return f"{name}: {msg}" if msg else name
+
+
 @dataclass
 class PipelineRunStats:
     """Statistics from a single pipeline run."""
@@ -136,7 +144,7 @@ async def run_daily_pipeline(
             await _flush_progress()
             log.info("stage_complete", stage="ingest", papers=len(ingested_papers))
         except Exception as exc:
-            stats.errors.append(f"Ingest: {exc}")
+            stats.errors.append(f"Ingest: {_exc_str(exc)}")
             log.error("pipeline_ingest_error", error=str(exc), exc_info=True)
             await session.rollback()
 
@@ -158,7 +166,7 @@ async def run_daily_pipeline(
                 duplicates=dup_count,
             )
         except Exception as exc:
-            stats.errors.append(f"Dedup: {exc}")
+            stats.errors.append(f"Dedup: {_exc_str(exc)}")
             log.error("pipeline_dedup_error", error=str(exc), exc_info=True)
             non_dup_papers = ingested_papers
             await session.rollback()
@@ -185,7 +193,7 @@ async def run_daily_pipeline(
                 await _flush_progress()
                 log.info("stage_complete", stage="translation", total=len(non_english))
         except Exception as exc:
-            stats.errors.append(f"Translation: {exc}")
+            stats.errors.append(f"Translation: {_exc_str(exc)}")
             log.error("pipeline_translation_error", error=str(exc), exc_info=True)
             await session.rollback()
 
@@ -239,7 +247,7 @@ async def run_daily_pipeline(
                 passed=len(passed),
             )
         except Exception as exc:
-            stats.errors.append(f"Coarse filter: {exc}")
+            stats.errors.append(f"Coarse filter: {_exc_str(exc)}")
             log.error("pipeline_coarse_filter_error", error=str(exc), exc_info=True)
             await session.rollback()
 
@@ -272,7 +280,7 @@ async def run_daily_pipeline(
                 retrieved=stats.papers_fulltext_retrieved,
             )
         except Exception as exc:
-            stats.errors.append(f"Full-text retrieval: {exc}")
+            stats.errors.append(f"Full-text retrieval: {_exc_str(exc)}")
             log.error("pipeline_fulltext_error", error=str(exc), exc_info=True)
             await session.rollback()
 
@@ -307,7 +315,7 @@ async def run_daily_pipeline(
                 await _flush_progress()
                 log.info("stage_complete", stage="fulltext_translation", total=len(non_english_ft))
         except Exception as exc:
-            stats.errors.append(f"Fulltext translation: {exc}")
+            stats.errors.append(f"Fulltext translation: {_exc_str(exc)}")
             log.error("pipeline_fulltext_translation_error", error=str(exc), exc_info=True)
             await session.rollback()
 
@@ -340,7 +348,7 @@ async def run_daily_pipeline(
             await _flush_progress()
             log.info("stage_complete", stage="methods_analysis", total=len(fulltext_papers))
         except Exception as exc:
-            stats.errors.append(f"Methods analysis: {exc}")
+            stats.errors.append(f"Methods analysis: {_exc_str(exc)}")
             log.error("pipeline_methods_error", error=str(exc), exc_info=True)
             await session.rollback()
 
@@ -368,7 +376,7 @@ async def run_daily_pipeline(
                 enriched=len(enriched),
             )
         except Exception as exc:
-            stats.errors.append(f"Enrichment: {exc}")
+            stats.errors.append(f"Enrichment: {_exc_str(exc)}")
             log.error("pipeline_enrichment_error", error=str(exc), exc_info=True)
             await session.rollback()
 
@@ -397,7 +405,7 @@ async def run_daily_pipeline(
             await _flush_progress()
             log.info("stage_complete", stage="adjudication", total=len(to_adjudicate))
         except Exception as exc:
-            stats.errors.append(f"Adjudication: {exc}")
+            stats.errors.append(f"Adjudication: {_exc_str(exc)}")
             log.error("pipeline_adjudication_error", error=str(exc), exc_info=True)
             await session.rollback()
 

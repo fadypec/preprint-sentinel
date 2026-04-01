@@ -42,7 +42,7 @@ export function Sidebar({ pipelineStatus, userName }: SidebarProps) {
     : "Unknown";
 
   return (
-    <aside className="flex h-screen w-56 flex-col border-r border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
+    <aside suppressHydrationWarning className="relative z-50 flex h-screen w-56 flex-col border-r border-slate-200 bg-white pb-16 dark:border-slate-700 dark:bg-slate-800">
       {/* Logo */}
       <div className="flex items-center gap-2 px-4 py-5">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white">

@@ -86,7 +86,7 @@ class BiorxivClient:
         for attempt in range(1, self.max_retries + 1):
             await asyncio.sleep(self.request_delay)
             try:
-                resp = await self._client.get(url, timeout=30.0)
+                resp = await self._client.get(url, timeout=60.0)
                 if resp.status_code == 200:
                     return resp.json()
                 if resp.status_code in (429, 503):
@@ -101,11 +101,18 @@ class BiorxivClient:
                     await asyncio.sleep(backoff)
                     continue
                 resp.raise_for_status()
-            except httpx.TimeoutException:
+            except (httpx.TimeoutException, httpx.RemoteProtocolError) as exc:
                 if attempt == self.max_retries:
                     raise
                 backoff = min(2**attempt, 30)
-                log.warning("timeout", url=url, attempt=attempt, backoff=backoff)
+                log.warning(
+                    "request_error",
+                    source=self.server,
+                    error=f"{type(exc).__name__}: {exc}" if str(exc) else type(exc).__name__,
+                    url=url,
+                    attempt=attempt,
+                    backoff=backoff,
+                )
                 await asyncio.sleep(backoff)
 
         raise RuntimeError(f"Failed after {self.max_retries} retries: {url}")

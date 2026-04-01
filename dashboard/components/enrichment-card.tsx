@@ -1,11 +1,20 @@
 import { AlertTriangle } from "lucide-react";
 
+type OpenAlexAuthor = {
+  name?: string;
+  orcid?: string | null;
+  institution?: string | null;
+  works_count?: number | null;
+  cited_by_count?: number | null;
+};
+
 type EnrichmentData = {
   openalex?: {
     cited_by_count?: number;
     topics?: { display_name: string }[];
     primary_institution?: string;
     funder_names?: string[];
+    authors?: OpenAlexAuthor[];
   };
   s2?: {
     tldr?: string;
@@ -64,7 +73,14 @@ export function EnrichmentCard({ data }: Props) {
         {data.orcid?.orcid_id && (
           <>
             <span className="text-slate-500 dark:text-slate-400">ORCID</span>
-            <span className="text-slate-700 dark:text-slate-300">{data.orcid.orcid_id}</span>
+            <a
+              href={`https://orcid.org/${data.orcid.orcid_id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 underline dark:text-blue-400"
+            >
+              {data.orcid.orcid_id}
+            </a>
           </>
         )}
         {data.openalex?.primary_institution && (
