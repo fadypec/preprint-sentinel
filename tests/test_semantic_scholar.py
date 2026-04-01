@@ -21,9 +21,7 @@ def _paper_response() -> dict:
     }
 
 
-def _author_response(
-    h_index: int = 25, citation_count: int = 4500, paper_count: int = 80
-) -> dict:
+def _author_response(h_index: int = 25, citation_count: int = 4500, paper_count: int = 80) -> dict:
     """Build a mock Semantic Scholar author response."""
     return {
         "authorId": "12345",
@@ -78,9 +76,7 @@ class TestSemanticScholarLookup:
         """Client works without an API key (no x-api-key header sent)."""
         from pipeline.enrichment.semantic_scholar import SemanticScholarClient
 
-        route = respx.get(
-            "https://api.semanticscholar.org/graph/v1/paper/DOI:10.1234/test"
-        ).mock(
+        route = respx.get("https://api.semanticscholar.org/graph/v1/paper/DOI:10.1234/test").mock(
             return_value=httpx.Response(200, json=_paper_response())
         )
         respx.get("https://api.semanticscholar.org/graph/v1/author/12345").mock(
@@ -98,9 +94,7 @@ class TestSemanticScholarLookup:
     async def test_api_key_sent_when_provided(self):
         from pipeline.enrichment.semantic_scholar import SemanticScholarClient
 
-        route = respx.get(
-            "https://api.semanticscholar.org/graph/v1/paper/DOI:10.1234/test"
-        ).mock(
+        route = respx.get("https://api.semanticscholar.org/graph/v1/paper/DOI:10.1234/test").mock(
             return_value=httpx.Response(200, json=_paper_response())
         )
         respx.get("https://api.semanticscholar.org/graph/v1/author/12345").mock(
@@ -118,9 +112,7 @@ class TestSemanticScholarLookup:
     async def test_retry_on_429(self):
         from pipeline.enrichment.semantic_scholar import SemanticScholarClient
 
-        route = respx.get(
-            "https://api.semanticscholar.org/graph/v1/paper/DOI:10.1234/retry"
-        ).mock(
+        route = respx.get("https://api.semanticscholar.org/graph/v1/paper/DOI:10.1234/retry").mock(
             side_effect=[
                 httpx.Response(429),
                 httpx.Response(200, json=_paper_response()),

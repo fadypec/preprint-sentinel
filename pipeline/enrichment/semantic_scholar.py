@@ -115,9 +115,7 @@ class SemanticScholarClient:
                 if attempt == self.max_retries:
                     raise
                 backoff = min(2**attempt, 30)
-                log.warning(
-                    "timeout", source="semantic_scholar", attempt=attempt, backoff=backoff
-                )
+                log.warning("timeout", source="semantic_scholar", attempt=attempt, backoff=backoff)
                 await asyncio.sleep(backoff)
 
         raise RuntimeError(f"Semantic Scholar failed after {self.max_retries} retries: {doi}")

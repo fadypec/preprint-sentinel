@@ -206,6 +206,7 @@ export function PaperFilters({ tier, source, status, q }: PaperFiltersProps) {
       </form>
 
       {hasFilters && (
+        // eslint-disable-next-line @next/next/no-html-link-for-pages -- intentional: plain <a> for server-side navigation
         <a
           href="/"
           className="inline-flex h-7 items-center gap-1 rounded-lg px-2.5 text-[0.8rem] font-medium transition-colors hover:bg-muted hover:text-foreground"

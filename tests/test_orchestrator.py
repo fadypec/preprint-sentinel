@@ -41,9 +41,7 @@ class TestRunDailyPipeline:
         async def mock_adjudicate(session, llm_client, papers, model, min_tier):
             call_order.append("adjudication")
 
-        session_factory = async_sessionmaker(
-            db_engine, class_=AsyncSession, expire_on_commit=False
-        )
+        session_factory = async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
 
         mock_settings = MagicMock()
         mock_settings.database_url = MagicMock()
@@ -51,9 +49,7 @@ class TestRunDailyPipeline:
             return_value="sqlite+aiosqlite:///:memory:"
         )
         mock_settings.anthropic_api_key = MagicMock()
-        mock_settings.anthropic_api_key.get_secret_value = MagicMock(
-            return_value="sk-test"
-        )
+        mock_settings.anthropic_api_key.get_secret_value = MagicMock(return_value="sk-test")
         mock_settings.stage1_model = "claude-haiku-4-5-20251001"
         mock_settings.stage2_model = "claude-sonnet-4-6"
         mock_settings.stage3_model = "claude-opus-4-6"
@@ -96,9 +92,7 @@ class TestRunDailyPipeline:
     async def test_stats_populated(self, db_engine, db_session: AsyncSession):
         from pipeline.orchestrator import run_daily_pipeline
 
-        session_factory = async_sessionmaker(
-            db_engine, class_=AsyncSession, expire_on_commit=False
-        )
+        session_factory = async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
 
         mock_settings = MagicMock()
         mock_settings.database_url = MagicMock()
@@ -106,9 +100,7 @@ class TestRunDailyPipeline:
             return_value="sqlite+aiosqlite:///:memory:"
         )
         mock_settings.anthropic_api_key = MagicMock()
-        mock_settings.anthropic_api_key.get_secret_value = MagicMock(
-            return_value="sk-test"
-        )
+        mock_settings.anthropic_api_key.get_secret_value = MagicMock(return_value="sk-test")
         mock_settings.stage1_model = "claude-haiku-4-5-20251001"
         mock_settings.stage2_model = "claude-sonnet-4-6"
         mock_settings.stage3_model = "claude-opus-4-6"
@@ -146,9 +138,7 @@ class TestRunDailyPipeline:
         from pipeline.models import PipelineRun
         from pipeline.orchestrator import run_daily_pipeline
 
-        session_factory = async_sessionmaker(
-            db_engine, class_=AsyncSession, expire_on_commit=False
-        )
+        session_factory = async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
 
         mock_settings = MagicMock()
         mock_settings.database_url = MagicMock()
@@ -156,9 +146,7 @@ class TestRunDailyPipeline:
             return_value="sqlite+aiosqlite:///:memory:"
         )
         mock_settings.anthropic_api_key = MagicMock()
-        mock_settings.anthropic_api_key.get_secret_value = MagicMock(
-            return_value="sk-test"
-        )
+        mock_settings.anthropic_api_key.get_secret_value = MagicMock(return_value="sk-test")
         mock_settings.stage1_model = "claude-haiku-4-5-20251001"
         mock_settings.stage2_model = "claude-sonnet-4-6"
         mock_settings.stage3_model = "claude-opus-4-6"
@@ -199,9 +187,7 @@ class TestRunDailyPipeline:
         """A failure in one stage should not prevent later stages."""
         from pipeline.orchestrator import run_daily_pipeline
 
-        session_factory = async_sessionmaker(
-            db_engine, class_=AsyncSession, expire_on_commit=False
-        )
+        session_factory = async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
 
         mock_settings = MagicMock()
         mock_settings.database_url = MagicMock()
@@ -209,9 +195,7 @@ class TestRunDailyPipeline:
             return_value="sqlite+aiosqlite:///:memory:"
         )
         mock_settings.anthropic_api_key = MagicMock()
-        mock_settings.anthropic_api_key.get_secret_value = MagicMock(
-            return_value="sk-test"
-        )
+        mock_settings.anthropic_api_key.get_secret_value = MagicMock(return_value="sk-test")
         mock_settings.stage1_model = "claude-haiku-4-5-20251001"
         mock_settings.stage2_model = "claude-sonnet-4-6"
         mock_settings.stage3_model = "claude-opus-4-6"

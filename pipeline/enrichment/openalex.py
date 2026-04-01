@@ -61,9 +61,7 @@ class OpenAlexClient:
 
         grants = work.get("grants", []) or []
         funder_names = [
-            g.get("funder_display_name", "")
-            for g in grants
-            if g.get("funder_display_name")
+            g.get("funder_display_name", "") for g in grants if g.get("funder_display_name")
         ]
 
         # Extract author data

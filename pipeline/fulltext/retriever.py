@@ -8,7 +8,6 @@ Falls back gracefully if all sources fail — the paper still advances.
 from __future__ import annotations
 
 import asyncio
-import io
 import re
 
 import httpx
@@ -39,16 +38,29 @@ async def fetch_full_text_content(
     result = None
 
     is_preprint = paper.source_server in (SourceServer.BIORXIV, SourceServer.MEDRXIV)
-    base_url = "https://www.medrxiv.org" if paper.source_server == SourceServer.MEDRXIV else "https://www.biorxiv.org"
+    if paper.source_server == SourceServer.MEDRXIV:
+        base_url = "https://www.medrxiv.org"
+    else:
+        base_url = "https://www.biorxiv.org"
 
     async with httpx.AsyncClient() as http:
         # Source 1: bioRxiv/medRxiv TDM XML
         if paper.doi and is_preprint:
-            result = await _try_preprint_xml(http, base_url, paper.doi, settings.fulltext_request_delay)
+            result = await _try_preprint_xml(
+                http,
+                base_url,
+                paper.doi,
+                settings.fulltext_request_delay,
+            )
 
         # Source 1b: bioRxiv/medRxiv HTML fallback
         if result is None and paper.doi and is_preprint:
-            result = await _try_preprint_html(http, base_url, paper.doi, settings.fulltext_request_delay)
+            result = await _try_preprint_html(
+                http,
+                base_url,
+                paper.doi,
+                settings.fulltext_request_delay,
+            )
 
         # Source 2: Europe PMC full text
         if result is None and paper.doi:
@@ -68,7 +80,12 @@ async def fetch_full_text_content(
 
         # Source 5: bioRxiv/medRxiv PDF as last resort
         if result is None and paper.doi and is_preprint:
-            result = await _try_preprint_pdf(http, base_url, paper.doi, settings.fulltext_request_delay)
+            result = await _try_preprint_pdf(
+                http,
+                base_url,
+                paper.doi,
+                settings.fulltext_request_delay,
+            )
 
     return result
 
@@ -108,7 +125,12 @@ def _extract_pmc_id(url: str) -> str | None:
     return f"PMC{digits}"
 
 
-async def _try_preprint_xml(http: httpx.AsyncClient, base_url: str, doi: str, delay: float) -> tuple[str, str] | None:
+async def _try_preprint_xml(
+    http: httpx.AsyncClient,
+    base_url: str,
+    doi: str,
+    delay: float,
+) -> tuple[str, str] | None:
     """Source 1: bioRxiv/medRxiv TDM XML."""
     url = f"{base_url}/content/{doi}.full.xml"
     try:
@@ -121,7 +143,12 @@ async def _try_preprint_xml(http: httpx.AsyncClient, base_url: str, doi: str, de
     return None
 
 
-async def _try_preprint_html(http: httpx.AsyncClient, base_url: str, doi: str, delay: float) -> tuple[str, str] | None:
+async def _try_preprint_html(
+    http: httpx.AsyncClient,
+    base_url: str,
+    doi: str,
+    delay: float,
+) -> tuple[str, str] | None:
     """Source 1b: bioRxiv/medRxiv HTML full text."""
     url = f"{base_url}/content/{doi}.full"
     try:
@@ -134,7 +161,12 @@ async def _try_preprint_html(http: httpx.AsyncClient, base_url: str, doi: str, d
     return None
 
 
-async def _try_preprint_pdf(http: httpx.AsyncClient, base_url: str, doi: str, delay: float) -> tuple[str, str] | None:
+async def _try_preprint_pdf(
+    http: httpx.AsyncClient,
+    base_url: str,
+    doi: str,
+    delay: float,
+) -> tuple[str, str] | None:
     """Source 5: bioRxiv/medRxiv PDF as last resort."""
     url = f"{base_url}/content/{doi}.full.pdf"
     try:

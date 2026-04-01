@@ -31,14 +31,15 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy import Enum as _SQLEnum
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 def SQLEnum(enum_cls, **kw):
-    """Wrapper that ensures StrEnum values (lowercase) are sent to Postgres, not names (UPPERCASE)."""
+    """Ensure StrEnum values (lowercase) are sent to Postgres, not names."""
     kw.setdefault("values_callable", lambda e: [m.value for m in e])
     return _SQLEnum(enum_cls, **kw)
-from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
 
 # Cross-database JSON: renders as JSONB on PostgreSQL, JSON on SQLite/others.
 PlatformJSON = JSON().with_variant(JSONB(), "postgresql")
@@ -188,9 +189,7 @@ class Paper(Base):
         onupdate=func.now(),
     )
 
-    __table_args__ = (
-        Index("ix_papers_posted_date_stage", "posted_date", "pipeline_stage"),
-    )
+    __table_args__ = (Index("ix_papers_posted_date_stage", "posted_date", "pipeline_stage"),)
 
 
 class PaperGroup(Base):
@@ -281,9 +280,7 @@ class PipelineSettings(Base):
     """Single-row table for dashboard-editable pipeline config."""
 
     __tablename__ = "pipeline_settings"
-    __table_args__ = (
-        CheckConstraint("id = 1", name="ck_pipeline_settings_singleton"),
-    )
+    __table_args__ = (CheckConstraint("id = 1", name="ck_pipeline_settings_singleton"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
     settings: Mapped[dict] = mapped_column(PlatformJSON, default=dict)

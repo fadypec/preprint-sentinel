@@ -17,7 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from pipeline.enrichment.enricher import enrich_paper
-from pipeline.fulltext.retriever import fetch_full_text_content, retrieve_full_text
+from pipeline.fulltext.retriever import fetch_full_text_content
 from pipeline.ingest.biorxiv import BiorxivClient
 from pipeline.ingest.dedup import DedupEngine
 from pipeline.ingest.europepmc import EuropepmcClient
@@ -116,7 +116,12 @@ async def run_daily_pipeline(
             non_dup_papers, dup_count = await _run_dedup(session, ingested_papers)
             stats.papers_after_dedup = len(non_dup_papers)
             await session.commit()
-            log.info("stage_complete", stage="dedup", unique=len(non_dup_papers), duplicates=dup_count)
+            log.info(
+                "stage_complete",
+                stage="dedup",
+                unique=len(non_dup_papers),
+                duplicates=dup_count,
+            )
         except Exception as exc:
             stats.errors.append(f"Dedup: {exc}")
             log.error("pipeline_dedup_error", error=str(exc), exc_info=True)
@@ -161,7 +166,12 @@ async def run_daily_pipeline(
             papers_list = []
             skipped = 0
             for p in ingested:
-                has_title = p.title and p.title.strip() not in ("", "[Not Available].", "[Not Available]")
+                _not_available = (
+                    "",
+                    "[Not Available].",
+                    "[Not Available]",
+                )
+                has_title = p.title and p.title.strip() not in _not_available
                 has_abstract = p.abstract and p.abstract.strip()
                 if has_title or has_abstract:
                     papers_list.append(p)
@@ -181,7 +191,12 @@ async def run_daily_pipeline(
             )
             stats.papers_coarse_passed = len(passed)
             await session.commit()
-            log.info("stage_complete", stage="coarse_filter", total=len(papers_list), passed=len(passed))
+            log.info(
+                "stage_complete",
+                stage="coarse_filter",
+                total=len(papers_list),
+                passed=len(passed),
+            )
         except Exception as exc:
             stats.errors.append(f"Coarse filter: {exc}")
             log.error("pipeline_coarse_filter_error", error=str(exc), exc_info=True)
@@ -198,13 +213,20 @@ async def run_daily_pipeline(
             result = await session.execute(stmt)
             coarse_passed = list(result.scalars().all())
 
-            log.info("stage_starting", stage="fulltext_retrieval", papers_to_process=len(coarse_passed))
-            await _run_fulltext(session, coarse_passed, settings)
-            stats.papers_fulltext_retrieved = sum(
-                1 for p in coarse_passed if p.full_text_retrieved
+            log.info(
+                "stage_starting",
+                stage="fulltext_retrieval",
+                papers_to_process=len(coarse_passed),
             )
+            await _run_fulltext(session, coarse_passed, settings)
+            stats.papers_fulltext_retrieved = sum(1 for p in coarse_passed if p.full_text_retrieved)
             await session.commit()
-            log.info("stage_complete", stage="fulltext_retrieval", total=len(coarse_passed), retrieved=stats.papers_fulltext_retrieved)
+            log.info(
+                "stage_complete",
+                stage="fulltext_retrieval",
+                total=len(coarse_passed),
+                retrieved=stats.papers_fulltext_retrieved,
+            )
         except Exception as exc:
             stats.errors.append(f"Full-text retrieval: {exc}")
             log.error("pipeline_fulltext_error", error=str(exc), exc_info=True)
@@ -224,8 +246,17 @@ async def run_daily_pipeline(
             non_english_ft = list(result.scalars().all())
 
             if non_english_ft:
-                log.info("stage_starting", stage="fulltext_translation", papers_to_process=len(non_english_ft))
-                await _run_fulltext_translation(session, llm_client, non_english_ft, settings.stage1_model)
+                log.info(
+                    "stage_starting",
+                    stage="fulltext_translation",
+                    papers_to_process=len(non_english_ft),
+                )
+                await _run_fulltext_translation(
+                    session,
+                    llm_client,
+                    non_english_ft,
+                    settings.stage1_model,
+                )
                 await session.commit()
                 log.info("stage_complete", stage="fulltext_translation", total=len(non_english_ft))
         except Exception as exc:
@@ -243,7 +274,11 @@ async def run_daily_pipeline(
             result = await session.execute(stmt)
             fulltext_papers = list(result.scalars().all())
 
-            log.info("stage_starting", stage="methods_analysis", papers_to_process=len(fulltext_papers))
+            log.info(
+                "stage_starting",
+                stage="methods_analysis",
+                papers_to_process=len(fulltext_papers),
+            )
             await run_methods_analysis(
                 session=session,
                 llm_client=llm_client,
@@ -273,7 +308,12 @@ async def run_daily_pipeline(
             enriched = await _run_enrichment(session, methods_papers, settings)
             stats.papers_enriched = len(enriched)
             await session.commit()
-            log.info("stage_complete", stage="enrichment", total=len(methods_papers), enriched=len(enriched))
+            log.info(
+                "stage_complete",
+                stage="enrichment",
+                total=len(methods_papers),
+                enriched=len(enriched),
+            )
         except Exception as exc:
             stats.errors.append(f"Enrichment: {exc}")
             log.error("pipeline_enrichment_error", error=str(exc), exc_info=True)
@@ -363,15 +403,30 @@ async def _run_ingest(
     papers: list[Paper] = []
 
     sources = [
-        ("biorxiv", lambda: BiorxivClient(server="biorxiv", request_delay=settings.biorxiv_request_delay)),
-        ("medrxiv", lambda: BiorxivClient(server="medrxiv", request_delay=settings.biorxiv_request_delay)),
+        (
+            "biorxiv",
+            lambda: BiorxivClient(
+                server="biorxiv",
+                request_delay=settings.biorxiv_request_delay,
+            ),
+        ),
+        (
+            "medrxiv",
+            lambda: BiorxivClient(
+                server="medrxiv",
+                request_delay=settings.biorxiv_request_delay,
+            ),
+        ),
         ("europepmc", lambda: EuropepmcClient(request_delay=settings.europepmc_request_delay)),
-        ("pubmed", lambda: PubmedClient(
-            api_key=settings.ncbi_api_key,
-            request_delay=settings.pubmed_request_delay,
-            query_mode=settings.pubmed_query_mode,
-            mesh_query=settings.pubmed_mesh_query,
-        )),
+        (
+            "pubmed",
+            lambda: PubmedClient(
+                api_key=settings.ncbi_api_key,
+                request_delay=settings.pubmed_request_delay,
+                query_mode=settings.pubmed_query_mode,
+                mesh_query=settings.pubmed_mesh_query,
+            ),
+        ),
     ]
 
     _extra_keys = {"full_text_url", "_language", "_vernacular_title"}
@@ -534,7 +589,6 @@ async def _run_fulltext_translation(
 ) -> None:
     """Translate non-English methods sections to English after fulltext retrieval."""
     import asyncio
-    import json
 
     total = len(papers)
     sem = asyncio.Semaphore(concurrency)
@@ -556,7 +610,11 @@ async def _run_fulltext_translation(
         async with sem:
             result = await llm_client.call(
                 model=model,
-                system_prompt="You are a scientific translator. Translate accurately, preserving all technical detail.",
+                system_prompt=(
+                    "You are a scientific translator."
+                    " Translate accurately, preserving"
+                    " all technical detail."
+                ),
                 user_message=prompt,
                 max_tokens=8192,
             )
@@ -606,7 +664,9 @@ async def _run_translation(
         text = "\n\n".join(parts_to_translate)
         prompt = (
             f"Translate the following scientific paper metadata from {paper.language} to English. "
-            "Return ONLY a JSON object with keys \"title\" and \"abstract\" (use null if not present). "
+            "Return ONLY a JSON object with keys "
+            '"title" and "abstract" '
+            "(use null if not present). "
             "Preserve all technical and scientific terminology accurately.\n\n"
             f"{text}"
         )

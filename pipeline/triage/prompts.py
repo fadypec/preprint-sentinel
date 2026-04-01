@@ -244,8 +244,7 @@ ADJUDICATE_PAPER_TOOL: dict = {
                 "minimum": 0.0,
                 "maximum": 1.0,
                 "description": (
-                    "Confidence in this adjudication, "
-                    "reduced when enrichment is partial"
+                    "Confidence in this adjudication, reduced when enrichment is partial"
                 ),
             },
             "partial_enrichment": {
@@ -260,16 +259,14 @@ ADJUDICATE_PAPER_TOOL: dict = {
             "institutional_context": {
                 "type": "string",
                 "description": (
-                    "Assessment of institutional/author credibility "
-                    "and oversight context"
+                    "Assessment of institutional/author credibility and oversight context"
                 ),
             },
             "durc_oversight_indicators": {
                 "type": "array",
                 "items": {"type": "string"},
                 "description": (
-                    "Evidence of DURC oversight "
-                    "(IBC approval, DURC review, biosafety protocols)"
+                    "Evidence of DURC oversight (IBC approval, DURC review, biosafety protocols)"
                 ),
             },
             "adjustment_reasoning": {

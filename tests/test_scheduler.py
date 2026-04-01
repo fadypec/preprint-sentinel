@@ -16,9 +16,7 @@ class TestPipelineScheduler:
             return_value="sqlite+aiosqlite:///:memory:"
         )
         mock_settings.anthropic_api_key = MagicMock()
-        mock_settings.anthropic_api_key.get_secret_value = MagicMock(
-            return_value="sk-test"
-        )
+        mock_settings.anthropic_api_key.get_secret_value = MagicMock(return_value="sk-test")
         return mock_settings
 
     def test_scheduler_creates_job(self):

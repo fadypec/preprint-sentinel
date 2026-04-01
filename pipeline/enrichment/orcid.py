@@ -141,9 +141,7 @@ class OrcidClient:
         activities = record.get("activities-summary", {})
 
         # Employment history
-        employment_groups = (
-            activities.get("employments", {}).get("affiliation-group", [])
-        )
+        employment_groups = activities.get("employments", {}).get("affiliation-group", [])
         employment_history = []
         current_institution = None
 
@@ -166,9 +164,7 @@ class OrcidClient:
                 employment_history.append(entry)
 
         # Education
-        education_groups = (
-            activities.get("educations", {}).get("affiliation-group", [])
-        )
+        education_groups = activities.get("educations", {}).get("affiliation-group", [])
         education = []
         for group in education_groups:
             summaries = group.get("summaries", [])

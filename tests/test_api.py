@@ -18,11 +18,13 @@ def mock_scheduler():
         "last_run_time": None,
         "last_run_stats": None,
     }
-    scheduler.trigger_run = AsyncMock(return_value=MagicMock(
-        papers_ingested=10,
-        papers_adjudicated=2,
-        errors=[],
-    ))
+    scheduler.trigger_run = AsyncMock(
+        return_value=MagicMock(
+            papers_ingested=10,
+            papers_adjudicated=2,
+            errors=[],
+        )
+    )
     scheduler.pause = AsyncMock()
     scheduler.resume = AsyncMock()
     scheduler.update_schedule = AsyncMock()

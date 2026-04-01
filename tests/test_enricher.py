@@ -60,7 +60,9 @@ class TestEnrichPaper:
         from pipeline.enrichment.enricher import enrich_paper
 
         paper = await insert_paper(
-            db_session, title="Test Paper", doi="10.1234/test",
+            db_session,
+            title="Test Paper",
+            doi="10.1234/test",
             corresponding_author="Jane Smith",
         )
 
@@ -73,15 +75,9 @@ class TestEnrichPaper:
         mock_settings.orcid_request_delay = 0
 
         with (
-            patch(
-                "pipeline.enrichment.enricher.OpenAlexClient"
-            ) as mock_oa_cls,
-            patch(
-                "pipeline.enrichment.enricher.SemanticScholarClient"
-            ) as mock_s2_cls,
-            patch(
-                "pipeline.enrichment.enricher.OrcidClient"
-            ) as mock_orcid_cls,
+            patch("pipeline.enrichment.enricher.OpenAlexClient") as mock_oa_cls,
+            patch("pipeline.enrichment.enricher.SemanticScholarClient") as mock_s2_cls,
+            patch("pipeline.enrichment.enricher.OrcidClient") as mock_orcid_cls,
         ):
             # OpenAlex mock
             mock_oa = AsyncMock()
@@ -117,7 +113,9 @@ class TestEnrichPaper:
         from pipeline.enrichment.enricher import enrich_paper
 
         paper = await insert_paper(
-            db_session, title="Test Paper", doi="10.1234/test",
+            db_session,
+            title="Test Paper",
+            doi="10.1234/test",
             corresponding_author="Jane Smith",
         )
 
@@ -130,15 +128,9 @@ class TestEnrichPaper:
         mock_settings.orcid_request_delay = 0
 
         with (
-            patch(
-                "pipeline.enrichment.enricher.OpenAlexClient"
-            ) as mock_oa_cls,
-            patch(
-                "pipeline.enrichment.enricher.SemanticScholarClient"
-            ) as mock_s2_cls,
-            patch(
-                "pipeline.enrichment.enricher.OrcidClient"
-            ) as mock_orcid_cls,
+            patch("pipeline.enrichment.enricher.OpenAlexClient") as mock_oa_cls,
+            patch("pipeline.enrichment.enricher.SemanticScholarClient") as mock_s2_cls,
+            patch("pipeline.enrichment.enricher.OrcidClient") as mock_orcid_cls,
         ):
             # OpenAlex succeeds
             mock_oa = AsyncMock()
@@ -175,7 +167,9 @@ class TestEnrichPaper:
         from pipeline.enrichment.enricher import enrich_paper
 
         paper = await insert_paper(
-            db_session, title="Test Paper", doi="10.1234/test",
+            db_session,
+            title="Test Paper",
+            doi="10.1234/test",
             corresponding_author="Jane Smith",
         )
 
@@ -188,15 +182,9 @@ class TestEnrichPaper:
         mock_settings.orcid_request_delay = 0
 
         with (
-            patch(
-                "pipeline.enrichment.enricher.OpenAlexClient"
-            ) as mock_oa_cls,
-            patch(
-                "pipeline.enrichment.enricher.SemanticScholarClient"
-            ) as mock_s2_cls,
-            patch(
-                "pipeline.enrichment.enricher.OrcidClient"
-            ) as mock_orcid_cls,
+            patch("pipeline.enrichment.enricher.OpenAlexClient") as mock_oa_cls,
+            patch("pipeline.enrichment.enricher.SemanticScholarClient") as mock_s2_cls,
+            patch("pipeline.enrichment.enricher.OrcidClient") as mock_orcid_cls,
         ):
             for mock_cls in [mock_oa_cls, mock_s2_cls, mock_orcid_cls]:
                 mock_inst = AsyncMock()
@@ -217,7 +205,9 @@ class TestEnrichPaper:
         from pipeline.enrichment.enricher import enrich_paper
 
         paper = await insert_paper(
-            db_session, title="Test Paper", doi="10.1234/test",
+            db_session,
+            title="Test Paper",
+            doi="10.1234/test",
             corresponding_author="Jane Smith",
         )
 
@@ -230,15 +220,9 @@ class TestEnrichPaper:
         mock_settings.orcid_request_delay = 0
 
         with (
-            patch(
-                "pipeline.enrichment.enricher.OpenAlexClient"
-            ) as mock_oa_cls,
-            patch(
-                "pipeline.enrichment.enricher.SemanticScholarClient"
-            ) as mock_s2_cls,
-            patch(
-                "pipeline.enrichment.enricher.OrcidClient"
-            ) as mock_orcid_cls,
+            patch("pipeline.enrichment.enricher.OpenAlexClient") as mock_oa_cls,
+            patch("pipeline.enrichment.enricher.SemanticScholarClient") as mock_s2_cls,
+            patch("pipeline.enrichment.enricher.OrcidClient") as mock_orcid_cls,
         ):
             mock_oa = AsyncMock()
             mock_oa.lookup = AsyncMock(return_value=_openalex_data())
@@ -261,6 +245,4 @@ class TestEnrichPaper:
             await enrich_paper(paper, mock_settings)
 
         # Verify ORCID was called with the known_orcid from OpenAlex
-        mock_orcid.lookup.assert_called_once_with(
-            "Jane Smith", known_orcid="0000-0001-2345-6789"
-        )
+        mock_orcid.lookup.assert_called_once_with("Jane Smith", known_orcid="0000-0001-2345-6789")

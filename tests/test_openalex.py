@@ -135,9 +135,7 @@ class TestOpenAlexLookup:
     async def test_404_returns_none(self):
         from pipeline.enrichment.openalex import OpenAlexClient
 
-        respx.get("https://api.openalex.org/works").mock(
-            return_value=httpx.Response(404)
-        )
+        respx.get("https://api.openalex.org/works").mock(return_value=httpx.Response(404))
 
         async with OpenAlexClient(email="test@test.com", request_delay=0) as client:
             result = await client.lookup("10.1234/gone")
@@ -198,12 +196,8 @@ class TestOpenAlexLookup:
         respx.get("https://api.openalex.org/works").mock(
             return_value=httpx.Response(200, json=_work_response())
         )
-        respx.get("https://api.openalex.org/authors/A1111").mock(
-            return_value=httpx.Response(500)
-        )
-        respx.get("https://api.openalex.org/authors/A2222").mock(
-            return_value=httpx.Response(500)
-        )
+        respx.get("https://api.openalex.org/authors/A1111").mock(return_value=httpx.Response(500))
+        respx.get("https://api.openalex.org/authors/A2222").mock(return_value=httpx.Response(500))
 
         async with OpenAlexClient(email="test@test.com", request_delay=0) as client:
             result = await client.lookup("10.1234/test")
