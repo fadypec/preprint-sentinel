@@ -1,6 +1,8 @@
 import { auth } from "@/lib/auth";
 import { UserRole } from "@prisma/client";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 /** Auth is optional in dev when no OAuth providers are configured */
 function authConfigured(): boolean {
@@ -33,8 +35,16 @@ export async function requireAdmin() {
 // API guards (return Response on failure — never redirect)
 // ---------------------------------------------------------------------------
 
-/** Returns null if the request is authorised, or a 401 Response if not. */
+/** Get client IP for rate limiting. */
+async function getClientIp(): Promise<string> {
+  const h = await headers();
+  return h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+}
+
+/** Returns null if the request is authorised, or a 401/429 Response if not. */
 export async function apiRequireAuth(): Promise<Response | null> {
+  const rateLimited = checkRateLimit(await getClientIp());
+  if (rateLimited) return rateLimited;
   if (!authConfigured()) return null; // dev mode — allow all
   const session = await auth();
   if (!session?.user) {
@@ -43,8 +53,10 @@ export async function apiRequireAuth(): Promise<Response | null> {
   return null;
 }
 
-/** Returns null if the request is from an admin, or a 401/403 Response. */
+/** Returns null if the request is from an admin, or a 401/403/429 Response. */
 export async function apiRequireAdmin(): Promise<Response | null> {
+  const rateLimited = checkRateLimit(await getClientIp());
+  if (rateLimited) return rateLimited;
   if (!authConfigured()) return null;
   const session = await auth();
   if (!session?.user) {

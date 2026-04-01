@@ -166,8 +166,10 @@ class OpenAlexClient:
             resp = await self._client.get(url, params=params, timeout=30.0)
             if resp.status_code == 200:
                 return resp.json()
-        except (httpx.HTTPError, Exception):
-            log.debug("openalex_author_error", author_id=author_id)
+        except httpx.HTTPError as exc:
+            log.debug("openalex_author_error", author_id=author_id, error=str(exc))
+        except Exception as exc:
+            log.warning("openalex_author_unexpected_error", author_id=author_id, error=str(exc))
         return None
 
     @staticmethod

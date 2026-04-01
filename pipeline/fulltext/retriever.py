@@ -239,7 +239,7 @@ def _extract_from_pdf(pdf_bytes: bytes, doi: str) -> tuple[str, str] | None:
         methods = _find_methods_in_text(full_text)
         return (full_text, methods)
     except Exception as exc:
-        log.debug("pdf_extract_error", doi=doi, error=str(exc))
+        log.warning("pdf_extract_error", doi=doi, error=str(exc), exc_type=type(exc).__name__)
         return None
 
 
