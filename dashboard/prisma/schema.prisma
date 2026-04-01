@@ -162,6 +162,8 @@ model PipelineRun {
   currentStage            String?   @map("current_stage") @db.VarChar(50)
   pubmedQueryMode         String?   @map("pubmed_query_mode") @db.VarChar(20)
   pid                     Int?
+  fromDate                DateTime? @map("from_date") @db.Date
+  toDate                  DateTime? @map("to_date") @db.Date
   errors                  Json?
   totalCostUsd            Float     @default(0) @map("total_cost_usd")
   trigger                 String    @db.VarChar(50)

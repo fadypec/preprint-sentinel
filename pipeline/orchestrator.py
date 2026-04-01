@@ -129,6 +129,14 @@ async def run_daily_pipeline(
     if from_date is None:
         from_date = to_date - timedelta(days=2)
 
+    # Store resolved date range on the run record
+    async with session_factory() as s:
+        stmt = select(PipelineRun).where(PipelineRun.id == run_id)
+        rec = (await s.execute(stmt)).scalar_one()
+        rec.from_date = from_date
+        rec.to_date = to_date
+        await s.commit()
+
     log.info("pipeline_started", from_date=str(from_date), to_date=str(to_date), trigger=trigger)
 
     async with session_factory() as session:

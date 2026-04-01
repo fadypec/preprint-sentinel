@@ -249,6 +249,8 @@ class PipelineRun(Base):
     current_stage: Mapped[str | None] = mapped_column(String(50))
     pubmed_query_mode: Mapped[str | None] = mapped_column(String(20))
     pid: Mapped[int | None] = mapped_column(Integer)
+    from_date: Mapped[date | None] = mapped_column(Date)
+    to_date: Mapped[date | None] = mapped_column(Date)
     errors: Mapped[list | None] = mapped_column(PlatformJSON)
     total_cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
     trigger: Mapped[str] = mapped_column(String(50))

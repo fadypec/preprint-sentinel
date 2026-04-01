@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import type { PipelineRun } from "@prisma/client";
 import {
   Table,
@@ -11,19 +11,36 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ClientTimestamp } from "@/components/client-timestamp";
 import { formatDuration, formatCost } from "@/lib/utils";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Trash2 } from "lucide-react";
 
 type Props = {
   runs: PipelineRun[];
+  clearAction: () => Promise<{ ok: true; message: string } | { ok: false; error: string }>;
 };
 
-export function RunHistoryTable({ runs }: Props) {
+function formatDateRange(from: Date | null, to: Date | null): string {
+  if (!from && !to) return "-";
+  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+  if (from && to) return `${fmt(from)} → ${fmt(to)}`;
+  if (from) return `${fmt(from)} →`;
+  return `→ ${fmt(to!)}`;
+}
+
+export function RunHistoryTable({ runs, clearAction }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const [clearMsg, setClearMsg] = useState<string | null>(null);
 
   if (runs.length === 0) {
-    return <p className="text-sm text-slate-500">No pipeline runs recorded.</p>;
+    return (
+      <div className="space-y-2">
+        <p className="text-sm text-slate-500">No pipeline runs recorded.</p>
+        {clearMsg && <p className="text-xs text-slate-500">{clearMsg}</p>}
+      </div>
+    );
   }
 
   function toggle(id: string) {
@@ -51,6 +68,9 @@ export function RunHistoryTable({ runs }: Props) {
         </TableCell>
         <TableCell className="text-xs">
           <ClientTimestamp date={run.startedAt} />
+        </TableCell>
+        <TableCell className="text-xs whitespace-nowrap">
+          {formatDateRange(run.fromDate, run.toDate)}
         </TableCell>
         <TableCell className="text-xs">
           {formatDuration(run.startedAt, run.finishedAt)}
@@ -97,7 +117,7 @@ export function RunHistoryTable({ runs }: Props) {
     if (isExpanded) {
       rows.push(
         <TableRow key={`${run.id}-detail`}>
-          <TableCell colSpan={10} className="bg-slate-50 px-6 py-3 dark:bg-slate-800/50">
+          <TableCell colSpan={11} className="bg-slate-50 px-6 py-3 dark:bg-slate-800/50">
             <RunDetail run={run} errors={errors} />
           </TableCell>
         </TableRow>,
@@ -105,24 +125,56 @@ export function RunHistoryTable({ runs }: Props) {
     }
   }
 
+  function handleClear() {
+    if (!confirm("Clear all pipeline run history? This cannot be undone.")) return;
+    startTransition(async () => {
+      const res = await clearAction();
+      if (res.ok) {
+        setClearMsg(res.message);
+        window.location.href = "/pipeline";
+      } else {
+        setClearMsg(res.error);
+      }
+    });
+  }
+
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead className="w-6" />
-          <TableHead>Started</TableHead>
-          <TableHead>Duration</TableHead>
-          <TableHead>Ingested</TableHead>
-          <TableHead>Passed</TableHead>
-          <TableHead>Adjudicated</TableHead>
-          <TableHead>Errors</TableHead>
-          <TableHead>Cost</TableHead>
-          <TableHead>PubMed</TableHead>
-          <TableHead>Trigger</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>{rows}</TableBody>
-    </Table>
+    <div className="space-y-3">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-6" />
+            <TableHead>Started</TableHead>
+            <TableHead>Date Range</TableHead>
+            <TableHead>Duration</TableHead>
+            <TableHead>Ingested</TableHead>
+            <TableHead>Passed</TableHead>
+            <TableHead>Adjudicated</TableHead>
+            <TableHead>Errors</TableHead>
+            <TableHead>Cost</TableHead>
+            <TableHead>PubMed</TableHead>
+            <TableHead>Trigger</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>{rows}</TableBody>
+      </Table>
+
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className="text-xs text-red-600 hover:text-red-700 dark:text-red-400"
+          onClick={handleClear}
+          disabled={isPending}
+        >
+          <Trash2 className="mr-1.5 h-3 w-3" />
+          {isPending ? "Clearing…" : "Clear History"}
+        </Button>
+        {clearMsg && (
+          <span className="text-xs text-slate-500">{clearMsg}</span>
+        )}
+      </div>
+    </div>
   );
 }
 

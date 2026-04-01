@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { RunHistoryTable } from "@/components/run-history-table";
 import { PipelineControls } from "@/components/pipeline-controls";
+import { CoverageHeatmap } from "@/components/coverage-heatmap";
 import { Card } from "@/components/ui/card";
-import { triggerPipeline, cancelPipeline, togglePubmedQueryMode } from "./actions";
+import { triggerPipeline, cancelPipeline, clearRunHistory, togglePubmedQueryMode } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +41,7 @@ export default async function PipelinePage() {
             <h2 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
               Run History
             </h2>
-            <RunHistoryTable runs={runs} />
+            <RunHistoryTable runs={runs} clearAction={clearRunHistory} />
           </Card>
         </div>
 
@@ -58,6 +59,12 @@ export default async function PipelinePage() {
             />
           </Card>
 
+          <Card className="p-4">
+            <h2 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
+              Data Coverage
+            </h2>
+            <CoverageHeatmap />
+          </Card>
         </div>
       </div>
     </div>

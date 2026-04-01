@@ -120,6 +120,21 @@ export async function cancelPipeline(): Promise<
   return { ok: true, message: "Pipeline cancelled" };
 }
 
+export async function clearRunHistory(): Promise<
+  { ok: true; message: string } | { ok: false; error: string }
+> {
+  // Don't allow clearing while a run is in progress
+  const running = await prisma.pipelineRun.findFirst({
+    where: { finishedAt: null },
+  });
+  if (running) {
+    return { ok: false, error: "Cannot clear history while a pipeline is running" };
+  }
+
+  const { count } = await prisma.pipelineRun.deleteMany({});
+  return { ok: true, message: `Cleared ${count} run${count !== 1 ? "s" : ""}` };
+}
+
 export async function togglePubmedQueryMode(): Promise<string> {
   const row = await prisma.pipelineSettings.findUnique({ where: { id: 1 } });
   const current = (row?.settings as Record<string, unknown>) ?? {};
