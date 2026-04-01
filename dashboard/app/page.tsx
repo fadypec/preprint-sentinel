@@ -4,6 +4,8 @@ import { queryPapers } from "@/lib/queries/papers";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 const paginationBase =
   "inline-flex shrink-0 items-center justify-center rounded-lg text-sm font-medium border border-border bg-background h-7 px-2.5 text-[0.8rem]";
 const paginationEnabled =

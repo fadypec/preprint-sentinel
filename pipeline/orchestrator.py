@@ -55,6 +55,8 @@ class PipelineRunStats:
     papers_adjudicated: int = 0
     errors: list[str] = field(default_factory=list)
     total_cost_usd: float = 0.0
+    # Per-stage counts of papers picked up from previous runs (backlog)
+    backlog: dict[str, int] = field(default_factory=dict)
 
 
 async def run_daily_pipeline(
@@ -119,6 +121,7 @@ async def run_daily_pipeline(
             rec.papers_adjudicated = stats.papers_adjudicated
             rec.errors = stats.errors if stats.errors else None
             rec.total_cost_usd = stats.total_cost_usd
+            rec.backlog_stats = stats.backlog if stats.backlog else None
             await s.commit()
 
     await _flush_progress()
@@ -236,7 +239,10 @@ async def run_daily_pipeline(
 
             if skipped:
                 log.info("coarse_filter_skipped_empty", skipped=skipped)
-            log.info("stage_starting", stage="coarse_filter", papers_to_process=len(papers_list))
+            backlog = sum(1 for p in papers_list if p.created_at < stats.started_at)
+            if backlog:
+                stats.backlog["coarse_filter"] = backlog
+            log.info("stage_starting", stage="coarse_filter", papers_to_process=len(papers_list), backlog=backlog)
             passed = await run_coarse_filter(
                 session=session,
                 llm_client=llm_client,
@@ -272,10 +278,14 @@ async def run_daily_pipeline(
             result = await session.execute(stmt)
             coarse_passed = list(result.scalars().all())
 
+            backlog = sum(1 for p in coarse_passed if p.created_at < stats.started_at)
+            if backlog:
+                stats.backlog["fulltext"] = backlog
             log.info(
                 "stage_starting",
                 stage="fulltext_retrieval",
                 papers_to_process=len(coarse_passed),
+                backlog=backlog,
             )
             await _run_fulltext(session, coarse_passed, settings)
             stats.papers_fulltext_retrieved = sum(1 for p in coarse_passed if p.full_text_retrieved)
@@ -339,10 +349,14 @@ async def run_daily_pipeline(
             result = await session.execute(stmt)
             fulltext_papers = list(result.scalars().all())
 
+            backlog = sum(1 for p in fulltext_papers if p.created_at < stats.started_at)
+            if backlog:
+                stats.backlog["methods_analysis"] = backlog
             log.info(
                 "stage_starting",
                 stage="methods_analysis",
                 papers_to_process=len(fulltext_papers),
+                backlog=backlog,
             )
             await run_methods_analysis(
                 session=session,
@@ -372,7 +386,10 @@ async def run_daily_pipeline(
             result = await session.execute(stmt)
             methods_papers = list(result.scalars().all())
 
-            log.info("stage_starting", stage="enrichment", papers_to_process=len(methods_papers))
+            backlog = sum(1 for p in methods_papers if p.created_at < stats.started_at)
+            if backlog:
+                stats.backlog["enrichment"] = backlog
+            log.info("stage_starting", stage="enrichment", papers_to_process=len(methods_papers), backlog=backlog)
             enriched = await _run_enrichment(session, methods_papers, settings)
             stats.papers_enriched = len(enriched)
             await session.commit()
@@ -400,7 +417,10 @@ async def run_daily_pipeline(
             result = await session.execute(stmt)
             to_adjudicate = list(result.scalars().all())
 
-            log.info("stage_starting", stage="adjudication", papers_to_process=len(to_adjudicate))
+            backlog = sum(1 for p in to_adjudicate if p.created_at < stats.started_at)
+            if backlog:
+                stats.backlog["adjudication"] = backlog
+            log.info("stage_starting", stage="adjudication", papers_to_process=len(to_adjudicate), backlog=backlog)
             await run_adjudication(
                 session=session,
                 llm_client=llm_client,
@@ -436,6 +456,7 @@ async def run_daily_pipeline(
         run_record.papers_adjudicated = stats.papers_adjudicated
         run_record.errors = stats.errors if stats.errors else None
         run_record.total_cost_usd = stats.total_cost_usd
+        run_record.backlog_stats = stats.backlog if stats.backlog else None
         await session.commit()
 
     log.info(
@@ -460,11 +481,11 @@ async def _run_ingest(
     Skips papers whose DOI or title already exists in the DB to avoid
     wasteful re-ingestion on overlapping date ranges.
     """
-    # Pre-load existing DOIs and titles for the date range so we can skip
-    # papers we already have, without a per-paper DB round-trip.
-    existing_stmt = select(Paper.doi, Paper.title).where(
-        Paper.posted_date >= from_date,
-    )
+    # Pre-load existing DOIs and titles so we can skip papers we already
+    # have, without a per-paper DB round-trip.  We check ALL existing papers,
+    # not just those in the date range, because the same paper can appear
+    # from different sources with different posted dates.
+    existing_stmt = select(Paper.doi, Paper.title)
     existing_rows = (await session.execute(existing_stmt)).all()
     existing_dois: set[str] = {r.doi.lower() for r in existing_rows if r.doi}
     existing_titles: set[str] = {r.title.lower().strip() for r in existing_rows if r.title}

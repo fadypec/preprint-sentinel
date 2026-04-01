@@ -21,9 +21,9 @@ type Props = {
   clearAction: () => Promise<{ ok: true; message: string } | { ok: false; error: string }>;
 };
 
-function formatDateRange(from: Date | null, to: Date | null): string {
+function formatDateRange(from: Date | string | null, to: Date | string | null): string {
   if (!from && !to) return "-";
-  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+  const fmt = (d: Date | string) => new Date(d).toISOString().slice(0, 10);
   if (from && to) return `${fmt(from)} → ${fmt(to)}`;
   if (from) return `${fmt(from)} →`;
   return `→ ${fmt(to!)}`;
@@ -77,12 +77,6 @@ export function RunHistoryTable({ runs, clearAction }: Props) {
         </TableCell>
         <TableCell className="text-xs">{run.papersIngested}</TableCell>
         <TableCell className="text-xs">
-          {run.papersCoarsePassed}
-        </TableCell>
-        <TableCell className="text-xs">
-          {run.papersAdjudicated}
-        </TableCell>
-        <TableCell className="text-xs">
           {errors.length > 0 ? (
             <Badge variant="destructive" className="text-[10px]">
               {errors.length}
@@ -91,33 +85,13 @@ export function RunHistoryTable({ runs, clearAction }: Props) {
             <span className="text-green-600 dark:text-green-400">0</span>
           )}
         </TableCell>
-        <TableCell className="text-xs">
-          {formatCost(run.totalCostUsd)}
-        </TableCell>
-        <TableCell className="text-xs">
-          {run.pubmedQueryMode ? (
-            <Badge
-              variant={run.pubmedQueryMode === "all" ? "default" : "outline"}
-              className="text-[10px]"
-            >
-              {run.pubmedQueryMode === "all" ? "Full" : "MeSH"}
-            </Badge>
-          ) : (
-            <span className="text-slate-400">-</span>
-          )}
-        </TableCell>
-        <TableCell className="text-xs">
-          <Badge variant="outline" className="text-[10px]">
-            {run.trigger}
-          </Badge>
-        </TableCell>
       </TableRow>,
     );
 
     if (isExpanded) {
       rows.push(
         <TableRow key={`${run.id}-detail`}>
-          <TableCell colSpan={11} className="bg-slate-50 px-6 py-3 dark:bg-slate-800/50">
+          <TableCell colSpan={7} className="bg-slate-50 px-6 py-3 dark:bg-slate-800/50">
             <RunDetail run={run} errors={errors} />
           </TableCell>
         </TableRow>,
@@ -148,12 +122,7 @@ export function RunHistoryTable({ runs, clearAction }: Props) {
             <TableHead>Date Range</TableHead>
             <TableHead>Duration</TableHead>
             <TableHead>Ingested</TableHead>
-            <TableHead>Passed</TableHead>
-            <TableHead>Adjudicated</TableHead>
             <TableHead>Errors</TableHead>
-            <TableHead>Cost</TableHead>
-            <TableHead>PubMed</TableHead>
-            <TableHead>Trigger</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>{rows}</TableBody>
@@ -178,25 +147,50 @@ export function RunHistoryTable({ runs, clearAction }: Props) {
   );
 }
 
+function fmtBacklog(value: number, backlogKey: string, backlog: Record<string, number> | null): string {
+  const bl = backlog?.[backlogKey] ?? 0;
+  if (bl === 0) return String(value);
+  const fresh = value - bl;
+  return `${value} (${fresh} new + ${bl} backlog)`;
+}
+
 function RunDetail({ run, errors }: { run: PipelineRun; errors: unknown[] }) {
+  const backlog = (run.backlogStats as Record<string, number> | null) ?? null;
+
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-4 gap-x-6 gap-y-2 text-xs">
         <Stat label="Papers ingested" value={run.papersIngested} />
         <Stat label="After dedup" value={run.papersAfterDedup} />
-        <Stat label="Coarse filter passed" value={run.papersCoarsePassed} />
-        <Stat label="Full text retrieved" value={run.papersFulltextRetrieved} />
-        <Stat label="Methods analysed" value={run.papersMethodsAnalysed} />
-        <Stat label="Enriched" value={run.papersEnriched} />
-        <Stat label="Adjudicated" value={run.papersAdjudicated} />
+        <Stat label="Coarse filter passed" value={fmtBacklog(run.papersCoarsePassed, "coarse_filter", backlog)} />
+        <Stat label="Full text retrieved" value={fmtBacklog(run.papersFulltextRetrieved, "fulltext", backlog)} />
+        <Stat label="Methods analysed" value={fmtBacklog(run.papersMethodsAnalysed, "methods_analysis", backlog)} />
+        <Stat label="Enriched" value={fmtBacklog(run.papersEnriched, "enrichment", backlog)} />
+        <Stat label="Adjudicated" value={fmtBacklog(run.papersAdjudicated, "adjudication", backlog)} />
         <Stat label="Total cost" value={formatCost(run.totalCostUsd)} />
       </div>
 
-      {run.currentStage && (
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          Final stage: <span className="font-medium">{run.currentStage}</span>
-        </p>
-      )}
+      <div className="flex flex-wrap items-center gap-3 text-xs">
+        {run.currentStage && (
+          <span className="text-slate-500 dark:text-slate-400">
+            Final stage: <span className="font-medium text-slate-700 dark:text-slate-200">{run.currentStage}</span>
+          </span>
+        )}
+        {run.pubmedQueryMode && (
+          <span className="text-slate-500 dark:text-slate-400">
+            PubMed:{" "}
+            <Badge
+              variant={run.pubmedQueryMode === "all" ? "default" : "outline"}
+              className="text-[10px]"
+            >
+              {run.pubmedQueryMode === "all" ? "Full" : "MeSH"}
+            </Badge>
+          </span>
+        )}
+        <span className="text-slate-500 dark:text-slate-400">
+          Trigger: <Badge variant="outline" className="text-[10px]">{run.trigger}</Badge>
+        </span>
+      </div>
 
       {errors.length > 0 ? (
         <div className="space-y-1">

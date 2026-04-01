@@ -167,6 +167,7 @@ model PipelineRun {
   errors                  Json?
   totalCostUsd            Float     @default(0) @map("total_cost_usd")
   trigger                 String    @db.VarChar(50)
+  backlogStats            Json?     @map("backlog_stats")
 
   @@map("pipeline_runs")
 }

@@ -254,6 +254,7 @@ class PipelineRun(Base):
     errors: Mapped[list | None] = mapped_column(PlatformJSON)
     total_cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
     trigger: Mapped[str] = mapped_column(String(50))
+    backlog_stats: Mapped[dict | None] = mapped_column(PlatformJSON)
 
 
 class User(Base):
