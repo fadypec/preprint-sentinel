@@ -5,7 +5,7 @@ import { SettingsForm } from "@/components/settings-form";
 export default async function SettingsPage() {
   await requireAdmin();
 
-  const row = await prisma.pipelineSettings.findFirst({ where: { id: 1 } });
+  const row = await prisma.pipelineSettings.findUnique({ where: { id: 1 } });
   const settings = (row?.settings as Record<string, unknown>) ?? {};
 
   return (

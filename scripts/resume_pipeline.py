@@ -46,9 +46,13 @@ async def resume(start_from: str | None = None) -> None:
                 ("enrichment", PipelineStage.METHODS_ANALYSED),
                 ("adjudication", PipelineStage.METHODS_ANALYSED),
             ]:
-                stmt = select(func.count()).select_from(Paper).where(
-                    Paper.pipeline_stage == pipeline_stage,
-                    Paper.posted_date >= from_date,
+                stmt = (
+                    select(func.count())
+                    .select_from(Paper)
+                    .where(
+                        Paper.pipeline_stage == pipeline_stage,
+                        Paper.posted_date >= from_date,
+                    )
                 )
                 result = await session.execute(stmt)
                 count = result.scalar()
@@ -105,7 +109,12 @@ async def resume(start_from: str | None = None) -> None:
 
                 await session.flush()
                 await session.commit()
-                log.info("stage_complete", stage="fulltext_retrieval", total=total, retrieved=retrieved)
+                log.info(
+                    "stage_complete",
+                    stage="fulltext_retrieval",
+                    total=total,
+                    retrieved=retrieved,
+                )
 
     # Fulltext translation for non-English papers (runs after fulltext, before methods)
     if "fulltext" in stages_to_run or "methods" in stages_to_run:
@@ -122,8 +131,17 @@ async def resume(start_from: str | None = None) -> None:
             non_english_ft = list(result.scalars().all())
 
             if non_english_ft:
-                log.info("stage_starting", stage="fulltext_translation", papers_to_process=len(non_english_ft))
-                await _run_fulltext_translation(session, llm_client, non_english_ft, settings.stage1_model)
+                log.info(
+                    "stage_starting",
+                    stage="fulltext_translation",
+                    papers_to_process=len(non_english_ft),
+                )
+                await _run_fulltext_translation(
+                    session,
+                    llm_client,
+                    non_english_ft,
+                    settings.stage1_model,
+                )
                 await session.commit()
                 log.info("stage_complete", stage="fulltext_translation", total=len(non_english_ft))
 
@@ -174,7 +192,11 @@ async def resume(start_from: str | None = None) -> None:
                         }
                         enriched += 1
                     except Exception as exc:
-                        log.warning("enrichment_paper_error", paper_id=str(paper.id), error=str(exc))
+                        log.warning(
+                            "enrichment_paper_error",
+                            paper_id=str(paper.id),
+                            error=str(exc),
+                        )
 
                     if i % 10 == 0 or i == total:
                         log.info("enrichment_progress", processed=i, total=total, enriched=enriched)

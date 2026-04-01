@@ -66,8 +66,11 @@ class TestRetrieveCascade:
             source_server=SourceServer.BIORXIV,
         )
 
-        # bioRxiv returns 404
+        # bioRxiv XML and HTML both return 404
         respx.get("https://www.biorxiv.org/content/10.1101/2026.03.01.888888.full.xml").mock(
+            return_value=httpx.Response(404)
+        )
+        respx.get("https://www.biorxiv.org/content/10.1101/2026.03.01.888888.full").mock(
             return_value=httpx.Response(404)
         )
         # Europe PMC search returns source/id

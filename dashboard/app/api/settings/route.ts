@@ -20,7 +20,7 @@ export async function GET() {
   const denied = await apiRequireAuth();
   if (denied) return denied;
   try {
-    const row = await prisma.pipelineSettings.findFirst({ where: { id: 1 } });
+    const row = await prisma.pipelineSettings.findUnique({ where: { id: 1 } });
     const settings = (row?.settings ?? {}) as Record<string, unknown>;
     return Response.json(redactSecrets(settings));
   } catch (err) {
@@ -36,7 +36,7 @@ export async function PUT(request: NextRequest) {
     const incoming = await request.json();
 
     // Merge with existing settings so redacted values aren't overwritten
-    const existing = await prisma.pipelineSettings.findFirst({ where: { id: 1 } });
+    const existing = await prisma.pipelineSettings.findUnique({ where: { id: 1 } });
     const current = (existing?.settings ?? {}) as Record<string, unknown>;
     const merged = { ...current, ...incoming };
 

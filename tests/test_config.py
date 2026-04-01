@@ -17,10 +17,12 @@ def test_settings_defaults(monkeypatch):
     """Optional fields have sensible defaults."""
     monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://u:p@localhost/test")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-key")
+    # Clear optional env vars that may exist in the real environment
+    monkeypatch.delenv("NCBI_API_KEY", raising=False)
 
     from pipeline.config import Settings
 
-    s = Settings()
+    s = Settings(_env_file=None)
     assert s.stage1_model == "claude-haiku-4-5-20251001"
     assert s.coarse_filter_threshold == 0.8
     assert s.daily_run_hour == 6

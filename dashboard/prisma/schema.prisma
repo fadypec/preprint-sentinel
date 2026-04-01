@@ -66,6 +66,15 @@ enum UserRole {
   @@map("user_role")
 }
 
+enum DedupRelationship {
+  duplicate
+  published_version
+  updated_version
+  cross_posted
+
+  @@map("dedup_relationship")
+}
+
 model Paper {
   id                       String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   doi                      String?             @db.VarChar(255)
@@ -102,12 +111,15 @@ model Paper {
   updatedAt                DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   assessmentLogs AssessmentLog[]
+  paperGroupsAsCanonical PaperGroup[] @relation("CanonicalPaper")
+  paperGroupsAsMember    PaperGroup[] @relation("MemberPaper")
 
   @@index([doi])
   @@index([postedDate])
   @@index([pipelineStage])
   @@index([riskTier])
   @@index([reviewStatus])
+  @@index([coarseFilterPassed])
   @@index([isDuplicateOf])
   @@index([postedDate, pipelineStage], map: "ix_papers_posted_date_stage")
   @@map("papers")
@@ -197,6 +209,24 @@ model Session {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("sessions")
+}
+
+model PaperGroup {
+  id           String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  canonicalId  String            @map("canonical_id") @db.Uuid
+  memberId     String            @map("member_id") @db.Uuid
+  relationship DedupRelationship
+  confidence   Float             @default(1.0)
+  strategyUsed String            @map("strategy_used") @db.VarChar(50)
+  createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz
+
+  canonical Paper @relation("CanonicalPaper", fields: [canonicalId], references: [id])
+  member    Paper @relation("MemberPaper", fields: [memberId], references: [id])
+
+  @@unique([canonicalId, memberId], map: "uq_paper_group_pair")
+  @@index([canonicalId])
+  @@index([memberId])
+  @@map("paper_groups")
 }
 
 model PipelineSettings {
