@@ -11,8 +11,13 @@ type PipelineStatus = {
   paused: boolean;
 };
 
+type TriggerResult =
+  | { ok: true; message: string }
+  | { ok: false; error: string };
+
 type Props = {
   initialStatus: PipelineStatus | null;
+  triggerAction: (from: string, to: string) => Promise<TriggerResult>;
 };
 
 /** Format a Date to YYYY-MM-DD for input[type=date]. */
@@ -20,7 +25,7 @@ function fmtDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-export function PipelineControls({ initialStatus }: Props) {
+export function PipelineControls({ initialStatus, triggerAction }: Props) {
   const [status, setStatus] = useState(initialStatus);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,39 +39,20 @@ export function PipelineControls({ initialStatus }: Props) {
   const [fromDate, setFromDate] = useState(twoDaysAgo);
   const [toDate, setToDate] = useState(today);
 
-  async function refreshStatus() {
-    try {
-      const res = await fetch("/api/pipeline");
-      if (res.ok) setStatus(await res.json());
-    } catch {
-      // ignore
-    }
-  }
-
   async function runPipeline() {
     setPending(true);
     setError(null);
     setSuccess(null);
     try {
-      const res = await fetch("/api/pipeline", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fromDate: fromDate || undefined,
-          toDate: toDate || undefined,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Failed to start pipeline");
+      const result = await triggerAction(fromDate, toDate);
+      if (result.ok) {
+        setSuccess(result.message);
+        setStatus({ running: true, paused: false });
       } else {
-        setSuccess(
-          `Pipeline started (${data.fromDate} → ${data.toDate})`,
-        );
-        await refreshStatus();
+        setError(result.error);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Network error");
+      setError(err instanceof Error ? err.message : "Failed to start");
     } finally {
       setPending(false);
     }
@@ -86,14 +72,12 @@ export function PipelineControls({ initialStatus }: Props) {
           {statusLabel}
         </span>
         {!pending && (
-          <button
-            type="button"
-            onClick={refreshStatus}
+          <a
+            href="/pipeline"
             className="ml-auto text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-            title="Refresh status"
           >
             Refresh
-          </button>
+          </a>
         )}
       </div>
 

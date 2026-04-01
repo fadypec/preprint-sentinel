@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { RunHistoryTable } from "@/components/run-history-table";
 import { PipelineControls } from "@/components/pipeline-controls";
 import { Card } from "@/components/ui/card";
+import { triggerPipeline } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +40,10 @@ export default async function PipelinePage() {
             <h2 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
               Controls
             </h2>
-            <PipelineControls initialStatus={pipelineStatus} />
+            <PipelineControls
+              initialStatus={pipelineStatus}
+              triggerAction={triggerPipeline}
+            />
           </Card>
         </div>
       </div>

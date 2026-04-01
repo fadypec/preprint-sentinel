@@ -83,10 +83,20 @@ export async function POST(request: NextRequest) {
   // Resolve the project root (dashboard is in <root>/dashboard)
   const projectRoot = path.resolve(process.cwd(), "..");
 
-  // Find Python — prefer venv, fall back to system
+  // Find Python — prefer env var, then venv
   const pythonCmd =
     process.env.PIPELINE_PYTHON ??
     path.join(projectRoot, ".venv", "bin", "python");
+
+  // Verify python binary exists before attempting spawn
+  if (!fs.existsSync(pythonCmd)) {
+    return Response.json(
+      {
+        error: `Python not found at ${pythonCmd}. Set PIPELINE_PYTHON env var.`,
+      },
+      { status: 500 },
+    );
+  }
 
   // Log file for debugging pipeline output
   const logDir = path.join(projectRoot, "logs");
@@ -110,8 +120,27 @@ export async function POST(request: NextRequest) {
         ),
       ) as NodeJS.ProcessEnv,
     });
+
+    // Wait briefly to catch immediate spawn failures (bad binary, missing
+    // module, etc.) before returning success to the client.
+    const spawnOk = await new Promise<boolean>((resolve) => {
+      child.on("error", (err) => {
+        fs.writeSync(out, `SPAWN ERROR: ${err.message}\n`);
+        resolve(false);
+      });
+      // If no error fires within 500ms, the process launched successfully
+      setTimeout(() => resolve(true), 500);
+    });
+
     child.unref();
     fs.closeSync(out);
+
+    if (!spawnOk) {
+      return Response.json(
+        { error: "Pipeline process failed to start. Check server logs." },
+        { status: 500 },
+      );
+    }
 
     return Response.json({
       started: true,
