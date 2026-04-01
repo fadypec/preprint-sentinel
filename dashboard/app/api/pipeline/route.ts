@@ -3,6 +3,7 @@ import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 import { prisma } from "@/lib/prisma";
+import { apiRequireAuth, apiRequireAdmin } from "@/lib/auth-guard";
 
 /**
  * Derive pipeline status from the pipeline_runs table.
@@ -28,11 +29,15 @@ async function getDbStatus() {
 }
 
 export async function GET() {
+  const denied = await apiRequireAuth();
+  if (denied) return denied;
   const status = await getDbStatus();
   return Response.json(status);
 }
 
 export async function POST(request: NextRequest) {
+  const denied = await apiRequireAdmin();
+  if (denied) return denied;
   // Check if already running
   const status = await getDbStatus();
   if (status.running) {
@@ -42,13 +47,30 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Parse optional date range from request body
+  // Parse and validate optional date range from request body
+  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
   let fromDate: string | undefined;
   let toDate: string | undefined;
   try {
     const body = await request.json();
-    if (body.fromDate) fromDate = body.fromDate;
-    if (body.toDate) toDate = body.toDate;
+    if (body.fromDate) {
+      if (typeof body.fromDate !== "string" || !DATE_RE.test(body.fromDate)) {
+        return Response.json(
+          { error: "fromDate must be YYYY-MM-DD" },
+          { status: 400 },
+        );
+      }
+      fromDate = body.fromDate;
+    }
+    if (body.toDate) {
+      if (typeof body.toDate !== "string" || !DATE_RE.test(body.toDate)) {
+        return Response.json(
+          { error: "toDate must be YYYY-MM-DD" },
+          { status: 400 },
+        );
+      }
+      toDate = body.toDate;
+    }
   } catch {
     // No body or invalid JSON — run with defaults
   }

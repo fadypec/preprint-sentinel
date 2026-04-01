@@ -24,6 +24,19 @@ from pipeline.triage.prompts import (
 log = structlog.get_logger()
 
 
+_REQUIRED_KEYS = {"relevant", "confidence", "reason"}
+
+
+def _validate_result(result: dict) -> str | None:
+    """Return an error string if required keys are missing, else None."""
+    missing = _REQUIRED_KEYS - result.keys()
+    if missing:
+        return f"Missing required keys: {sorted(missing)}"
+    if not isinstance(result["relevant"], bool):
+        return f"'relevant' must be bool, got {type(result['relevant']).__name__}"
+    return None
+
+
 def _paper_passes(result: dict, threshold: float) -> bool:
     """Determine if a paper should advance past the coarse filter.
 
@@ -110,19 +123,32 @@ async def _run_sync(
         if llm_result.error:
             log.warning("coarse_filter_error", paper_id=str(paper.id), error=llm_result.error)
         else:
-            paper.stage1_result = llm_result.tool_input
-            paper.pipeline_stage = PipelineStage.COARSE_FILTERED
-            passes = _paper_passes(llm_result.tool_input, threshold)
-            paper.coarse_filter_passed = passes
-
-            if passes:
-                passed.append(paper)
-                log.info(
-                    "coarse_filter_pass",
+            validation_err = _validate_result(llm_result.tool_input)
+            if validation_err:
+                log.warning(
+                    "coarse_filter_invalid_response",
                     paper_id=str(paper.id),
-                    relevant=llm_result.tool_input.get("relevant"),
-                    confidence=llm_result.tool_input.get("confidence"),
+                    error=validation_err,
                 )
+                # Fail-open: treat malformed response as passing so paper isn't silently dropped
+                paper.stage1_result = llm_result.tool_input
+                paper.pipeline_stage = PipelineStage.COARSE_FILTERED
+                paper.coarse_filter_passed = True
+                passed.append(paper)
+            else:
+                paper.stage1_result = llm_result.tool_input
+                paper.pipeline_stage = PipelineStage.COARSE_FILTERED
+                passes = _paper_passes(llm_result.tool_input, threshold)
+                paper.coarse_filter_passed = passes
+
+                if passes:
+                    passed.append(paper)
+                    log.info(
+                        "coarse_filter_pass",
+                        paper_id=str(paper.id),
+                        relevant=llm_result.tool_input.get("relevant"),
+                        confidence=llm_result.tool_input.get("confidence"),
+                    )
 
         processed += 1
         if processed % 50 == 0 or processed == total:

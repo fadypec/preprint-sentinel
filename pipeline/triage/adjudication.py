@@ -85,6 +85,21 @@ def _create_assessment_log(
     )
 
 
+_REQUIRED_KEYS = {"adjusted_risk_tier", "adjusted_action", "confidence", "summary"}
+
+
+def _validate_result(result: dict) -> str | None:
+    """Return an error string if required keys are missing, else None."""
+    missing = _REQUIRED_KEYS - result.keys()
+    if missing:
+        return f"Missing required keys: {sorted(missing)}"
+    if result["adjusted_risk_tier"] not in _RISK_TIER_MAP:
+        return f"Invalid adjusted_risk_tier: {result['adjusted_risk_tier']!r}"
+    if result["adjusted_action"] not in _ACTION_MAP:
+        return f"Invalid adjusted_action: {result['adjusted_action']!r}"
+    return None
+
+
 def _apply_result(paper: Paper, tool_input: dict) -> None:
     """Apply the adjudication result to the paper record."""
     paper.stage3_result = tool_input
@@ -150,15 +165,23 @@ async def run_adjudication(
                 error=llm_result.error,
             )
         else:
-            _apply_result(paper, llm_result.tool_input)
-            adjudicated_count += 1
-            log.info(
-                "adjudication_result",
-                paper_id=str(paper.id),
-                adjusted_tier=llm_result.tool_input.get("adjusted_risk_tier"),
-                confidence=llm_result.tool_input.get("confidence"),
-                progress=f"{i}/{total}",
-            )
+            validation_err = _validate_result(llm_result.tool_input)
+            if validation_err:
+                log.warning(
+                    "adjudication_invalid_response",
+                    paper_id=str(paper.id),
+                    error=validation_err,
+                )
+            else:
+                _apply_result(paper, llm_result.tool_input)
+                adjudicated_count += 1
+                log.info(
+                    "adjudication_result",
+                    paper_id=str(paper.id),
+                    adjusted_tier=llm_result.tool_input.get("adjusted_risk_tier"),
+                    confidence=llm_result.tool_input.get("confidence"),
+                    progress=f"{i}/{total}",
+                )
         await session.flush()
 
     log.info(

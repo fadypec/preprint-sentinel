@@ -1,7 +1,10 @@
 import { NextRequest } from "next/server";
 import { updatePipelineSchedule } from "@/lib/pipeline-api";
+import { apiRequireAdmin } from "@/lib/auth-guard";
 
 export async function PUT(request: NextRequest) {
+  const denied = await apiRequireAdmin();
+  if (denied) return denied;
   // Parse JSON body
   let body: unknown;
   try {

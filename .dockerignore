@@ -1,40 +1,22 @@
-# Python
 __pycache__/
 *.py[cod]
 *.egg-info/
 dist/
 build/
 .eggs/
-
-# Environment — ignore secrets, keep examples
 .env
-.env.local
-!**/.env.example
 .venv/
 venv/
-
-# IDE
 .vscode/
 .idea/
-*.swp
-*.swo
-
-# Testing
 .pytest_cache/
 .coverage
 htmlcov/
-
-# OS
 .DS_Store
-Thumbs.db
-
-# Next.js
 .next/
 dashboard/.next/
-
-# Pipeline logs
+dashboard/node_modules/
 logs/
-
-# Superpowers
 .superpowers/
 .worktrees/
+node_modules/

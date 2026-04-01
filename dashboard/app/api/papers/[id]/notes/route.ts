@@ -1,10 +1,13 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { apiRequireAuth } from "@/lib/auth-guard";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
 export async function PUT(request: NextRequest, { params }: RouteParams) {
+  const denied = await apiRequireAuth();
+  if (denied) return denied;
   try {
     const { id } = await params;
     const { notes } = await request.json();

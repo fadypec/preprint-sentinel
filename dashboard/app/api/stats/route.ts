@@ -1,7 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { PipelineStage, RiskTier } from "@prisma/client";
+import { apiRequireAuth } from "@/lib/auth-guard";
 
 export async function GET() {
+  const denied = await apiRequireAuth();
+  if (denied) return denied;
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);

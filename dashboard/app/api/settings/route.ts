@@ -1,7 +1,10 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { apiRequireAuth, apiRequireAdmin } from "@/lib/auth-guard";
 
 export async function GET() {
+  const denied = await apiRequireAuth();
+  if (denied) return denied;
   try {
     const row = await prisma.pipelineSettings.findFirst({ where: { id: 1 } });
     return Response.json(row?.settings ?? {});
@@ -12,6 +15,8 @@ export async function GET() {
 }
 
 export async function PUT(request: NextRequest) {
+  const adminDenied = await apiRequireAdmin();
+  if (adminDenied) return adminDenied;
   try {
     const settings = await request.json();
     const row = await prisma.pipelineSettings.upsert({

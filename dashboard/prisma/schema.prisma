@@ -109,6 +109,7 @@ model Paper {
   @@index([riskTier])
   @@index([reviewStatus])
   @@index([isDuplicateOf])
+  @@index([postedDate, pipelineStage], map: "ix_papers_posted_date_stage")
   @@map("papers")
 }
 

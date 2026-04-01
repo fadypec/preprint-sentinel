@@ -23,6 +23,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -185,6 +186,10 @@ class Paper(Base):
         DateTime(timezone=True),
         server_default=func.now(),
         onupdate=func.now(),
+    )
+
+    __table_args__ = (
+        Index("ix_papers_posted_date_stage", "posted_date", "pipeline_stage"),
     )
 
 

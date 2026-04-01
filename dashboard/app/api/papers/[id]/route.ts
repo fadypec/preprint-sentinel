@@ -1,12 +1,15 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ReviewStatus, Prisma } from "@prisma/client";
+import { apiRequireAuth } from "@/lib/auth-guard";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
 const validStatuses = new Set(Object.values(ReviewStatus));
 
 export async function GET(_request: NextRequest, { params }: RouteParams) {
+  const denied = await apiRequireAuth();
+  if (denied) return denied;
   try {
     const { id } = await params;
     const paper = await prisma.paper.findUnique({
@@ -26,6 +29,8 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 }
 
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
+  const authDenied = await apiRequireAuth();
+  if (authDenied) return authDenied;
   try {
     const { id } = await params;
     const body = await request.json();

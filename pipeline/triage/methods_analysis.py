@@ -68,6 +68,21 @@ def _create_assessment_log(
     )
 
 
+_REQUIRED_KEYS = {"aggregate_score", "risk_tier", "recommended_action", "summary", "dimensions"}
+
+
+def _validate_result(result: dict) -> str | None:
+    """Return an error string if required keys are missing, else None."""
+    missing = _REQUIRED_KEYS - result.keys()
+    if missing:
+        return f"Missing required keys: {sorted(missing)}"
+    if result["risk_tier"] not in _RISK_TIER_MAP:
+        return f"Invalid risk_tier: {result['risk_tier']!r}"
+    if result["recommended_action"] not in _ACTION_MAP:
+        return f"Invalid recommended_action: {result['recommended_action']!r}"
+    return None
+
+
 def _apply_result(paper: Paper, tool_input: dict) -> None:
     """Apply the LLM assessment result to the paper record."""
     # stage2_result = second LLM stage (methods analysis);
@@ -121,14 +136,22 @@ async def _run_sync(
         if llm_result.error:
             log.warning("methods_analysis_error", paper_id=str(paper.id), error=llm_result.error)
         else:
-            _apply_result(paper, llm_result.tool_input)
-            log.info(
-                "methods_analysis_result",
-                paper_id=str(paper.id),
-                risk_tier=paper.risk_tier,
-                aggregate_score=paper.aggregate_score,
-                progress=f"{i}/{total}",
-            )
+            validation_err = _validate_result(llm_result.tool_input)
+            if validation_err:
+                log.warning(
+                    "methods_analysis_invalid_response",
+                    paper_id=str(paper.id),
+                    error=validation_err,
+                )
+            else:
+                _apply_result(paper, llm_result.tool_input)
+                log.info(
+                    "methods_analysis_result",
+                    paper_id=str(paper.id),
+                    risk_tier=paper.risk_tier,
+                    aggregate_score=paper.aggregate_score,
+                    progress=f"{i}/{total}",
+                )
         await session.flush()
 
         if i % 10 == 0 or i == total:
@@ -189,6 +212,15 @@ async def _run_batch(
 
         if llm_result.error:
             log.warning("methods_analysis_error", paper_id=custom_id, error=llm_result.error)
+            continue
+
+        validation_err = _validate_result(llm_result.tool_input)
+        if validation_err:
+            log.warning(
+                "methods_analysis_invalid_response",
+                paper_id=custom_id,
+                error=validation_err,
+            )
             continue
 
         _apply_result(paper, llm_result.tool_input)

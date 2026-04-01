@@ -1,0 +1,43 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: durc
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+      POSTGRES_DB: durc_triage
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U durc"]
+      interval: 5s
+      retries: 5
+    restart: unless-stopped
+
+  pipeline:
+    build:
+      context: .
+      dockerfile: pipeline/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://durc:${DB_PASSWORD}@db:5432/durc_triage
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: dashboard
+      dockerfile: Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${DASHBOARD_PORT:-3000}:3000"
+    env_file: dashboard/.env.local
+    environment:
+      DATABASE_URL: postgresql://durc:${DB_PASSWORD}@db:5432/durc_triage
+    restart: unless-stopped
+
+volumes:
+  pgdata:

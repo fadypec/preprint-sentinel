@@ -1,7 +1,10 @@
 import { NextRequest } from "next/server";
 import { queryPapers, invalidFilters } from "@/lib/queries/papers";
+import { apiRequireAuth } from "@/lib/auth-guard";
 
 export async function GET(request: NextRequest) {
+  const denied = await apiRequireAuth();
+  if (denied) return denied;
   try {
     const params = request.nextUrl.searchParams;
     const page = parseInt(params.get("page") ?? "1", 10) || 1;
