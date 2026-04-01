@@ -1,9 +1,14 @@
 import { PaperCard } from "@/components/paper-card";
 import { PaperFilters } from "@/components/paper-filters";
-import { buttonVariants } from "@/components/ui/button";
 import { queryPapers } from "@/lib/queries/papers";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+
+const paginationBase =
+  "inline-flex shrink-0 items-center justify-center rounded-lg text-sm font-medium border border-border bg-background h-7 px-2.5 text-[0.8rem]";
+const paginationEnabled =
+  "hover:bg-muted hover:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50";
+const paginationDisabled = "pointer-events-none opacity-50";
 
 type Props = {
   searchParams: Promise<{
@@ -36,7 +41,7 @@ export default async function DailyFeedPage({ searchParams }: Props) {
   const status = params.status;
   const search = params.q?.trim();
 
-  const { papers, total, totalPages } = await queryPapers({
+  const { papers, total, totalIngested, totalPages } = await queryPapers({
     page,
     tier,
     source,
@@ -45,6 +50,7 @@ export default async function DailyFeedPage({ searchParams }: Props) {
   });
 
   const filterState = { tier, source, status, q: search };
+  const flaggedPct = totalIngested > 0 ? ((total / totalIngested) * 100).toFixed(1) : "0";
 
   return (
     <div>
@@ -54,7 +60,7 @@ export default async function DailyFeedPage({ searchParams }: Props) {
             Daily Feed
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            {total} papers flagged &middot;{" "}
+            {total} flagged of {totalIngested.toLocaleString()} ingested ({flaggedPct}%) &middot;{" "}
             {new Date().toLocaleDateString("en-US", {
               month: "long",
               day: "numeric",
@@ -65,7 +71,12 @@ export default async function DailyFeedPage({ searchParams }: Props) {
       </div>
 
       <div className="mb-4">
-        <PaperFilters />
+        <PaperFilters
+          tier={tier ?? "all"}
+          source={source ?? "all"}
+          status={status ?? "all"}
+          q={search ?? ""}
+        />
       </div>
 
       <div className="flex flex-col gap-3" role="feed" aria-label="Flagged papers">
@@ -84,16 +95,13 @@ export default async function DailyFeedPage({ searchParams }: Props) {
           {page > 1 ? (
             <Link
               href={buildPaginationHref(page - 1, filterState)}
-              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+              className={cn(paginationBase, paginationEnabled)}
             >
               Previous
             </Link>
           ) : (
             <span
-              className={cn(
-                buttonVariants({ variant: "outline", size: "sm" }),
-                "pointer-events-none opacity-50",
-              )}
+              className={cn(paginationBase, paginationDisabled)}
               aria-disabled="true"
             >
               Previous
@@ -105,16 +113,13 @@ export default async function DailyFeedPage({ searchParams }: Props) {
           {page < totalPages ? (
             <Link
               href={buildPaginationHref(page + 1, filterState)}
-              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+              className={cn(paginationBase, paginationEnabled)}
             >
               Next
             </Link>
           ) : (
             <span
-              className={cn(
-                buttonVariants({ variant: "outline", size: "sm" }),
-                "pointer-events-none opacity-50",
-              )}
+              className={cn(paginationBase, paginationDisabled)}
               aria-disabled="true"
             >
               Next

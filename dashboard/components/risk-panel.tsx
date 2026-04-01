@@ -1,13 +1,10 @@
 import { DimensionBar } from "@/components/dimension-bar";
 import { ReviewStatusSelect } from "@/components/review-status-select";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
 import { riskStyle } from "@/lib/risk-colors";
-import { cn } from "@/lib/utils";
+import { cn, parseDimensions } from "@/lib/utils";
 import { ExternalLink } from "lucide-react";
 import type { Paper } from "@prisma/client";
-
-type Dimensions = Record<string, { score: number; justification: string }>;
 
 const dimensionLabels: Record<string, string> = {
   pathogen_enhancement: "Pathogen Enhancement",
@@ -24,8 +21,8 @@ type RiskPanelProps = {
 
 export function RiskPanel({ paper }: RiskPanelProps) {
   const style = riskStyle(paper.riskTier);
-  const stage2 = paper.stage2Result as { dimensions?: Dimensions } | null;
-  const dimensions = stage2?.dimensions ?? {};
+  const stage2 = paper.stage2Result as { dimensions?: unknown } | null;
+  const dimensions = parseDimensions(stage2?.dimensions);
 
   const doiUrl = paper.doi ? `https://doi.org/${paper.doi}` : null;
 
@@ -71,9 +68,9 @@ export function RiskPanel({ paper }: RiskPanelProps) {
             href={doiUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-full")}
+            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-lg border border-border bg-background px-2.5 text-[0.8rem] font-medium transition-colors hover:bg-muted hover:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50"
           >
-            <ExternalLink className="mr-2 h-3 w-3" />
+            <ExternalLink className="h-3 w-3" />
             Open Original
           </a>
         )}

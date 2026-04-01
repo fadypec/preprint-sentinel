@@ -2,14 +2,13 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
 import { RiskPanel } from "@/components/risk-panel";
 import { EnrichmentCard } from "@/components/enrichment-card";
 import { MethodsViewer } from "@/components/methods-viewer";
 import { AnalystNotes } from "@/components/analyst-notes";
 import { AuditTrail } from "@/components/audit-trail";
 import { riskStyle } from "@/lib/risk-colors";
-import { cn, formatDate, sourceServerLabel } from "@/lib/utils";
+import { cn, formatDate, sourceServerLabel, languageName } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
 
 type Props = {
@@ -28,6 +27,7 @@ export default async function PaperDetailPage({ params }: Props) {
   if (!paper) notFound();
 
   const style = riskStyle(paper.riskTier);
+  const isTranslated = paper.language != null && paper.language !== "eng" && paper.originalTitle != null;
   const stage2 = paper.stage2Result as {
     summary?: string;
     key_methods_of_concern?: string[];
@@ -54,13 +54,18 @@ export default async function PaperDetailPage({ params }: Props) {
         <Link
           href="/"
           aria-label="Back to feed"
-          className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}
+          className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-sm transition-colors hover:bg-muted hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
         </Link>
         <div className="flex-1">
           <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100">
             {paper.title}
+            {isTranslated && (
+              <span className="ml-2 inline-flex rounded bg-blue-100 px-1.5 py-0.5 align-middle text-xs font-normal text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                AI translated from {languageName(paper.language!)}
+              </span>
+            )}
           </h1>
           <div className="mt-1 flex items-center gap-2">
             <Badge className={cn(style.badge)}>{style.label}</Badge>
