@@ -8,9 +8,11 @@ Falls back gracefully if all sources fail — the paper still advances.
 from __future__ import annotations
 
 import asyncio
+import io
 import re
 
 import httpx
+import pymupdf
 import structlog
 from lxml import etree
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,25 +24,31 @@ from pipeline.models import Paper, PipelineStage, SourceServer
 
 log = structlog.get_logger()
 
-_PMC_ID_PATTERN = re.compile(r"PMC\d+")
+_PMC_ID_PATTERN = re.compile(r"(?:PMC)?(\d+)")
 
 
-async def retrieve_full_text(
-    session: AsyncSession,
+async def fetch_full_text_content(
     paper: Paper,
     settings,
-) -> None:
+) -> tuple[str, str] | None:
     """Run the full-text retrieval cascade for a single paper.
 
-    Updates paper.full_text_content, paper.methods_section,
-    paper.full_text_retrieved, and paper.pipeline_stage in-place.
+    Returns (full_text, methods_section) or None if no full text found.
+    Pure HTTP — does not touch the database.
     """
     result = None
 
+    is_preprint = paper.source_server in (SourceServer.BIORXIV, SourceServer.MEDRXIV)
+    base_url = "https://www.medrxiv.org" if paper.source_server == SourceServer.MEDRXIV else "https://www.biorxiv.org"
+
     async with httpx.AsyncClient() as http:
         # Source 1: bioRxiv/medRxiv TDM XML
-        if paper.doi and paper.source_server in (SourceServer.BIORXIV, SourceServer.MEDRXIV):
-            result = await _try_biorxiv(http, paper.doi, settings.fulltext_request_delay)
+        if paper.doi and is_preprint:
+            result = await _try_preprint_xml(http, base_url, paper.doi, settings.fulltext_request_delay)
+
+        # Source 1b: bioRxiv/medRxiv HTML fallback
+        if result is None and paper.doi and is_preprint:
+            result = await _try_preprint_html(http, base_url, paper.doi, settings.fulltext_request_delay)
 
         # Source 2: Europe PMC full text
         if result is None and paper.doi:
@@ -54,9 +62,28 @@ async def retrieve_full_text(
                     http, pmc_id, settings.fulltext_request_delay, settings.ncbi_api_key
                 )
 
-        # Source 4: Unpaywall
+        # Source 4: Unpaywall (XML/HTML, then PDF fallback)
         if result is None and paper.doi and settings.unpaywall_email:
             result = await _try_unpaywall(http, paper.doi, settings)
+
+        # Source 5: bioRxiv/medRxiv PDF as last resort
+        if result is None and paper.doi and is_preprint:
+            result = await _try_preprint_pdf(http, base_url, paper.doi, settings.fulltext_request_delay)
+
+    return result
+
+
+async def retrieve_full_text(
+    session: AsyncSession,
+    paper: Paper,
+    settings,
+) -> None:
+    """Run the full-text retrieval cascade for a single paper.
+
+    Updates paper.full_text_content, paper.methods_section,
+    paper.full_text_retrieved, and paper.pipeline_stage in-place.
+    """
+    result = await fetch_full_text_content(paper, settings)
 
     if result is not None:
         full_text, methods = result
@@ -73,21 +100,50 @@ async def retrieve_full_text(
 
 
 def _extract_pmc_id(url: str) -> str | None:
-    """Extract PMC ID from a URL like https://...pmc/articles/PMC7654321/."""
+    """Extract PMC ID from a URL like /pmc/articles/PMC7654321/ or /pmc/articles/7654321/."""
     match = _PMC_ID_PATTERN.search(url)
-    return match.group(0) if match else None
+    if not match:
+        return None
+    digits = match.group(1)
+    return f"PMC{digits}"
 
 
-async def _try_biorxiv(http: httpx.AsyncClient, doi: str, delay: float) -> tuple[str, str] | None:
+async def _try_preprint_xml(http: httpx.AsyncClient, base_url: str, doi: str, delay: float) -> tuple[str, str] | None:
     """Source 1: bioRxiv/medRxiv TDM XML."""
-    url = f"https://www.biorxiv.org/content/{doi}.full.xml"
+    url = f"{base_url}/content/{doi}.full.xml"
     try:
         await asyncio.sleep(delay)
-        resp = await http.get(url, timeout=30.0)
+        resp = await http.get(url, timeout=30.0, follow_redirects=True)
         if resp.status_code == 200:
             return jats_extract(resp.content)
     except (httpx.HTTPError, etree.Error, ValueError) as exc:
-        log.debug("biorxiv_fulltext_error", doi=doi, error=str(exc))
+        log.debug("preprint_xml_error", doi=doi, error=str(exc))
+    return None
+
+
+async def _try_preprint_html(http: httpx.AsyncClient, base_url: str, doi: str, delay: float) -> tuple[str, str] | None:
+    """Source 1b: bioRxiv/medRxiv HTML full text."""
+    url = f"{base_url}/content/{doi}.full"
+    try:
+        await asyncio.sleep(delay)
+        resp = await http.get(url, timeout=30.0, follow_redirects=True)
+        if resp.status_code == 200 and resp.content:
+            return html_extract(resp.content)
+    except (httpx.HTTPError, ValueError) as exc:
+        log.debug("preprint_html_error", doi=doi, error=str(exc))
+    return None
+
+
+async def _try_preprint_pdf(http: httpx.AsyncClient, base_url: str, doi: str, delay: float) -> tuple[str, str] | None:
+    """Source 5: bioRxiv/medRxiv PDF as last resort."""
+    url = f"{base_url}/content/{doi}.full.pdf"
+    try:
+        await asyncio.sleep(delay)
+        resp = await http.get(url, timeout=60.0, follow_redirects=True)
+        if resp.status_code == 200 and resp.content:
+            return _extract_from_pdf(resp.content, doi)
+    except (httpx.HTTPError, ValueError) as exc:
+        log.debug("preprint_pdf_error", doi=doi, error=str(exc))
     return None
 
 
@@ -141,7 +197,7 @@ async def _try_pmc(
 
 
 async def _try_unpaywall(http: httpx.AsyncClient, doi: str, settings) -> tuple[str, str] | None:
-    """Source 4: Unpaywall → fetch OA URL → parse."""
+    """Source 4: Unpaywall → fetch OA URL → parse (XML, HTML, or PDF)."""
     try:
         async with UnpaywallClient(
             email=settings.unpaywall_email,
@@ -152,18 +208,60 @@ async def _try_unpaywall(http: httpx.AsyncClient, doi: str, settings) -> tuple[s
         if result is None:
             return None
 
-        if result.content_type == "pdf":
-            log.debug("unpaywall_pdf_skipped", doi=doi)
-            return None
-
-        resp = await http.get(result.url, timeout=30.0)
+        timeout = 60.0 if result.content_type == "pdf" else 30.0
+        resp = await http.get(result.url, timeout=timeout, follow_redirects=True)
         if resp.status_code != 200:
             return None
 
         if result.content_type == "xml":
             return jats_extract(resp.content)
+        if result.content_type == "pdf":
+            return _extract_from_pdf(resp.content, doi)
         return html_extract(resp.content)
 
     except (httpx.HTTPError, etree.Error, ValueError) as exc:
         log.debug("unpaywall_fulltext_error", doi=doi, error=str(exc))
     return None
+
+
+def _extract_from_pdf(pdf_bytes: bytes, doi: str) -> tuple[str, str] | None:
+    """Extract text from PDF bytes and identify the methods section."""
+    try:
+        doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+        pages = [page.get_text() for page in doc]
+        doc.close()
+
+        full_text = "\n".join(pages)
+        if not full_text.strip():
+            log.debug("pdf_no_text", doi=doi)
+            return None
+
+        methods = _find_methods_in_text(full_text)
+        return (full_text, methods)
+    except Exception as exc:
+        log.debug("pdf_extract_error", doi=doi, error=str(exc))
+        return None
+
+
+_METHODS_HEADING_RE = re.compile(
+    r"^(materials?\s*(?:and|&)\s*methods|methods|experimental\s*(?:procedures|methods)|study\s*methods)\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+_SECTION_HEADING_RE = re.compile(
+    r"^(results|discussion|acknowledgements?|references|conclusions?|data\s*availability|supplementary|funding)\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def _find_methods_in_text(text: str) -> str:
+    """Find the methods section in plain text by heading patterns."""
+    match = _METHODS_HEADING_RE.search(text)
+    if not match:
+        return text
+
+    start = match.start()
+    end_match = _SECTION_HEADING_RE.search(text, match.end())
+    end = end_match.start() if end_match else len(text)
+    methods = text[start:end].strip()
+    return methods if methods else text

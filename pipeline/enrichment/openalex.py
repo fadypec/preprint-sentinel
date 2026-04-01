@@ -120,6 +120,9 @@ class OpenAlexClient:
 
     async def _fetch_work(self, doi: str) -> dict | None:
         """Fetch work data from OpenAlex by DOI."""
+        if not doi:
+            log.debug("openalex_skip_empty_doi")
+            return None
         url = f"{BASE_URL}/works"
         params = {"filter": f"doi:{doi}", "mailto": self.email}
 
@@ -168,8 +171,10 @@ class OpenAlexClient:
         return None
 
     @staticmethod
-    def _extract_id(openalex_url: str) -> str:
+    def _extract_id(openalex_url: str | None) -> str:
         """Extract the short ID from an OpenAlex URL like 'https://openalex.org/W123'."""
+        if not openalex_url:
+            return ""
         if "/" in openalex_url:
             return openalex_url.rsplit("/", 1)[-1]
         return openalex_url

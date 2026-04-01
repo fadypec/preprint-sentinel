@@ -26,6 +26,13 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
+# Next.js
+.next/
+dashboard/.next/
+
+# Pipeline logs
+logs/
+
 # Superpowers
 .superpowers/
 .worktrees/

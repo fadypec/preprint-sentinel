@@ -58,8 +58,8 @@ class BiorxivClient:
                 break
 
             msg = messages[0]
-            total = msg.get("total", 0)
-            count = msg.get("count", 0)
+            total = int(msg.get("total", 0))
+            count = int(msg.get("count", 0))
 
             for raw in data.get("collection", []):
                 yield self._normalise(raw)

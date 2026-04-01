@@ -7,6 +7,8 @@ are NOT relevant get filtered out. Everything else passes to Stage 3.
 
 from __future__ import annotations
 
+import asyncio
+
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -84,41 +86,52 @@ async def _run_sync(
     papers: list[Paper],
     model: str,
     threshold: float,
+    concurrency: int = 10,
 ) -> list[Paper]:
-    """Process papers one at a time."""
+    """Process papers concurrently with a semaphore."""
     passed: list[Paper] = []
+    processed = 0
+    total = len(papers)
+    sem = asyncio.Semaphore(concurrency)
 
-    for paper in papers:
-        user_msg = format_coarse_filter_message(paper.title, paper.abstract or "")
-
-        llm_result = await llm_client.call_tool(
-            model=model,
-            system_prompt=COARSE_FILTER_SYSTEM_PROMPT,
-            user_message=user_msg,
-            tool=CLASSIFY_PAPER_TOOL,
-        )
+    async def _classify(paper: Paper) -> None:
+        nonlocal processed
+        async with sem:
+            user_msg = format_coarse_filter_message(paper.title, paper.abstract or "")
+            llm_result = await llm_client.call_tool(
+                model=model,
+                system_prompt=COARSE_FILTER_SYSTEM_PROMPT,
+                user_message=user_msg,
+                tool=CLASSIFY_PAPER_TOOL,
+            )
 
         _create_assessment_log(session, paper, llm_result, model, user_msg)
 
         if llm_result.error:
             log.warning("coarse_filter_error", paper_id=str(paper.id), error=llm_result.error)
-            continue
+        else:
+            paper.stage1_result = llm_result.tool_input
+            paper.pipeline_stage = PipelineStage.COARSE_FILTERED
+            passes = _paper_passes(llm_result.tool_input, threshold)
+            paper.coarse_filter_passed = passes
 
-        paper.stage1_result = llm_result.tool_input
-        paper.pipeline_stage = PipelineStage.COARSE_FILTERED
+            if passes:
+                passed.append(paper)
+                log.info(
+                    "coarse_filter_pass",
+                    paper_id=str(paper.id),
+                    relevant=llm_result.tool_input.get("relevant"),
+                    confidence=llm_result.tool_input.get("confidence"),
+                )
 
-        if _paper_passes(llm_result.tool_input, threshold):
-            passed.append(paper)
-            log.info(
-                "coarse_filter_pass",
-                paper_id=str(paper.id),
-                relevant=llm_result.tool_input.get("relevant"),
-                confidence=llm_result.tool_input.get("confidence"),
-            )
+        processed += 1
+        if processed % 50 == 0 or processed == total:
+            log.info("coarse_filter_progress", processed=processed, total=total)
 
-        await session.flush()
+    await asyncio.gather(*[_classify(p) for p in papers])
+    await session.flush()
 
-    log.info("coarse_filter_complete", total=len(papers), passed=len(passed))
+    log.info("coarse_filter_complete", total=total, passed=len(passed))
     return passed
 
 
@@ -163,8 +176,10 @@ async def _run_batch(
 
         paper.stage1_result = llm_result.tool_input
         paper.pipeline_stage = PipelineStage.COARSE_FILTERED
+        passes = _paper_passes(llm_result.tool_input, threshold)
+        paper.coarse_filter_passed = passes
 
-        if _paper_passes(llm_result.tool_input, threshold):
+        if passes:
             passed.append(paper)
 
     await session.flush()

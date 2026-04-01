@@ -122,6 +122,48 @@ class LLMClient:
                     continue
                 raise
 
+    async def call(
+        self,
+        model: str,
+        system_prompt: str,
+        user_message: str,
+        max_retries: int = 3,
+        max_tokens: int = 1024,
+    ) -> LLMResult:
+        """Make a plain text call (no tool use) with retry on transient errors."""
+        for attempt in range(1, max_retries + 1):
+            try:
+                response = await self._anthropic.messages.create(
+                    model=model,
+                    max_tokens=max_tokens,
+                    system=system_prompt,
+                    messages=[{"role": "user", "content": user_message}],
+                )
+
+                raw = response.content[0].text if response.content else ""
+                in_tok = response.usage.input_tokens
+                out_tok = response.usage.output_tokens
+                cost = estimate_cost(model, in_tok, out_tok)
+
+                return LLMResult(
+                    tool_input={},
+                    raw_response=raw,
+                    input_tokens=in_tok,
+                    output_tokens=out_tok,
+                    cost_estimate_usd=cost,
+                )
+
+            except (APIStatusError, APITimeoutError) as exc:
+                retryable = isinstance(exc, APITimeoutError) or (
+                    isinstance(exc, APIStatusError) and exc.status_code in _RETRYABLE_STATUS_CODES
+                )
+                if retryable and attempt < max_retries:
+                    backoff = min(2**attempt, 30)
+                    log.warning("llm_retry", attempt=attempt, backoff=backoff, error=str(exc))
+                    await asyncio.sleep(backoff)
+                    continue
+                raise
+
     async def submit_batch(
         self,
         model: str,

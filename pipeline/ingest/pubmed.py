@@ -196,9 +196,21 @@ class PubmedClient:
         if article is None:
             raise ValueError("MedlineCitation missing Article element")
 
-        # Title — extract text only, strip inline XML markup like <i>, <sub>
+        # Title — prefer ArticleTitle, fall back to VernacularTitle for non-English
         title_elem = article.find("ArticleTitle")
         title = "".join(title_elem.itertext()).strip() if title_elem is not None else ""
+
+        vernacular_title = None
+        vt_elem = article.find("VernacularTitle")
+        if vt_elem is not None:
+            vernacular_title = "".join(vt_elem.itertext()).strip()
+
+        if not title or title == "[Not Available].":
+            title = vernacular_title or title
+
+        # Language
+        lang_elem = article.find("Language")
+        language = lang_elem.text if lang_elem is not None else "eng"
 
         # Authors
         authors = []
@@ -260,6 +272,8 @@ class PubmedClient:
             "subject_category": subject_category,
             "version": 1,
             "full_text_url": full_text_url,
+            "_language": language,
+            "_vernacular_title": vernacular_title,
         }
 
     def _extract_date(self, elem) -> date:

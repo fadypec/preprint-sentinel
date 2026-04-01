@@ -108,20 +108,15 @@ async def run_adjudication(
     if not papers:
         return
 
+    total = len(papers)
     adjudicated_count = 0
     auto_advanced_count = 0
 
-    for paper in papers:
+    for i, paper in enumerate(papers, 1):
         if not _tier_meets_threshold(paper.risk_tier, min_tier):
             # Auto-advance below-threshold papers
             paper.pipeline_stage = PipelineStage.ADJUDICATED
             auto_advanced_count += 1
-            log.info(
-                "adjudication_auto_advanced",
-                paper_id=str(paper.id),
-                risk_tier=paper.risk_tier.value if paper.risk_tier else None,
-                min_tier=min_tier,
-            )
             await session.flush()
             continue
 
@@ -154,21 +149,21 @@ async def run_adjudication(
                 paper_id=str(paper.id),
                 error=llm_result.error,
             )
-            continue
-
-        _apply_result(paper, llm_result.tool_input)
-        adjudicated_count += 1
-        log.info(
-            "adjudication_complete",
-            paper_id=str(paper.id),
-            adjusted_tier=llm_result.tool_input.get("adjusted_risk_tier"),
-            confidence=llm_result.tool_input.get("confidence"),
-        )
+        else:
+            _apply_result(paper, llm_result.tool_input)
+            adjudicated_count += 1
+            log.info(
+                "adjudication_result",
+                paper_id=str(paper.id),
+                adjusted_tier=llm_result.tool_input.get("adjusted_risk_tier"),
+                confidence=llm_result.tool_input.get("confidence"),
+                progress=f"{i}/{total}",
+            )
         await session.flush()
 
     log.info(
         "adjudication_run_complete",
-        total=len(papers),
+        total=total,
         adjudicated=adjudicated_count,
         auto_advanced=auto_advanced_count,
     )

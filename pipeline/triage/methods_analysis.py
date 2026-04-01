@@ -103,7 +103,8 @@ async def _run_sync(
     model: str,
 ) -> None:
     """Process papers one at a time."""
-    for paper in papers:
+    total = len(papers)
+    for i, paper in enumerate(papers, 1):
         user_msg = format_methods_analysis_message(
             paper.title, paper.abstract or "", methods=paper.methods_section
         )
@@ -119,18 +120,21 @@ async def _run_sync(
 
         if llm_result.error:
             log.warning("methods_analysis_error", paper_id=str(paper.id), error=llm_result.error)
-            continue
-
-        _apply_result(paper, llm_result.tool_input)
-        log.info(
-            "methods_analysis_complete",
-            paper_id=str(paper.id),
-            risk_tier=paper.risk_tier,
-            aggregate_score=paper.aggregate_score,
-        )
+        else:
+            _apply_result(paper, llm_result.tool_input)
+            log.info(
+                "methods_analysis_result",
+                paper_id=str(paper.id),
+                risk_tier=paper.risk_tier,
+                aggregate_score=paper.aggregate_score,
+                progress=f"{i}/{total}",
+            )
         await session.flush()
 
-    log.info("methods_analysis_sync_complete", total=len(papers))
+        if i % 10 == 0 or i == total:
+            log.info("methods_analysis_progress", processed=i, total=total)
+
+    log.info("methods_analysis_sync_complete", total=total)
 
 
 async def _run_batch(

@@ -29,7 +29,13 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy import Enum as SQLEnum
+from sqlalchemy import Enum as _SQLEnum
+
+
+def SQLEnum(enum_cls, **kw):
+    """Wrapper that ensures StrEnum values (lowercase) are sent to Postgres, not names (UPPERCASE)."""
+    kw.setdefault("values_callable", lambda e: [m.value for m in e])
+    return _SQLEnum(enum_cls, **kw)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -121,6 +127,10 @@ class Paper(Base):
     posted_date: Mapped[date] = mapped_column(Date, index=True)
     subject_category: Mapped[str | None] = mapped_column(String(255))
     version: Mapped[int] = mapped_column(Integer, default=1)
+    language: Mapped[str | None] = mapped_column(String(10))
+    original_title: Mapped[str | None] = mapped_column(Text)
+    original_abstract: Mapped[str | None] = mapped_column(Text)
+    original_methods_section: Mapped[str | None] = mapped_column(Text)
 
     # Full text (populated in later pipeline stages)
     full_text_url: Mapped[str | None] = mapped_column(Text)
@@ -135,6 +145,9 @@ class Paper(Base):
         default=PipelineStage.INGESTED,
         index=True,
     )
+
+    # Coarse filter gate — only papers that pass advance to fulltext+
+    coarse_filter_passed: Mapped[bool | None] = mapped_column(Boolean, index=True)
 
     # Classification results (latest only; history in assessment_logs)
     stage1_result: Mapped[dict | None] = mapped_column(PlatformJSON)

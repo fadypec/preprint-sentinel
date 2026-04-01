@@ -1,34 +1,74 @@
 """Entry point for the DURC triage pipeline.
 
 Usage:
-    python -m pipeline              # One-shot run
+    python -m pipeline              # One-shot run (last 2 days)
     python -m pipeline --schedule   # Long-lived scheduled mode
+    python -m pipeline --from-date 2026-03-01 --to-date 2026-03-31  # Backfill
 """
 
 from __future__ import annotations
 
+import argparse
 import asyncio
-import sys
+from datetime import date
 
 import structlog
 
 log = structlog.get_logger()
 
 
+def parse_date(s: str) -> date:
+    """Parse YYYY-MM-DD string to date."""
+    return date.fromisoformat(s)
+
+
 def main() -> None:
     """Parse args and run the pipeline in the appropriate mode."""
-    if "--schedule" in sys.argv:
+    parser = argparse.ArgumentParser(description="DURC triage pipeline")
+    parser.add_argument(
+        "--schedule",
+        action="store_true",
+        help="Run in long-lived scheduled mode (daily cron + HTTP API)",
+    )
+    parser.add_argument(
+        "--from-date",
+        type=parse_date,
+        default=None,
+        help="Start date for ingestion (YYYY-MM-DD). Default: 2 days ago.",
+    )
+    parser.add_argument(
+        "--to-date",
+        type=parse_date,
+        default=None,
+        help="End date for ingestion (YYYY-MM-DD). Default: today.",
+    )
+    args = parser.parse_args()
+
+    if args.schedule:
         _run_scheduled()
     else:
-        _run_oneshot()
+        _run_oneshot(from_date=args.from_date, to_date=args.to_date)
 
 
-def _run_oneshot() -> None:
+def _run_oneshot(
+    from_date: date | None = None,
+    to_date: date | None = None,
+) -> None:
     """Execute a single pipeline run and exit."""
     from pipeline.orchestrator import run_daily_pipeline
 
-    log.info("pipeline_oneshot_start")
-    stats = asyncio.run(run_daily_pipeline(trigger="manual"))
+    log.info(
+        "pipeline_oneshot_start",
+        from_date=str(from_date) if from_date else "default",
+        to_date=str(to_date) if to_date else "default",
+    )
+    stats = asyncio.run(
+        run_daily_pipeline(
+            trigger="manual",
+            from_date=from_date,
+            to_date=to_date,
+        )
+    )
     log.info(
         "pipeline_oneshot_complete",
         papers_ingested=stats.papers_ingested,
