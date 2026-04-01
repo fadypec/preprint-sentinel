@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/prisma";
-import { getPipelineStatus } from "@/lib/pipeline-api";
 import { RunHistoryTable } from "@/components/run-history-table";
 import { PipelineControls } from "@/components/pipeline-controls";
 import { Card } from "@/components/ui/card";
+
+export const dynamic = "force-dynamic";
 
 export default async function PipelinePage() {
   const runs = await prisma.pipelineRun.findMany({
@@ -10,12 +11,12 @@ export default async function PipelinePage() {
     take: 50,
   });
 
-  let pipelineStatus = null;
-  try {
-    pipelineStatus = await getPipelineStatus();
-  } catch {
-    // Sidecar may not be running
-  }
+  // Derive status from DB — no sidecar needed
+  const runningRun = runs.find((r) => r.finishedAt === null);
+  const pipelineStatus = {
+    running: !!runningRun,
+    paused: false,
+  };
 
   return (
     <div>

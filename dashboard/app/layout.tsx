@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { Sidebar } from "@/components/sidebar";
 import "./globals.css";
+
+const geistSans = Geist({ subsets: ["latin"], variable: "--font-sans" });
+const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" });
 
 export const metadata: Metadata = {
   title: "DURC Triage Dashboard",
@@ -12,17 +17,23 @@ export const metadata: Metadata = {
 
 async function getPipelineStatusSafe() {
   try {
-    const url = process.env.PIPELINE_API_URL ?? "http://localhost:8000";
-    const secret = process.env.PIPELINE_API_SECRET ?? "";
-    const res = await fetch(`${url}/status`, {
-      headers: { Authorization: `Bearer ${secret}` },
-      cache: "no-store",
+    const runningRun = await prisma.pipelineRun.findFirst({
+      where: { finishedAt: null },
+      orderBy: { startedAt: "desc" },
     });
-    if (res.ok) return res.json();
+    return {
+      running: !!runningRun,
+      paused: false,
+      next_run_time: null,
+    };
   } catch {
-    // Pipeline sidecar may not be running
+    return null;
   }
-  return null;
+}
+
+/** Auth is optional in dev when no OAuth providers are configured */
+function authConfigured(): boolean {
+  return !!(process.env.AUTH_GITHUB_ID || process.env.AUTH_GOOGLE_ID);
 }
 
 export default async function RootLayout({
@@ -30,13 +41,16 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth();
-  const pipelineStatus = session ? await getPipelineStatusSafe() : null;
+  const session = authConfigured() ? await auth() : null;
+  const showDashboard = session || !authConfigured();
+  const pipelineStatus = showDashboard ? await getPipelineStatusSafe() : null;
 
-  // Login page renders without sidebar
-  if (!session) {
+  const fontClasses = `${geistSans.variable} ${geistMono.variable} antialiased`;
+
+  // Login page renders without sidebar (only when auth is configured but user isn't logged in)
+  if (!showDashboard) {
     return (
-      <html lang="en" suppressHydrationWarning>
+      <html lang="en" suppressHydrationWarning className={fontClasses}>
         <body>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
             <NuqsAdapter>
@@ -49,14 +63,14 @@ export default async function RootLayout({
   }
 
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={fontClasses}>
       <body>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <NuqsAdapter>
             <div className="flex h-screen bg-slate-50 dark:bg-slate-900">
               <Sidebar
                 pipelineStatus={pipelineStatus}
-                userName={session.user?.name}
+                userName={session?.user?.name ?? "Dev User"}
               />
               <main className="flex-1 overflow-y-auto p-6">
                 {children}
