@@ -1,105 +1,245 @@
-"use client";
+import { cn } from "@/lib/utils";
 
-import { useQueryState, parseAsString, parseAsInteger } from "nuqs";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { Search, X } from "lucide-react";
+const TIER_OPTIONS = [
+  {
+    value: "critical",
+    label: "Critical",
+    active:
+      "bg-red-600 text-white border-red-600 dark:bg-red-700 dark:border-red-700",
+    inactive:
+      "border-red-300 text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/30",
+  },
+  {
+    value: "high",
+    label: "High",
+    active:
+      "bg-orange-500 text-white border-orange-500 dark:bg-orange-600 dark:border-orange-600",
+    inactive:
+      "border-orange-300 text-orange-700 hover:bg-orange-50 dark:border-orange-800 dark:text-orange-400 dark:hover:bg-orange-900/30",
+  },
+  {
+    value: "medium",
+    label: "Medium",
+    active:
+      "bg-yellow-500 text-white border-yellow-500 dark:bg-yellow-600 dark:border-yellow-600",
+    inactive:
+      "border-yellow-300 text-yellow-700 hover:bg-yellow-50 dark:border-yellow-800 dark:text-yellow-400 dark:hover:bg-yellow-900/30",
+  },
+  {
+    value: "low",
+    label: "Low",
+    active:
+      "bg-green-600 text-white border-green-600 dark:bg-green-700 dark:border-green-700",
+    inactive:
+      "border-green-300 text-green-700 hover:bg-green-50 dark:border-green-800 dark:text-green-400 dark:hover:bg-green-900/30",
+  },
+] as const;
 
-export function PaperFilters() {
-  const [riskTier, setRiskTier] = useQueryState("tier", parseAsString.withDefault("all"));
-  const [source, setSource] = useQueryState("source", parseAsString.withDefault("all"));
-  const [status, setStatus] = useQueryState("status", parseAsString.withDefault("all"));
-  const [search, setSearch] = useQueryState("q", parseAsString.withDefault(""));
-  const [, setPage] = useQueryState("page", parseAsInteger.withDefault(1));
+const selectClasses =
+  "h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30 dark:hover:bg-input/50";
 
-  const resetPage = () => setPage(1);
+type PaperFiltersProps = {
+  tier: string;
+  source: string;
+  status: string;
+  q: string;
+};
 
-  const hasFilters = riskTier !== "all" || source !== "all" || status !== "all" || search !== "";
+/** Build a clean URL with only non-default filter params. */
+function buildUrl(filters: {
+  tier: string;
+  source: string;
+  status: string;
+  q: string;
+}): string {
+  const p = new URLSearchParams();
+  if (filters.tier && filters.tier !== "all") p.set("tier", filters.tier);
+  if (filters.source && filters.source !== "all")
+    p.set("source", filters.source);
+  if (filters.status && filters.status !== "all")
+    p.set("status", filters.status);
+  if (filters.q) p.set("q", filters.q);
+  const qs = p.toString();
+  return qs ? `/?${qs}` : "/";
+}
 
-  function clearAll() {
-    setRiskTier("all");
-    setSource("all");
-    setStatus("all");
-    setSearch("");
-    setPage(1);
+/**
+ * Server component — no "use client".
+ *
+ * Tier chips are plain <a> tags with server-computed hrefs.
+ * They navigate via standard HTML links — zero JavaScript dependency.
+ *
+ * Dropdowns + search live in a <form method="GET">.
+ * An inline <script> auto-submits on dropdown change (runs during HTML
+ * parse, independent of React hydration). Falls back to the Go button
+ * if JS never loads.
+ */
+export function PaperFilters({ tier, source, status, q }: PaperFiltersProps) {
+  const selectedTiers = new Set(
+    !tier || tier === "all" ? [] : tier.split(","),
+  );
+
+  /** Compute the href that toggles a single tier on/off. */
+  function tierHref(value: string): string {
+    const updated = new Set(selectedTiers);
+    if (updated.has(value)) updated.delete(value);
+    else updated.add(value);
+    return buildUrl({
+      tier: updated.size === 0 ? "all" : [...updated].join(","),
+      source,
+      status,
+      q,
+    });
   }
 
+  const hasFilters =
+    selectedTiers.size > 0 ||
+    (source !== "all" && source !== "") ||
+    (status !== "all" && status !== "") ||
+    q !== "";
+
+  const tierValue =
+    selectedTiers.size > 0 ? [...selectedTiers].join(",") : "";
+
   return (
-    <div className="flex flex-wrap items-center gap-2" role="search" aria-label="Filter papers">
-      <Select
-        value={riskTier}
-        onValueChange={(v) => { setRiskTier(v); resetPage(); }}
+    <div
+      className="flex flex-wrap items-center gap-2"
+      role="search"
+      aria-label="Filter papers"
+    >
+      {/* Tier multi-select chips — plain <a> links, work without JS */}
+      <div
+        className="flex items-center gap-1"
+        role="group"
+        aria-label="Risk tier filters"
       >
-        <SelectTrigger className="w-32" aria-label="Filter by risk tier">
-          <SelectValue placeholder="Risk Tier" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Tiers</SelectItem>
-          <SelectItem value="critical">Critical</SelectItem>
-          <SelectItem value="high">High</SelectItem>
-          <SelectItem value="medium">Medium</SelectItem>
-          <SelectItem value="low">Low</SelectItem>
-        </SelectContent>
-      </Select>
-
-      <Select
-        value={source}
-        onValueChange={(v) => { setSource(v); resetPage(); }}
-      >
-        <SelectTrigger className="w-36" aria-label="Filter by source">
-          <SelectValue placeholder="Source" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Sources</SelectItem>
-          <SelectItem value="biorxiv">bioRxiv</SelectItem>
-          <SelectItem value="medrxiv">medRxiv</SelectItem>
-          <SelectItem value="pubmed">PubMed</SelectItem>
-          <SelectItem value="europepmc">Europe PMC</SelectItem>
-        </SelectContent>
-      </Select>
-
-      <Select
-        value={status}
-        onValueChange={(v) => { setStatus(v); resetPage(); }}
-      >
-        <SelectTrigger className="w-40" aria-label="Filter by review status">
-          <SelectValue placeholder="Status" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Statuses</SelectItem>
-          <SelectItem value="unreviewed">Unreviewed</SelectItem>
-          <SelectItem value="under_review">Under Review</SelectItem>
-          <SelectItem value="confirmed_concern">Confirmed Concern</SelectItem>
-          <SelectItem value="false_positive">False Positive</SelectItem>
-          <SelectItem value="archived">Archived</SelectItem>
-        </SelectContent>
-      </Select>
-
-      <div className="relative flex-1">
-        <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-        <Input
-          type="search"
-          placeholder="Search papers..."
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); resetPage(); }}
-          className="pl-8"
-          aria-label="Search papers by title or abstract"
-        />
+        {TIER_OPTIONS.map((opt) => {
+          const isActive = selectedTiers.has(opt.value);
+          return (
+            <a
+              key={opt.value}
+              href={tierHref(opt.value)}
+              role="button"
+              aria-pressed={isActive}
+              className={cn(
+                "rounded-md border px-2.5 py-1 text-xs font-medium no-underline transition-colors",
+                isActive ? opt.active : opt.inactive,
+              )}
+            >
+              {opt.label}
+            </a>
+          );
+        })}
       </div>
 
+      {/* Source / Status / Search — HTML form, no React hydration needed */}
+      <form
+        method="GET"
+        action="/"
+        className="contents"
+        data-filter-form=""
+      >
+        {/* Preserve tier selection when form submits */}
+        {tierValue && (
+          <input type="hidden" name="tier" value={tierValue} />
+        )}
+
+        <select
+          name="source"
+          defaultValue={source || "all"}
+          aria-label="Filter by source"
+          className={selectClasses}
+          data-auto-submit=""
+        >
+          <option value="all">All Sources</option>
+          <option value="biorxiv">bioRxiv</option>
+          <option value="medrxiv">medRxiv</option>
+          <option value="pubmed">PubMed</option>
+          <option value="europepmc">Europe PMC</option>
+        </select>
+
+        <select
+          name="status"
+          defaultValue={status || "all"}
+          aria-label="Filter by review status"
+          className={selectClasses}
+          data-auto-submit=""
+        >
+          <option value="all">All Statuses</option>
+          <option value="unreviewed">Unreviewed</option>
+          <option value="under_review">Under Review</option>
+          <option value="confirmed_concern">Confirmed Concern</option>
+          <option value="false_positive">False Positive</option>
+          <option value="archived">Archived</option>
+        </select>
+
+        <div className="relative flex-1">
+          <input
+            type="search"
+            name="q"
+            defaultValue={q}
+            placeholder="Search papers..."
+            aria-label="Search papers by title or abstract"
+            className="h-8 w-full rounded-lg border border-input bg-transparent pl-8 pr-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30 dark:hover:bg-input/50"
+          />
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+            aria-hidden="true"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.3-4.3" />
+          </svg>
+        </div>
+
+        <button
+          type="submit"
+          aria-label="Apply filters"
+          className="inline-flex h-8 items-center rounded-lg border border-input bg-transparent px-2.5 text-sm transition-colors hover:bg-muted dark:bg-input/30 dark:hover:bg-input/50"
+        >
+          Go
+        </button>
+      </form>
+
       {hasFilters && (
-        <Button variant="ghost" size="sm" onClick={clearAll} aria-label="Clear all filters">
-          <X className="mr-1 h-3 w-3" />
+        <a
+          href="/"
+          className="inline-flex h-7 items-center gap-1 rounded-lg px-2.5 text-[0.8rem] font-medium transition-colors hover:bg-muted hover:text-foreground"
+        >
           Clear
-        </Button>
+        </a>
       )}
+
+      {/*
+        Inline script for two enhancements (runs during HTML parse,
+        independent of React hydration):
+        1. Auto-submit form when a dropdown changes
+        2. Strip default/empty values from URL on submit
+      */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `(function(){
+  var f=document.querySelector('[data-filter-form]');
+  if(!f)return;
+  f.addEventListener('submit',function(e){
+    e.preventDefault();
+    var p=new URLSearchParams();
+    new FormData(f).forEach(function(v,k){
+      if(v&&v!=='all')p.set(k,String(v));
+    });
+    var qs=p.toString();
+    window.location.href=qs?'/?'+qs:'/';
+  });
+  f.querySelectorAll('[data-auto-submit]').forEach(function(el){
+    el.addEventListener('change',function(){f.requestSubmit();});
+  });
+})();`,
+        }}
+      />
     </div>
   );
 }

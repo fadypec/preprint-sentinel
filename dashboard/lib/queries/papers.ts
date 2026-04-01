@@ -27,6 +27,7 @@ export type PaperQueryParams = {
 export type PaperQueryResult = {
   papers: Paper[];
   total: number;
+  totalIngested: number;
   page: number;
   pageSize: number;
   totalPages: number;
@@ -36,9 +37,10 @@ export type PaperQueryResult = {
  * Validate and normalize filter values against known enums.
  * Returns the value if valid, or undefined if invalid/empty/"all".
  */
-function validTier(v?: string | null): RiskTier | undefined {
+function validTiers(v?: string | null): RiskTier[] | undefined {
   if (!v || v === "all") return undefined;
-  return VALID_TIERS.has(v) ? (v as RiskTier) : undefined;
+  const tiers = v.split(",").filter((t) => VALID_TIERS.has(t)) as RiskTier[];
+  return tiers.length > 0 ? tiers : undefined;
 }
 
 function validSource(v?: string | null): SourceServer | undefined {
@@ -62,8 +64,13 @@ export function invalidFilters(params: {
   status?: string | null;
 }): string[] {
   const errors: string[] = [];
-  if (params.tier && params.tier !== "all" && !VALID_TIERS.has(params.tier)) {
-    errors.push(`Invalid tier: ${params.tier}`);
+  if (params.tier && params.tier !== "all") {
+    const invalid = params.tier
+      .split(",")
+      .filter((t) => !VALID_TIERS.has(t));
+    if (invalid.length > 0) {
+      errors.push(`Invalid tier(s): ${invalid.join(", ")}`);
+    }
   }
   if (
     params.source &&
@@ -98,12 +105,17 @@ function mapRawToPaper(row: Record<string, unknown>): Paper {
     postedDate: row.posted_date,
     subjectCategory: row.subject_category ?? null,
     version: row.version,
+    language: row.language ?? null,
+    originalTitle: row.original_title ?? null,
+    originalAbstract: row.original_abstract ?? null,
+    originalMethodsSection: row.original_methods_section ?? null,
     fullTextUrl: row.full_text_url ?? null,
     fullTextRetrieved: row.full_text_retrieved,
     fullTextContent: row.full_text_content ?? null,
     methodsSection: row.methods_section ?? null,
     enrichmentData: row.enrichment_data ?? null,
     pipelineStage: row.pipeline_stage,
+    coarseFilterPassed: row.coarse_filter_passed ?? null,
     stage1Result: row.stage1_result ?? null,
     stage2Result: row.stage2_result ?? null,
     stage3Result: row.stage3_result ?? null,
@@ -129,36 +141,38 @@ export async function queryPapers(
   params: PaperQueryParams,
 ): Promise<PaperQueryResult> {
   const page = Math.max(1, Number.isFinite(params.page) ? params.page : 1);
-  const tier = validTier(params.tier);
+  const tiers = validTiers(params.tier);
   const source = validSource(params.source);
   const status = validStatus(params.status);
   const search = params.search?.trim() || undefined;
 
   if (search) {
-    return queryPapersFullText({ page, tier, source, status, search });
+    return queryPapersFullText({ page, tiers, source, status, search });
   }
 
-  return queryPapersPrisma({ page, tier, source, status });
+  return queryPapersPrisma({ page, tiers, source, status });
 }
 
 /** Standard Prisma query path (no full-text search). */
 async function queryPapersPrisma(filters: {
   page: number;
-  tier?: RiskTier;
+  tiers?: RiskTier[];
   source?: SourceServer;
   status?: ReviewStatus;
 }): Promise<PaperQueryResult> {
   const where: Prisma.PaperWhereInput = {
     pipelineStage: { not: PipelineStage.ingested },
+    coarseFilterPassed: true,
     isDuplicateOf: null,
   };
 
-  if (filters.tier) where.riskTier = filters.tier;
+  if (filters.tiers) where.riskTier = { in: filters.tiers };
   if (filters.source) where.sourceServer = filters.source;
   if (filters.status) where.reviewStatus = filters.status;
 
-  const [total, papers] = await Promise.all([
+  const [total, totalIngested, papers] = await Promise.all([
     prisma.paper.count({ where }),
+    prisma.paper.count({ where: { isDuplicateOf: null } }),
     prisma.paper.findMany({
       where,
       orderBy: [
@@ -173,6 +187,7 @@ async function queryPapersPrisma(filters: {
   return {
     papers,
     total,
+    totalIngested,
     page: filters.page,
     pageSize: PAGE_SIZE,
     totalPages: Math.ceil(total / PAGE_SIZE),
@@ -182,7 +197,7 @@ async function queryPapersPrisma(filters: {
 /** Raw SQL path for full-text search via tsvector. */
 async function queryPapersFullText(filters: {
   page: number;
-  tier?: RiskTier;
+  tiers?: RiskTier[];
   source?: SourceServer;
   status?: ReviewStatus;
   search: string;
@@ -192,6 +207,7 @@ async function queryPapersFullText(filters: {
     return {
       papers: [],
       total: 0,
+      totalIngested: 0,
       page: filters.page,
       pageSize: PAGE_SIZE,
       totalPages: 0,
@@ -199,8 +215,8 @@ async function queryPapersFullText(filters: {
   }
 
   const tierClause =
-    filters.tier
-      ? Prisma.sql`AND risk_tier = ${filters.tier}::risk_tier`
+    filters.tiers
+      ? Prisma.sql`AND risk_tier::text IN (${Prisma.join(filters.tiers)})`
       : Prisma.empty;
   const sourceClause =
     filters.source
@@ -215,6 +231,7 @@ async function queryPapersFullText(filters: {
     SELECT COUNT(*) as count FROM papers
     WHERE search_vector @@ to_tsquery('english', ${tsquery})
       AND pipeline_stage != 'ingested'
+      AND coarse_filter_passed = true
       AND is_duplicate_of IS NULL
       ${tierClause}
       ${sourceClause}
@@ -226,6 +243,7 @@ async function queryPapersFullText(filters: {
     SELECT * FROM papers
     WHERE search_vector @@ to_tsquery('english', ${tsquery})
       AND pipeline_stage != 'ingested'
+      AND coarse_filter_passed = true
       AND is_duplicate_of IS NULL
       ${tierClause}
       ${sourceClause}
@@ -234,11 +252,17 @@ async function queryPapersFullText(filters: {
     LIMIT ${PAGE_SIZE} OFFSET ${(filters.page - 1) * PAGE_SIZE}
   `;
 
+  const totalIngestedResult = await prisma.$queryRaw<[{ count: bigint }]>`
+    SELECT COUNT(*) as count FROM papers WHERE is_duplicate_of IS NULL
+  `;
+  const totalIngested = Number(totalIngestedResult[0].count);
+
   const papers = rawPapers.map(mapRawToPaper);
 
   return {
     papers,
     total,
+    totalIngested,
     page: filters.page,
     pageSize: PAGE_SIZE,
     totalPages: Math.ceil(total / PAGE_SIZE),
