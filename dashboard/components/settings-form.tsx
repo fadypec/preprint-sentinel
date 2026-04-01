@@ -44,7 +44,7 @@ const DEFAULTS: SettingsData = {
   coarse_filter_threshold: 0.8,
   adjudication_min_tier: "high",
   use_batch_api: false,
-  pubmed_query_mode: "all",
+  pubmed_query_mode: "mesh_filtered",
   biorxiv_request_delay: 1.0,
   pubmed_request_delay: 0.1,
   europepmc_request_delay: 1.0,

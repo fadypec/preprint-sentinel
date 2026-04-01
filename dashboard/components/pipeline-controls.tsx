@@ -3,21 +3,26 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Play, Pause, Loader2, Calendar } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Play, Square, Loader2, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PipelineProgress } from "@/components/pipeline-progress";
 
 type PipelineStatus = {
   running: boolean;
   paused: boolean;
 };
 
-type TriggerResult =
+type ActionResult =
   | { ok: true; message: string }
   | { ok: false; error: string };
 
 type Props = {
   initialStatus: PipelineStatus | null;
-  triggerAction: (from: string, to: string) => Promise<TriggerResult>;
+  triggerAction: (from: string, to: string) => Promise<ActionResult>;
+  cancelAction: () => Promise<ActionResult>;
+  pubmedMode: string;
+  togglePubmedMode: () => Promise<string>;
 };
 
 /** Format a Date to YYYY-MM-DD for input[type=date]. */
@@ -25,11 +30,20 @@ function fmtDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-export function PipelineControls({ initialStatus, triggerAction }: Props) {
+export function PipelineControls({
+  initialStatus,
+  triggerAction,
+  cancelAction,
+  pubmedMode: initialPubmedMode,
+  togglePubmedMode,
+}: Props) {
   const [status, setStatus] = useState(initialStatus);
   const [pending, setPending] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [currentPubmedMode, setCurrentPubmedMode] = useState(initialPubmedMode);
+  const [toggling, setToggling] = useState(false);
 
   // Default range: last 2 days → today
   const today = fmtDate(new Date());
@@ -55,6 +69,25 @@ export function PipelineControls({ initialStatus, triggerAction }: Props) {
       setError(err instanceof Error ? err.message : "Failed to start");
     } finally {
       setPending(false);
+    }
+  }
+
+  async function stopPipeline() {
+    setCancelling(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const result = await cancelAction();
+      if (result.ok) {
+        setSuccess(result.message);
+        setStatus({ running: false, paused: false });
+      } else {
+        setError(result.error);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to cancel");
+    } finally {
+      setCancelling(false);
     }
   }
 
@@ -108,30 +141,76 @@ export function PipelineControls({ initialStatus, triggerAction }: Props) {
         </div>
       </div>
 
-      {/* Run button */}
-      <div className="flex gap-2">
-        <Button
-          size="sm"
-          onClick={runPipeline}
-          disabled={pending || isRunning}
+      {/* PubMed mode */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+          PubMed:
+        </span>
+        <button
+          type="button"
+          onClick={async () => {
+            setToggling(true);
+            try {
+              const newMode = await togglePubmedMode();
+              setCurrentPubmedMode(newMode);
+            } finally {
+              setToggling(false);
+            }
+          }}
+          disabled={toggling || pending || isRunning}
+          className="cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {pending ? (
-            <>
-              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-              Starting...
-            </>
-          ) : isRunning ? (
-            <>
-              <Pause className="mr-1 h-3 w-3" />
-              Running...
-            </>
-          ) : (
-            <>
-              <Play className="mr-1 h-3 w-3" />
-              Run Pipeline
-            </>
-          )}
-        </Button>
+          <Badge variant={currentPubmedMode === "all" ? "default" : "outline"}>
+            {currentPubmedMode === "all" ? "Full" : "MeSH Filtered"}
+          </Badge>
+        </button>
+        <span className="text-[10px] text-slate-400">
+          {currentPubmedMode === "all"
+            ? "~30K papers/day"
+            : "~800 papers/day"}
+        </span>
+      </div>
+
+      {/* Run / Stop buttons */}
+      <div className="flex gap-2">
+        {isRunning ? (
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={stopPipeline}
+            disabled={cancelling}
+          >
+            {cancelling ? (
+              <>
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                Stopping...
+              </>
+            ) : (
+              <>
+                <Square className="mr-1 h-3 w-3" />
+                Stop Pipeline
+              </>
+            )}
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            onClick={runPipeline}
+            disabled={pending}
+          >
+            {pending ? (
+              <>
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                Starting...
+              </>
+            ) : (
+              <>
+                <Play className="mr-1 h-3 w-3" />
+                Run Pipeline
+              </>
+            )}
+          </Button>
+        )}
       </div>
 
       {/* Feedback */}
@@ -144,6 +223,16 @@ export function PipelineControls({ initialStatus, triggerAction }: Props) {
         <p className="rounded bg-green-50 px-3 py-2 text-xs text-green-700 dark:bg-green-900/30 dark:text-green-400">
           {success}
         </p>
+      )}
+
+      {/* Progress — shown inline as soon as a run is active */}
+      {isRunning && (
+        <div className="border-t pt-4">
+          <h3 className="mb-3 text-xs font-semibold text-slate-700 dark:text-slate-300">
+            Progress
+          </h3>
+          <PipelineProgress initialRunning />
+        </div>
       )}
     </div>
   );

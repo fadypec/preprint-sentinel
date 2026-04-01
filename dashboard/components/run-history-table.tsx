@@ -8,6 +8,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { ClientTimestamp } from "@/components/client-timestamp";
 import { formatDuration, formatCost } from "@/lib/utils";
 
 type Props = {
@@ -30,6 +31,7 @@ export function RunHistoryTable({ runs }: Props) {
           <TableHead>Adjudicated</TableHead>
           <TableHead>Errors</TableHead>
           <TableHead>Cost</TableHead>
+          <TableHead>PubMed</TableHead>
           <TableHead>Trigger</TableHead>
         </TableRow>
       </TableHeader>
@@ -39,7 +41,7 @@ export function RunHistoryTable({ runs }: Props) {
           return (
             <TableRow key={run.id}>
               <TableCell className="text-xs">
-                {new Date(run.startedAt).toLocaleString()}
+                <ClientTimestamp date={run.startedAt} />
               </TableCell>
               <TableCell className="text-xs">
                 {formatDuration(run.startedAt, run.finishedAt)}
@@ -62,6 +64,18 @@ export function RunHistoryTable({ runs }: Props) {
               </TableCell>
               <TableCell className="text-xs">
                 {formatCost(run.totalCostUsd)}
+              </TableCell>
+              <TableCell className="text-xs">
+                {run.pubmedQueryMode ? (
+                  <Badge
+                    variant={run.pubmedQueryMode === "all" ? "default" : "outline"}
+                    className="text-[10px]"
+                  >
+                    {run.pubmedQueryMode === "all" ? "Full" : "MeSH"}
+                  </Badge>
+                ) : (
+                  <span className="text-slate-400">-</span>
+                )}
               </TableCell>
               <TableCell className="text-xs">
                 <Badge variant="outline" className="text-[10px]">

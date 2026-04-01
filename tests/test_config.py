@@ -53,7 +53,7 @@ def test_settings_phase2_defaults(monkeypatch):
 
     s = Settings()
     assert s.europepmc_request_delay == 1.0
-    assert s.pubmed_query_mode == "all"
+    assert s.pubmed_query_mode == "mesh_filtered"
     assert "virology[MeSH]" in s.pubmed_mesh_query
 
 

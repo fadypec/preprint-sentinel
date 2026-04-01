@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     fulltext_request_delay: float = 1.0
 
     # PubMed query mode
-    pubmed_query_mode: str = "all"  # "all" or "mesh_filtered"
+    pubmed_query_mode: str = "mesh_filtered"  # "all" or "mesh_filtered"
     pubmed_mesh_query: str = (
         '(virology[MeSH] OR microbiology[MeSH] OR "synthetic biology"[MeSH] OR '
         '"genetic engineering"[MeSH] OR "gain of function"[tiab] OR '

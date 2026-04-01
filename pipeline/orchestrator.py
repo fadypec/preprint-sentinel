@@ -9,6 +9,7 @@ Or with custom settings/session:
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 
@@ -54,6 +55,7 @@ async def run_daily_pipeline(
     trigger: str = "manual",
     from_date: date | None = None,
     to_date: date | None = None,
+    pubmed_query_mode_override: str | None = None,
 ) -> PipelineRunStats:
     """Run the complete daily triage pipeline.
 
@@ -61,11 +63,15 @@ async def run_daily_pipeline(
         settings: Pipeline settings. If None, loads from environment.
         session_factory: SQLAlchemy async session factory. If None, creates one.
         trigger: "scheduled" or "manual" -- recorded in PipelineRun.
+        pubmed_query_mode_override: If set, overrides settings.pubmed_query_mode.
     """
     if settings is None:
         from pipeline.config import get_settings
 
         settings = get_settings()
+
+    if pubmed_query_mode_override:
+        settings.pubmed_query_mode = pubmed_query_mode_override
 
     if session_factory is None:
         from pipeline.db import make_engine, make_session_factory
@@ -80,11 +86,34 @@ async def run_daily_pipeline(
     run_record = PipelineRun(
         started_at=stats.started_at,
         trigger=trigger,
+        pubmed_query_mode=settings.pubmed_query_mode,
+        pid=os.getpid(),
     )
     async with session_factory() as session:
         session.add(run_record)
         await session.commit()
     run_id = run_record.id
+
+    current_stage = "starting"
+
+    async def _flush_progress() -> None:
+        """Write current stats to DB so the dashboard can poll progress."""
+        async with session_factory() as s:
+            stmt = select(PipelineRun).where(PipelineRun.id == run_id)
+            rec = (await s.execute(stmt)).scalar_one()
+            rec.current_stage = current_stage
+            rec.papers_ingested = stats.papers_ingested
+            rec.papers_after_dedup = stats.papers_after_dedup
+            rec.papers_coarse_passed = stats.papers_coarse_passed
+            rec.papers_fulltext_retrieved = stats.papers_fulltext_retrieved
+            rec.papers_methods_analysed = stats.papers_methods_analysed
+            rec.papers_enriched = stats.papers_enriched
+            rec.papers_adjudicated = stats.papers_adjudicated
+            rec.errors = stats.errors if stats.errors else None
+            rec.total_cost_usd = stats.total_cost_usd
+            await s.commit()
+
+    await _flush_progress()
 
     # Date range: use caller-provided dates or default to last 2 days
     if to_date is None:
@@ -96,12 +125,15 @@ async def run_daily_pipeline(
 
     async with session_factory() as session:
         # Stage 1: Ingest
+        current_stage = "ingest"
+        await _flush_progress()
         log.info("stage_starting", stage="ingest", description="Fetching papers from data sources")
         ingested_papers: list[Paper] = []
         try:
             ingested_papers = await _run_ingest(session, settings, from_date, to_date)
             stats.papers_ingested = len(ingested_papers)
             await session.commit()
+            await _flush_progress()
             log.info("stage_complete", stage="ingest", papers=len(ingested_papers))
         except Exception as exc:
             stats.errors.append(f"Ingest: {exc}")
@@ -110,12 +142,15 @@ async def run_daily_pipeline(
 
     async with session_factory() as session:
         # Stage 2: Dedup
+        current_stage = "dedup"
+        await _flush_progress()
         log.info("stage_starting", stage="dedup", papers_to_process=len(ingested_papers))
         non_dup_papers: list[Paper] = []
         try:
             non_dup_papers, dup_count = await _run_dedup(session, ingested_papers)
             stats.papers_after_dedup = len(non_dup_papers)
             await session.commit()
+            await _flush_progress()
             log.info(
                 "stage_complete",
                 stage="dedup",
@@ -130,6 +165,8 @@ async def run_daily_pipeline(
 
     async with session_factory() as session:
         # Stage 2b: Translate non-English papers
+        current_stage = "translation"
+        await _flush_progress()
         try:
             stmt = select(Paper).where(
                 Paper.pipeline_stage == PipelineStage.INGESTED,
@@ -145,6 +182,7 @@ async def run_daily_pipeline(
                 log.info("stage_starting", stage="translation", papers_to_process=len(non_english))
                 await _run_translation(session, llm_client, non_english, settings.stage1_model)
                 await session.commit()
+                await _flush_progress()
                 log.info("stage_complete", stage="translation", total=len(non_english))
         except Exception as exc:
             stats.errors.append(f"Translation: {exc}")
@@ -153,6 +191,8 @@ async def run_daily_pipeline(
 
     async with session_factory() as session:
         # Stage 3: Coarse filter
+        current_stage = "coarse_filter"
+        await _flush_progress()
         try:
             stmt = select(Paper).where(
                 Paper.pipeline_stage == PipelineStage.INGESTED,
@@ -191,6 +231,7 @@ async def run_daily_pipeline(
             )
             stats.papers_coarse_passed = len(passed)
             await session.commit()
+            await _flush_progress()
             log.info(
                 "stage_complete",
                 stage="coarse_filter",
@@ -204,6 +245,8 @@ async def run_daily_pipeline(
 
     async with session_factory() as session:
         # Stage 4: Full-text retrieval
+        current_stage = "fulltext"
+        await _flush_progress()
         try:
             stmt = select(Paper).where(
                 Paper.pipeline_stage == PipelineStage.COARSE_FILTERED,
@@ -221,6 +264,7 @@ async def run_daily_pipeline(
             await _run_fulltext(session, coarse_passed, settings)
             stats.papers_fulltext_retrieved = sum(1 for p in coarse_passed if p.full_text_retrieved)
             await session.commit()
+            await _flush_progress()
             log.info(
                 "stage_complete",
                 stage="fulltext_retrieval",
@@ -234,6 +278,8 @@ async def run_daily_pipeline(
 
     async with session_factory() as session:
         # Stage 4b: Translate non-English methods sections
+        current_stage = "fulltext_translation"
+        await _flush_progress()
         try:
             stmt = select(Paper).where(
                 Paper.pipeline_stage == PipelineStage.FULLTEXT_RETRIEVED,
@@ -258,6 +304,7 @@ async def run_daily_pipeline(
                     settings.stage1_model,
                 )
                 await session.commit()
+                await _flush_progress()
                 log.info("stage_complete", stage="fulltext_translation", total=len(non_english_ft))
         except Exception as exc:
             stats.errors.append(f"Fulltext translation: {exc}")
@@ -266,6 +313,8 @@ async def run_daily_pipeline(
 
     async with session_factory() as session:
         # Stage 5: Methods analysis
+        current_stage = "methods_analysis"
+        await _flush_progress()
         try:
             stmt = select(Paper).where(
                 Paper.pipeline_stage == PipelineStage.FULLTEXT_RETRIEVED,
@@ -288,6 +337,7 @@ async def run_daily_pipeline(
             )
             stats.papers_methods_analysed = len(fulltext_papers)
             await session.commit()
+            await _flush_progress()
             log.info("stage_complete", stage="methods_analysis", total=len(fulltext_papers))
         except Exception as exc:
             stats.errors.append(f"Methods analysis: {exc}")
@@ -296,6 +346,8 @@ async def run_daily_pipeline(
 
     async with session_factory() as session:
         # Stage 6: Enrichment
+        current_stage = "enrichment"
+        await _flush_progress()
         try:
             stmt = select(Paper).where(
                 Paper.pipeline_stage == PipelineStage.METHODS_ANALYSED,
@@ -308,6 +360,7 @@ async def run_daily_pipeline(
             enriched = await _run_enrichment(session, methods_papers, settings)
             stats.papers_enriched = len(enriched)
             await session.commit()
+            await _flush_progress()
             log.info(
                 "stage_complete",
                 stage="enrichment",
@@ -321,6 +374,8 @@ async def run_daily_pipeline(
 
     async with session_factory() as session:
         # Stage 7: Adjudication
+        current_stage = "adjudication"
+        await _flush_progress()
         try:
             stmt = select(Paper).where(
                 Paper.pipeline_stage == PipelineStage.METHODS_ANALYSED,
@@ -339,6 +394,7 @@ async def run_daily_pipeline(
             )
             stats.papers_adjudicated = len(to_adjudicate)
             await session.commit()
+            await _flush_progress()
             log.info("stage_complete", stage="adjudication", total=len(to_adjudicate))
         except Exception as exc:
             stats.errors.append(f"Adjudication: {exc}")
@@ -346,6 +402,7 @@ async def run_daily_pipeline(
             await session.rollback()
 
     stats.finished_at = datetime.now(UTC)
+    current_stage = "complete"
 
     # Update PipelineRun record
     async with session_factory() as session:
@@ -353,6 +410,7 @@ async def run_daily_pipeline(
         result = await session.execute(stmt)
         run_record = result.scalar_one()
         run_record.finished_at = stats.finished_at
+        run_record.current_stage = current_stage
         run_record.papers_ingested = stats.papers_ingested
         run_record.papers_after_dedup = stats.papers_after_dedup
         run_record.papers_coarse_passed = stats.papers_coarse_passed

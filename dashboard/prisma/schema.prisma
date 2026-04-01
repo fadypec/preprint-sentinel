@@ -159,6 +159,9 @@ model PipelineRun {
   papersMethodsAnalysed   Int       @default(0) @map("papers_methods_analysed")
   papersEnriched          Int       @default(0) @map("papers_enriched")
   papersAdjudicated       Int       @default(0) @map("papers_adjudicated")
+  currentStage            String?   @map("current_stage") @db.VarChar(50)
+  pubmedQueryMode         String?   @map("pubmed_query_mode") @db.VarChar(20)
+  pid                     Int?
   errors                  Json?
   totalCostUsd            Float     @default(0) @map("total_cost_usd")
   trigger                 String    @db.VarChar(50)

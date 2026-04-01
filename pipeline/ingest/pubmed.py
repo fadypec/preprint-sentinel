@@ -148,7 +148,7 @@ class PubmedClient:
         for attempt in range(1, self.max_retries + 1):
             await asyncio.sleep(self.request_delay)
             try:
-                resp = await self._client.get(url, params=params, timeout=30.0)
+                resp = await self._client.get(url, params=params, timeout=60.0)
                 if resp.status_code == 200:
                     return resp
                 if resp.status_code in (429, 503):
@@ -163,11 +163,17 @@ class PubmedClient:
                     await asyncio.sleep(backoff)
                     continue
                 resp.raise_for_status()
-            except httpx.TimeoutException:
+            except (httpx.TimeoutException, httpx.RemoteProtocolError) as exc:
                 if attempt == self.max_retries:
                     raise
                 backoff = min(2**attempt, 30)
-                log.warning("timeout", source="pubmed", attempt=attempt, backoff=backoff)
+                log.warning(
+                    "request_error",
+                    source="pubmed",
+                    error=str(exc),
+                    attempt=attempt,
+                    backoff=backoff,
+                )
                 await asyncio.sleep(backoff)
 
         raise RuntimeError(f"PubMed failed after {self.max_retries} retries: {url}")

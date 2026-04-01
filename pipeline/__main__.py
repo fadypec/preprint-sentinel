@@ -42,17 +42,28 @@ def main() -> None:
         default=None,
         help="End date for ingestion (YYYY-MM-DD). Default: today.",
     )
+    parser.add_argument(
+        "--pubmed-query-mode",
+        choices=["all", "mesh_filtered"],
+        default=None,
+        help="PubMed query mode. Overrides config setting.",
+    )
     args = parser.parse_args()
 
     if args.schedule:
         _run_scheduled()
     else:
-        _run_oneshot(from_date=args.from_date, to_date=args.to_date)
+        _run_oneshot(
+            from_date=args.from_date,
+            to_date=args.to_date,
+            pubmed_query_mode=args.pubmed_query_mode,
+        )
 
 
 def _run_oneshot(
     from_date: date | None = None,
     to_date: date | None = None,
+    pubmed_query_mode: str | None = None,
 ) -> None:
     """Execute a single pipeline run and exit."""
     from pipeline.orchestrator import run_daily_pipeline
@@ -61,12 +72,14 @@ def _run_oneshot(
         "pipeline_oneshot_start",
         from_date=str(from_date) if from_date else "default",
         to_date=str(to_date) if to_date else "default",
+        pubmed_query_mode=pubmed_query_mode or "config default",
     )
     stats = asyncio.run(
         run_daily_pipeline(
             trigger="manual",
             from_date=from_date,
             to_date=to_date,
+            pubmed_query_mode_override=pubmed_query_mode,
         )
     )
     log.info(
