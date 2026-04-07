@@ -66,8 +66,14 @@ class DedupEngine:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def check(self, paper: dict) -> DedupResult:
-        """Run the three-tier dedup cascade. Returns on first match."""
+    async def check(self, paper: dict, paper_id: uuid.UUID | None = None) -> DedupResult:
+        """Run the three-tier dedup cascade. Returns on first match.
+
+        Args:
+            paper: Dict with doi, title, authors, posted_date.
+            paper_id: If the paper is already in the DB, exclude it from
+                       match queries so it doesn't match itself.
+        """
         doi = paper.get("doi")
         title = paper.get("title", "")
         authors = paper.get("authors", [])
@@ -76,7 +82,7 @@ class DedupEngine:
 
         # Tier 1: DOI exact match
         if doi:
-            result = await self._check_doi(doi)
+            result = await self._check_doi(doi, exclude_id=paper_id)
             if result is not None:
                 return result
 
@@ -94,7 +100,8 @@ class DedupEngine:
                 strategy = "title_author_date"
 
             match = await self._find_title_author_match(
-                title, surname, posted_date, threshold, window
+                title, surname, posted_date, threshold, window,
+                exclude_id=paper_id,
             )
             if match is not None:
                 match_id, confidence = match
@@ -109,9 +116,14 @@ class DedupEngine:
             is_duplicate=False, duplicate_of=None, strategy_used="none", confidence=0.0
         )
 
-    async def _check_doi(self, doi: str) -> DedupResult | None:
+    async def _check_doi(
+        self, doi: str, *, exclude_id: uuid.UUID | None = None,
+    ) -> DedupResult | None:
         """Tier 1: exact DOI match via indexed lookup."""
-        stmt = select(Paper.id).where(Paper.doi == doi).limit(1)
+        clause = Paper.doi == doi
+        if exclude_id is not None:
+            clause = clause & (Paper.id != exclude_id)
+        stmt = select(Paper.id).where(clause).limit(1)
         result = await self._session.execute(stmt)
         row = result.scalar_one_or_none()
         if row is not None:
@@ -131,6 +143,8 @@ class DedupEngine:
         posted_date: date,
         threshold: float,
         window_days: int,
+        *,
+        exclude_id: uuid.UUID | None = None,
     ) -> tuple[uuid.UUID, float] | None:
         """Find a matching paper by fuzzy title + author within a date window.
 
@@ -141,9 +155,10 @@ class DedupEngine:
 
         # Only fetch columns needed for matching; stream rows to avoid loading
         # the entire date window into memory (can be tens of thousands of rows).
-        stmt = select(Paper.id, Paper.title, Paper.authors).where(
-            Paper.posted_date.between(date_from, date_to)
-        )
+        clause = Paper.posted_date.between(date_from, date_to)
+        if exclude_id is not None:
+            clause = clause & (Paper.id != exclude_id)
+        stmt = select(Paper.id, Paper.title, Paper.authors).where(clause)
         result = await self._session.stream(stmt)
 
         normalised_title = normalise_title(title)

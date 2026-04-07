@@ -626,7 +626,7 @@ async def _run_dedup(
             "authors": paper.authors,
             "posted_date": paper.posted_date,
         }
-        result = await engine.check(record)
+        result = await engine.check(record, paper_id=paper.id)
         if result.is_duplicate:
             paper.is_duplicate_of = result.duplicate_of
             await engine.record_duplicate(
