@@ -74,7 +74,8 @@ class EuropepmcClient:
 
     async def _fetch_page(self, from_date: date, to_date: date, cursor_mark: str) -> dict:
         """Fetch a single page from the Europe PMC API with retry and backoff."""
-        assert self._client is not None, "Use EuropepmcClient as async context manager"
+        if self._client is None:
+            raise RuntimeError("Use EuropepmcClient as async context manager")
 
         query = f"(FIRST_PDATE:[{from_date} TO {to_date}]) AND SRC:PPR"
         params = {

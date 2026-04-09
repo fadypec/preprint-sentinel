@@ -129,7 +129,7 @@ class Paper(Base):
     posted_date: Mapped[date] = mapped_column(Date, index=True)
     subject_category: Mapped[str | None] = mapped_column(String(255))
     version: Mapped[int] = mapped_column(Integer, default=1)
-    language: Mapped[str | None] = mapped_column(String(10))
+    language: Mapped[str | None] = mapped_column(String(10), index=True)
     original_title: Mapped[str | None] = mapped_column(Text)
     original_abstract: Mapped[str | None] = mapped_column(Text)
     original_methods_section: Mapped[str | None] = mapped_column(Text)
@@ -197,8 +197,12 @@ class PaperGroup(Base):
     __tablename__ = "paper_groups"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    canonical_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("papers.id"), index=True)
-    member_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("papers.id"), index=True)
+    canonical_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("papers.id", ondelete="CASCADE"), index=True,
+    )
+    member_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("papers.id", ondelete="CASCADE"), index=True,
+    )
     relationship: Mapped[DedupRelationship] = mapped_column(
         SQLEnum(DedupRelationship, name="dedup_relationship", create_constraint=True),
     )
@@ -216,7 +220,9 @@ class AssessmentLog(Base):
     __tablename__ = "assessment_logs"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    paper_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("papers.id"), index=True)
+    paper_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("papers.id", ondelete="CASCADE"), index=True,
+    )
     stage: Mapped[str] = mapped_column(String(50), index=True)
     model_used: Mapped[str] = mapped_column(String(100))
     prompt_version: Mapped[str] = mapped_column(String(50))

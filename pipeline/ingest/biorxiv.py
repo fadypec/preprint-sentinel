@@ -80,7 +80,8 @@ class BiorxivClient:
 
     async def _fetch_page(self, from_date: date, to_date: date, cursor: int) -> dict:
         """Fetch a single page from the API with retry and backoff."""
-        assert self._client is not None, "Use BiorxivClient as async context manager"
+        if self._client is None:
+            raise RuntimeError("Use BiorxivClient as async context manager")
         url = f"{self.BASE_URL}/{self.server}/{from_date}/{to_date}/{cursor}"
 
         for attempt in range(1, self.max_retries + 1):

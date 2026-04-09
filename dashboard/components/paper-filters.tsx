@@ -179,7 +179,9 @@ export function PaperFilters({ tier, source, status, q, needsReview, sort }: Pap
           <input type="hidden" name="needs_review" value="true" />
         )}
 
+        <label htmlFor="filter-source" className="sr-only">Filter by source</label>
         <select
+          id="filter-source"
           name="source"
           defaultValue={source || "all"}
           aria-label="Filter by source"
@@ -193,7 +195,9 @@ export function PaperFilters({ tier, source, status, q, needsReview, sort }: Pap
           <option value="europepmc">Europe PMC</option>
         </select>
 
+        <label htmlFor="filter-status" className="sr-only">Filter by review status</label>
         <select
+          id="filter-status"
           name="status"
           defaultValue={status || "all"}
           aria-label="Filter by review status"
@@ -208,7 +212,9 @@ export function PaperFilters({ tier, source, status, q, needsReview, sort }: Pap
           <option value="archived">Archived</option>
         </select>
 
+        <label htmlFor="filter-sort" className="sr-only">Sort order</label>
         <select
+          id="filter-sort"
           name="sort"
           defaultValue={sort || "date_desc"}
           aria-label="Sort order"

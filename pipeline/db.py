@@ -13,6 +13,7 @@ For tests, pass a custom factory:
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+import structlog
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -20,6 +21,8 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from pipeline.config import get_settings
+
+log = structlog.get_logger()
 
 
 def make_engine(url: str | None = None):
@@ -35,10 +38,11 @@ def make_engine(url: str | None = None):
         return create_async_engine(url)
     return create_async_engine(
         url,
-        pool_size=5,
+        pool_size=10,
         max_overflow=10,
         pool_pre_ping=True,
         pool_recycle=3600,
+        connect_args={"timeout": 30},
     )
 
 
@@ -60,6 +64,12 @@ async def get_session(
         try:
             yield session
             await session.commit()
-        except Exception:
+        except Exception as exc:
+            log.error(
+                "session_error",
+                error_type=type(exc).__name__,
+                error=str(exc),
+                exc_info=True,
+            )
             await session.rollback()
             raise

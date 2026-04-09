@@ -123,6 +123,7 @@ model Paper {
   @@index([needsManualReview])
   @@index([coarseFilterPassed])
   @@index([isDuplicateOf])
+  @@index([language])
   @@index([postedDate, pipelineStage], map: "ix_papers_posted_date_stage")
   @@map("papers")
 }
@@ -142,7 +143,7 @@ model AssessmentLog {
   error           String?
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  paper Paper @relation(fields: [paperId], references: [id])
+  paper Paper @relation(fields: [paperId], references: [id], onDelete: Cascade)
 
   @@index([paperId])
   @@index([stage])
@@ -228,8 +229,8 @@ model PaperGroup {
   strategyUsed String            @map("strategy_used") @db.VarChar(50)
   createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz
 
-  canonical Paper @relation("CanonicalPaper", fields: [canonicalId], references: [id])
-  member    Paper @relation("MemberPaper", fields: [memberId], references: [id])
+  canonical Paper @relation("CanonicalPaper", fields: [canonicalId], references: [id], onDelete: Cascade)
+  member    Paper @relation("MemberPaper", fields: [memberId], references: [id], onDelete: Cascade)
 
   @@unique([canonicalId, memberId], map: "uq_paper_group_pair")
   @@index([canonicalId])

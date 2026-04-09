@@ -136,5 +136,7 @@ def _extract_orcid_from_openalex(oa_data: dict, corresponding_author: str) -> st
                     return author["orcid"]
 
     # Fall back to first author's ORCID
-    first_author = authors[0]
-    return first_author.get("orcid")
+    if authors:
+        first_author = authors[0]
+        return first_author.get("orcid")
+    return None

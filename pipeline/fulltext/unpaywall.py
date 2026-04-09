@@ -70,7 +70,8 @@ class UnpaywallClient:
 
     async def lookup(self, doi: str) -> UnpaywallResult | None:
         """Look up a DOI and return the best OA location, or None."""
-        assert self._client is not None, "Use UnpaywallClient as async context manager"
+        if self._client is None:
+            raise RuntimeError("Use UnpaywallClient as async context manager")
 
         url = f"{BASE_URL}/{doi}"
         params = {"email": self.email}

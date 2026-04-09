@@ -44,7 +44,8 @@ class OrcidClient:
 
     async def lookup(self, name: str, known_orcid: str | None = None) -> dict | None:
         """Look up an author by name or ORCID and return identity data, or None."""
-        assert self._client is not None, "Use OrcidClient as async context manager"
+        if self._client is None:
+            raise RuntimeError("Use OrcidClient as async context manager")
 
         orcid_id = known_orcid
         if orcid_id is None:

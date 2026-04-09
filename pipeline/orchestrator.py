@@ -671,14 +671,38 @@ async def _run_enrichment(
     session: AsyncSession,
     papers: list[Paper],
     settings,
+    concurrency: int = 10,
 ) -> list[Paper]:
-    """Run enrichment on papers and store results."""
-    enriched: list[Paper] = []
-    total = len(papers)
+    """Run enrichment on papers concurrently and store results."""
+    import asyncio
 
-    for i, paper in enumerate(papers, 1):
-        try:
-            result = await enrich_paper(paper, settings)
+    total = len(papers)
+    if total == 0:
+        return []
+
+    sem = asyncio.Semaphore(concurrency)
+    enriched: list[Paper] = []
+
+    async def _enrich(paper: Paper) -> tuple[Paper, bool]:
+        async with sem:
+            try:
+                result = await enrich_paper(paper, settings)
+                return paper, result
+            except Exception as exc:
+                log.warning(
+                    "enrichment_paper_error",
+                    paper_id=str(paper.id),
+                    error=_exc_str(exc),
+                )
+                return paper, None
+
+    # Fetch all enrichment data concurrently (HTTP only, no DB writes)
+    log.info("enrichment_fetching", total=total, concurrency=concurrency)
+    fetch_results = await asyncio.gather(*[_enrich(p) for p in papers])
+
+    # Apply results sequentially (session-safe)
+    for paper, result in fetch_results:
+        if result is not None:
             paper.enrichment_data = {
                 **result.data,
                 "_meta": {
@@ -688,11 +712,6 @@ async def _run_enrichment(
                 },
             }
             enriched.append(paper)
-        except Exception as exc:
-            log.warning("enrichment_paper_error", paper_id=str(paper.id), error=str(exc))
-
-        if i % 10 == 0 or i == total:
-            log.info("enrichment_progress", processed=i, total=total, enriched=len(enriched))
 
     await session.flush()
     log.info("enrichment_stage_complete", total=total, enriched=len(enriched))

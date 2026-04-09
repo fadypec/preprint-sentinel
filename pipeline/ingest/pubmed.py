@@ -143,7 +143,8 @@ class PubmedClient:
 
     async def _request(self, url: str, params: dict) -> httpx.Response:
         """Make a GET request with retry and exponential backoff."""
-        assert self._client is not None, "Use PubmedClient as async context manager"
+        if self._client is None:
+            raise RuntimeError("Use PubmedClient as async context manager")
 
         for attempt in range(1, self.max_retries + 1):
             await asyncio.sleep(self.request_delay)

@@ -44,7 +44,8 @@ class OpenAlexClient:
 
     async def lookup(self, doi: str) -> dict | None:
         """Look up a paper by DOI and return enrichment data, or None."""
-        assert self._client is not None, "Use OpenAlexClient as async context manager"
+        if self._client is None:
+            raise RuntimeError("Use OpenAlexClient as async context manager")
 
         work = await self._fetch_work(doi)
         if work is None:

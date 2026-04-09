@@ -67,12 +67,15 @@ export default async function RootLayout({
       <body>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <NuqsAdapter>
+            <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:bg-blue-600 focus:px-4 focus:py-2 focus:text-white">
+              Skip to main content
+            </a>
             <div className="flex h-screen bg-slate-50 dark:bg-slate-900">
               <Sidebar
                 pipelineStatus={pipelineStatus}
                 userName={session?.user?.name ?? "Dev User"}
               />
-              <main className="flex-1 overflow-y-auto p-6">
+              <main id="main-content" className="flex-1 overflow-y-auto p-6">
                 {children}
               </main>
             </div>

@@ -72,7 +72,6 @@ async def monitor_corruption(days: int = 1, send_alerts: bool = False) -> None:
             AND NOT (stage2_result ? '_error')
         ''')
         result = await session.execute(stmt, {"cutoff_date": cutoff_date})
-        result = await session.execute(stmt)
         missing_risk_tier_count = result.scalar() or 0
 
         # Check 4: High error rate in recent assessments
