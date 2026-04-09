@@ -71,6 +71,12 @@ class Settings(BaseSettings):
         '"aerosol transmission"[tiab] OR "airborne transmission"[tiab])'
     )
 
+    # Tier 2 source rate limits
+    arxiv_request_delay: float = 3.0  # arXiv recommends >= 3s between requests
+    crossref_request_delay: float = 1.0
+    crossref_email: str = ""  # for polite pool access
+    zenodo_request_delay: float = 1.0
+
     # Enrichment rate limits
     openalex_request_delay: float = 0.1
     semantic_scholar_request_delay: float = 1.0

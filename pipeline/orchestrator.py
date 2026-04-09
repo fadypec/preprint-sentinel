@@ -19,10 +19,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from pipeline.enrichment.enricher import enrich_paper
 from pipeline.fulltext.retriever import fetch_full_text_content
+from pipeline.ingest.arxiv import ArxivClient
 from pipeline.ingest.biorxiv import BiorxivClient
+from pipeline.ingest.crossref import CrossrefClient
 from pipeline.ingest.dedup import DedupEngine
 from pipeline.ingest.europepmc import EuropepmcClient
 from pipeline.ingest.pubmed import PubmedClient
+from pipeline.ingest.zenodo import ZenodoClient
 from pipeline.models import Paper, PipelineRun, PipelineStage
 from pipeline.triage.adjudication import run_adjudication
 from pipeline.triage.coarse_filter import run_coarse_filter
@@ -543,6 +546,25 @@ async def _run_ingest(
                 request_delay=settings.pubmed_request_delay,
                 query_mode=settings.pubmed_query_mode,
                 mesh_query=settings.pubmed_mesh_query,
+            ),
+        ),
+        (
+            "arxiv",
+            lambda: ArxivClient(
+                request_delay=settings.arxiv_request_delay,
+            ),
+        ),
+        (
+            "crossref",
+            lambda: CrossrefClient(
+                email=settings.crossref_email,
+                request_delay=settings.crossref_request_delay,
+            ),
+        ),
+        (
+            "zenodo",
+            lambda: ZenodoClient(
+                request_delay=settings.zenodo_request_delay,
             ),
         ),
     ]
