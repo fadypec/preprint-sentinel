@@ -20,12 +20,13 @@ type Props = {
     status?: string;
     q?: string;
     needs_review?: string;
+    sort?: string;
   }>;
 };
 
 function buildPaginationHref(
   targetPage: number,
-  filters: { tier?: string; source?: string; status?: string; q?: string },
+  filters: { tier?: string; source?: string; status?: string; q?: string; sort?: string },
 ): string {
   const p = new URLSearchParams();
   p.set("page", String(targetPage));
@@ -33,6 +34,7 @@ function buildPaginationHref(
   if (filters.source && filters.source !== "all") p.set("source", filters.source);
   if (filters.status && filters.status !== "all") p.set("status", filters.status);
   if (filters.q) p.set("q", filters.q);
+  if (filters.sort && filters.sort !== "date_desc") p.set("sort", filters.sort);
   return `/?${p.toString()}`;
 }
 
@@ -44,6 +46,7 @@ export default async function DailyFeedPage({ searchParams }: Props) {
   const status = params.status;
   const search = params.q?.trim();
   const needsReview = params.needs_review;
+  const sort = params.sort;
 
   const { papers, total, totalIngested, totalPages } = await queryPapers({
     page,
@@ -52,9 +55,10 @@ export default async function DailyFeedPage({ searchParams }: Props) {
     status,
     search,
     needsReview,
+    sort,
   });
 
-  const filterState = { tier, source, status, q: search, needsReview };
+  const filterState = { tier, source, status, q: search, needsReview, sort };
   const flaggedPct = totalIngested > 0 ? ((total / totalIngested) * 100).toFixed(1) : "0";
 
   return (
@@ -82,6 +86,7 @@ export default async function DailyFeedPage({ searchParams }: Props) {
           status={status ?? "all"}
           q={search ?? ""}
           needsReview={needsReview ?? ""}
+          sort={sort ?? "date_desc"}
         />
       </div>
 

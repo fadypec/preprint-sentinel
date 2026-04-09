@@ -44,6 +44,7 @@ type PaperFiltersProps = {
   status: string;
   q: string;
   needsReview: string;
+  sort: string;
 };
 
 /** Build a clean URL with only non-default filter params. */
@@ -53,6 +54,7 @@ function buildUrl(filters: {
   status: string;
   q: string;
   needsReview: string;
+  sort: string;
 }): string {
   const p = new URLSearchParams();
   if (filters.tier && filters.tier !== "all") p.set("tier", filters.tier);
@@ -62,6 +64,7 @@ function buildUrl(filters: {
     p.set("status", filters.status);
   if (filters.q) p.set("q", filters.q);
   if (filters.needsReview === "true") p.set("needs_review", "true");
+  if (filters.sort && filters.sort !== "date_desc") p.set("sort", filters.sort);
   const qs = p.toString();
   return qs ? `/?${qs}` : "/";
 }
@@ -77,7 +80,7 @@ function buildUrl(filters: {
  * parse, independent of React hydration). Falls back to the Go button
  * if JS never loads.
  */
-export function PaperFilters({ tier, source, status, q, needsReview }: PaperFiltersProps) {
+export function PaperFilters({ tier, source, status, q, needsReview, sort }: PaperFiltersProps) {
   const selectedTiers = new Set(
     !tier || tier === "all" ? [] : tier.split(","),
   );
@@ -93,6 +96,7 @@ export function PaperFilters({ tier, source, status, q, needsReview }: PaperFilt
       status,
       q,
       needsReview,
+      sort,
     });
   }
 
@@ -101,7 +105,8 @@ export function PaperFilters({ tier, source, status, q, needsReview }: PaperFilt
     (source !== "all" && source !== "") ||
     (status !== "all" && status !== "") ||
     q !== "" ||
-    needsReview === "true";
+    needsReview === "true" ||
+    (sort !== "date_desc" && sort !== "");
 
   const tierValue =
     selectedTiers.size > 0 ? [...selectedTiers].join(",") : "";
@@ -145,6 +150,7 @@ export function PaperFilters({ tier, source, status, q, needsReview }: PaperFilt
           status,
           q,
           needsReview: needsReview === "true" ? "" : "true",
+          sort,
         })}
         role="button"
         aria-pressed={needsReview === "true"}
@@ -200,6 +206,19 @@ export function PaperFilters({ tier, source, status, q, needsReview }: PaperFilt
           <option value="confirmed_concern">Confirmed Concern</option>
           <option value="false_positive">False Positive</option>
           <option value="archived">Archived</option>
+        </select>
+
+        <select
+          name="sort"
+          defaultValue={sort || "date_desc"}
+          aria-label="Sort order"
+          className={selectClasses}
+          data-auto-submit=""
+        >
+          <option value="date_desc">Date (Newest)</option>
+          <option value="date_asc">Date (Oldest)</option>
+          <option value="score_desc">Score (High→Low)</option>
+          <option value="score_asc">Score (Low→High)</option>
         </select>
 
         <div className="relative flex-1">

@@ -15,6 +15,10 @@ const PAGE_SIZE = 20;
 const VALID_TIERS = new Set<string>(Object.values(RiskTier));
 const VALID_SOURCES = new Set<string>(Object.values(SourceServer));
 const VALID_STATUSES = new Set<string>(Object.values(ReviewStatus));
+const VALID_SORTS = new Set<string>([
+  "date_desc", "date_asc",
+  "score_desc", "score_asc"
+]);
 
 export type PaperQueryParams = {
   page: number;
@@ -23,6 +27,7 @@ export type PaperQueryParams = {
   status?: string | null;
   search?: string | null;
   needsReview?: string | null;
+  sort?: string | null;
 };
 
 export type PaperQueryResult = {
@@ -54,6 +59,11 @@ function validStatus(v?: string | null): ReviewStatus | undefined {
   return VALID_STATUSES.has(v) ? (v as ReviewStatus) : undefined;
 }
 
+function validSort(v?: string | null): string | undefined {
+  if (!v) return "date_desc"; // default
+  return VALID_SORTS.has(v) ? v : "date_desc";
+}
+
 /**
  * Check whether any filter values are invalid (not just empty/"all", but
  * actually present and not matching a known enum). Used by the API route
@@ -63,6 +73,7 @@ export function invalidFilters(params: {
   tier?: string | null;
   source?: string | null;
   status?: string | null;
+  sort?: string | null;
 }): string[] {
   const errors: string[] = [];
   if (params.tier && params.tier !== "all") {
@@ -86,6 +97,12 @@ export function invalidFilters(params: {
     !VALID_STATUSES.has(params.status)
   ) {
     errors.push(`Invalid status: ${params.status}`);
+  }
+  if (
+    params.sort &&
+    !VALID_SORTS.has(params.sort)
+  ) {
+    errors.push(`Invalid sort: ${params.sort}`);
   }
   return errors;
 }
@@ -148,12 +165,13 @@ export async function queryPapers(
   const status = validStatus(params.status);
   const search = params.search?.trim() || undefined;
   const needsReview = params.needsReview === "true" ? true : undefined;
+  const sort = validSort(params.sort);
 
   if (search) {
-    return queryPapersFullText({ page, tiers, source, status, search, needsReview });
+    return queryPapersFullText({ page, tiers, source, status, search, needsReview, sort: sort! });
   }
 
-  return queryPapersPrisma({ page, tiers, source, status, needsReview });
+  return queryPapersPrisma({ page, tiers, source, status, needsReview, sort: sort! });
 }
 
 /** Standard Prisma query path (no full-text search). */
@@ -163,6 +181,7 @@ async function queryPapersPrisma(filters: {
   source?: SourceServer;
   status?: ReviewStatus;
   needsReview?: boolean;
+  sort: string;
 }): Promise<PaperQueryResult> {
   const where: Prisma.PaperWhereInput = {
     pipelineStage: { not: PipelineStage.ingested },
@@ -175,15 +194,43 @@ async function queryPapersPrisma(filters: {
   if (filters.status) where.reviewStatus = filters.status;
   if (filters.needsReview) where.needsManualReview = true;
 
+  // Build orderBy based on sort parameter
+  let orderBy: Prisma.PaperOrderByWithRelationInput[];
+  switch (filters.sort) {
+    case "score_desc":
+      orderBy = [
+        { riskTier: { sort: "desc", nulls: "last" } },
+        { aggregateScore: { sort: "desc", nulls: "last" } },
+        { postedDate: "desc" },
+      ];
+      break;
+    case "score_asc":
+      orderBy = [
+        { riskTier: { sort: "desc", nulls: "last" } },
+        { aggregateScore: { sort: "asc", nulls: "first" } },
+        { postedDate: "desc" },
+      ];
+      break;
+    case "date_asc":
+      orderBy = [
+        { riskTier: { sort: "desc", nulls: "last" } },
+        { postedDate: "asc" },
+      ];
+      break;
+    case "date_desc":
+    default:
+      orderBy = [
+        { riskTier: { sort: "desc", nulls: "last" } },
+        { postedDate: "desc" },
+      ];
+  }
+
   const [total, totalIngested, papers] = await Promise.all([
     prisma.paper.count({ where }),
     prisma.paper.count({ where: { isDuplicateOf: null } }),
     prisma.paper.findMany({
       where,
-      orderBy: [
-        { riskTier: { sort: "desc", nulls: "last" } },
-        { postedDate: "desc" },
-      ],
+      orderBy,
       take: PAGE_SIZE,
       skip: (filters.page - 1) * PAGE_SIZE,
     }),
@@ -207,6 +254,7 @@ async function queryPapersFullText(filters: {
   status?: ReviewStatus;
   search: string;
   needsReview?: boolean;
+  sort: string;
 }): Promise<PaperQueryResult> {
   const tsquery = buildSearchQuery(filters.search);
   if (!tsquery) {
@@ -250,6 +298,66 @@ async function queryPapersFullText(filters: {
   `;
   const total = Number(countResult[0].count);
 
+  // Build ORDER BY clause based on sort parameter
+  let orderByClause: Prisma.Sql;
+  switch (filters.sort) {
+    case "score_desc":
+      orderByClause = Prisma.sql`
+        ORDER BY
+          CASE risk_tier
+            WHEN 'critical' THEN 4
+            WHEN 'high' THEN 3
+            WHEN 'medium' THEN 2
+            WHEN 'low' THEN 1
+            ELSE 0
+          END DESC,
+          aggregate_score DESC NULLS LAST,
+          posted_date DESC
+      `;
+      break;
+    case "score_asc":
+      orderByClause = Prisma.sql`
+        ORDER BY
+          CASE risk_tier
+            WHEN 'critical' THEN 4
+            WHEN 'high' THEN 3
+            WHEN 'medium' THEN 2
+            WHEN 'low' THEN 1
+            ELSE 0
+          END DESC,
+          aggregate_score ASC NULLS FIRST,
+          posted_date DESC
+      `;
+      break;
+    case "date_asc":
+      orderByClause = Prisma.sql`
+        ORDER BY
+          CASE risk_tier
+            WHEN 'critical' THEN 4
+            WHEN 'high' THEN 3
+            WHEN 'medium' THEN 2
+            WHEN 'low' THEN 1
+            ELSE 0
+          END DESC,
+          posted_date ASC
+      `;
+      break;
+    case "date_desc":
+    default:
+      orderByClause = Prisma.sql`
+        ORDER BY
+          CASE risk_tier
+            WHEN 'critical' THEN 4
+            WHEN 'high' THEN 3
+            WHEN 'medium' THEN 2
+            WHEN 'low' THEN 1
+            ELSE 0
+          END DESC,
+          posted_date DESC
+      `;
+      break;
+  }
+
   const rawPapers = await prisma.$queryRaw<Record<string, unknown>[]>`
     SELECT * FROM papers
     WHERE search_vector @@ to_tsquery('english', ${tsquery})
@@ -260,7 +368,7 @@ async function queryPapersFullText(filters: {
       ${sourceClause}
       ${statusClause}
       ${needsReviewClause}
-    ORDER BY ts_rank(search_vector, to_tsquery('english', ${tsquery})) DESC
+    ${orderByClause}
     LIMIT ${PAGE_SIZE} OFFSET ${(filters.page - 1) * PAGE_SIZE}
   `;
 

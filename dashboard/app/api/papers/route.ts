@@ -12,14 +12,16 @@ export async function GET(request: NextRequest) {
     const source = params.get("source");
     const status = params.get("status");
     const search = params.get("q")?.trim();
+    const needsReview = params.get("needs_review");
+    const sort = params.get("sort");
 
     // Validate enum filter values -- return 400 for invalid input
-    const errors = invalidFilters({ tier, source, status });
+    const errors = invalidFilters({ tier, source, status, sort });
     if (errors.length > 0) {
       return Response.json({ error: errors.join("; ") }, { status: 400 });
     }
 
-    const result = await queryPapers({ page, tier, source, status, search });
+    const result = await queryPapers({ page, tier, source, status, search, needsReview, sort });
 
     return Response.json(result);
   } catch (err) {
