@@ -38,6 +38,14 @@ Based on comprehensive codebase audit conducted 2026-04-09 (see `2026-04-09_AUDI
 - [x] **#12** Alert system: email digests (daily/weekly) + Slack webhook for critical-tier papers
 - [x] **#17** Pre-commit hooks (ruff lint + format) and mypy type checking in CI
 
+### Batch 4 — Coverage expansion and hardening (2026-04-10)
+
+- [x] **#14** Tier 2 ingest clients: arXiv (q-bio), Crossref (Research Square, ChemRxiv, SSRN), Zenodo
+- [x] **#15** Frontend test framework — Vitest + happy-dom with 18 unit tests for lib/utils
+- [x] **#16** Database backup/restore scripts with retention policy (pg_dump/pg_restore wrappers)
+- [x] React.memo on AnalyticsCharts — prevent unnecessary chart re-renders (audit medium-severity)
+- [x] Parallelize raw SQL queries with Promise.all — eliminate extra totalIngested table scan (audit medium-severity)
+
 ---
 
 ## Deferred
@@ -47,12 +55,6 @@ Based on comprehensive codebase audit conducted 2026-04-09 (see `2026-04-09_AUDI
 ---
 
 ## Upcoming
-
-### Batch 4 — Coverage expansion
-
-- [ ] **#14** Tier 2 ingest clients: arXiv (q-bio, cs.AI+bio), then Crossref-based (Research Square, ChemRxiv, SSRN)
-- [ ] **#15** Frontend test framework (Vitest unit + Playwright E2E)
-- [ ] **#16** Database backup/restore scripts with scheduled execution
 
 ### Batch 5 — Analyst workflow
 
