@@ -8,7 +8,6 @@ Usage:
 
 from __future__ import annotations
 
-import asyncio
 import html
 from collections.abc import AsyncGenerator
 from datetime import date
@@ -16,6 +15,7 @@ from datetime import date
 import httpx
 import structlog
 
+from pipeline.http_retry import request_with_retry
 from pipeline.models import SourceServer
 
 log = structlog.get_logger()
@@ -86,32 +86,16 @@ class EuropepmcClient:
             "cursorMark": cursor_mark,
         }
 
-        for attempt in range(1, self.max_retries + 1):
-            await asyncio.sleep(self.request_delay)
-            try:
-                resp = await self._client.get(self.BASE_URL, params=params, timeout=30.0)
-                if resp.status_code == 200:
-                    return resp.json()
-                if resp.status_code in (429, 503):
-                    backoff = min(2**attempt, 30)
-                    log.warning(
-                        "rate_limited",
-                        source="europepmc",
-                        status=resp.status_code,
-                        attempt=attempt,
-                        backoff=backoff,
-                    )
-                    await asyncio.sleep(backoff)
-                    continue
-                resp.raise_for_status()
-            except httpx.TimeoutException:
-                if attempt == self.max_retries:
-                    raise
-                backoff = min(2**attempt, 30)
-                log.warning("timeout", source="europepmc", attempt=attempt, backoff=backoff)
-                await asyncio.sleep(backoff)
-
-        raise RuntimeError(f"Europe PMC failed after {self.max_retries} retries")
+        resp = await request_with_retry(
+            self._client,
+            self.BASE_URL,
+            params=params,
+            timeout=30.0,
+            request_delay=self.request_delay,
+            max_retries=self.max_retries,
+            source="europepmc",
+        )
+        return resp.json()
 
     # -- Internal ------------------------------------------------------------
 

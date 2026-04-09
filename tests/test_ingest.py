@@ -248,7 +248,7 @@ class TestRetry:
         from pipeline.ingest.biorxiv import BiorxivClient
 
         async with BiorxivClient(server="biorxiv", request_delay=0, max_retries=2) as client:
-            with pytest.raises(RuntimeError, match="Failed after 2 retries"):
+            with pytest.raises(RuntimeError, match="failed after 2 retries"):
                 _ = [p async for p in client.fetch_papers(date(2026, 3, 1), date(2026, 3, 1))]
 
     @respx.mock

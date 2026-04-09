@@ -9,10 +9,10 @@ Usage:
 
 from __future__ import annotations
 
-import asyncio
-
 import httpx
 import structlog
+
+from pipeline.http_retry import request_with_retry
 
 log = structlog.get_logger()
 
@@ -125,50 +125,42 @@ class OpenAlexClient:
         url = f"{BASE_URL}/works"
         params = {"filter": f"doi:{doi}", "mailto": self.email}
 
-        for attempt in range(1, self.max_retries + 1):
-            await asyncio.sleep(self.request_delay)
-            try:
-                resp = await self._client.get(url, params=params, timeout=30.0)
-                if resp.status_code == 404:
-                    return None
-                if resp.status_code == 200:
-                    data = resp.json()
-                    results = data.get("results", [])
-                    return results[0] if results else None
-                if resp.status_code in (429, 503):
-                    backoff = min(2**attempt, 30)
-                    log.warning(
-                        "rate_limited",
-                        source="openalex",
-                        status=resp.status_code,
-                        attempt=attempt,
-                        backoff=backoff,
-                    )
-                    await asyncio.sleep(backoff)
-                    continue
-                resp.raise_for_status()
-            except httpx.TimeoutException:
-                if attempt == self.max_retries:
-                    raise
-                backoff = min(2**attempt, 30)
-                log.warning("timeout", source="openalex", attempt=attempt, backoff=backoff)
-                await asyncio.sleep(backoff)
-
-        raise RuntimeError(f"OpenAlex failed after {self.max_retries} retries: {doi}")
+        resp = await request_with_retry(
+            self._client,
+            url,
+            params=params,
+            timeout=30.0,
+            request_delay=self.request_delay,
+            max_retries=self.max_retries,
+            none_on_404=True,
+            source="openalex",
+        )
+        if resp is None:
+            return None
+        data = resp.json()
+        results = data.get("results", [])
+        return results[0] if results else None
 
     async def _fetch_author(self, author_id: str) -> dict | None:
         """Fetch author detail from OpenAlex. Returns None on any error."""
         url = f"{BASE_URL}/authors/{author_id}"
         params = {"mailto": self.email}
         try:
-            await asyncio.sleep(self.request_delay)
-            resp = await self._client.get(url, params=params, timeout=30.0)
-            if resp.status_code == 200:
-                return resp.json()
-        except httpx.HTTPError as exc:
-            log.debug("openalex_author_error", author_id=author_id, error=str(exc))
+            resp = await request_with_retry(
+                self._client,
+                url,
+                params=params,
+                timeout=30.0,
+                request_delay=self.request_delay,
+                max_retries=self.max_retries,
+                none_on_404=True,
+                source="openalex",
+            )
+            if resp is None:
+                return None
+            return resp.json()
         except Exception as exc:
-            log.warning("openalex_author_unexpected_error", author_id=author_id, error=str(exc))
+            log.debug("openalex_author_error", author_id=author_id, error=str(exc))
         return None
 
     @staticmethod

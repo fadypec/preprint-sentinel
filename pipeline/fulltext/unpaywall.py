@@ -9,11 +9,12 @@ Usage:
 
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass
 
 import httpx
 import structlog
+
+from pipeline.http_retry import request_with_retry
 
 log = structlog.get_logger()
 
@@ -76,34 +77,19 @@ class UnpaywallClient:
         url = f"{BASE_URL}/{doi}"
         params = {"email": self.email}
 
-        for attempt in range(1, self.max_retries + 1):
-            await asyncio.sleep(self.request_delay)
-            try:
-                resp = await self._client.get(url, params=params, timeout=30.0)
-                if resp.status_code == 404:
-                    return None
-                if resp.status_code == 200:
-                    return self._parse_response(resp.json())
-                if resp.status_code in (429, 503):
-                    backoff = min(2**attempt, 30)
-                    log.warning(
-                        "rate_limited",
-                        source="unpaywall",
-                        status=resp.status_code,
-                        attempt=attempt,
-                        backoff=backoff,
-                    )
-                    await asyncio.sleep(backoff)
-                    continue
-                resp.raise_for_status()
-            except httpx.TimeoutException:
-                if attempt == self.max_retries:
-                    raise
-                backoff = min(2**attempt, 30)
-                log.warning("timeout", source="unpaywall", attempt=attempt, backoff=backoff)
-                await asyncio.sleep(backoff)
-
-        raise RuntimeError(f"Unpaywall failed after {self.max_retries} retries: {doi}")
+        resp = await request_with_retry(
+            self._client,
+            url,
+            params=params,
+            timeout=30.0,
+            request_delay=self.request_delay,
+            max_retries=self.max_retries,
+            none_on_404=True,
+            source="unpaywall",
+        )
+        if resp is None:
+            return None
+        return self._parse_response(resp.json())
 
     def _parse_response(self, data: dict) -> UnpaywallResult | None:
         """Extract best OA location from Unpaywall response."""

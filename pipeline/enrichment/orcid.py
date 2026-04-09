@@ -9,10 +9,10 @@ Usage:
 
 from __future__ import annotations
 
-import asyncio
-
 import httpx
 import structlog
+
+from pipeline.http_retry import request_with_retry
 
 log = structlog.get_logger()
 
@@ -72,70 +72,38 @@ class OrcidClient:
         url = f"{BASE_URL}/search/"
         params = {"q": query, "rows": 1}
 
-        for attempt in range(1, self.max_retries + 1):
-            await asyncio.sleep(self.request_delay)
-            try:
-                resp = await self._client.get(url, params=params, timeout=30.0)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    results = data.get("result", [])
-                    if not results:
-                        return None
-                    orcid_ident = results[0].get("orcid-identifier", {})
-                    return orcid_ident.get("path")
-                if resp.status_code in (429, 503):
-                    backoff = min(2**attempt, 30)
-                    log.warning(
-                        "rate_limited",
-                        source="orcid",
-                        status=resp.status_code,
-                        attempt=attempt,
-                        backoff=backoff,
-                    )
-                    await asyncio.sleep(backoff)
-                    continue
-                resp.raise_for_status()
-            except httpx.TimeoutException:
-                if attempt == self.max_retries:
-                    raise
-                backoff = min(2**attempt, 30)
-                log.warning("timeout", source="orcid", attempt=attempt, backoff=backoff)
-                await asyncio.sleep(backoff)
-
-        raise RuntimeError(f"ORCID search failed after {self.max_retries} retries")
+        resp = await request_with_retry(
+            self._client,
+            url,
+            params=params,
+            timeout=30.0,
+            request_delay=self.request_delay,
+            max_retries=self.max_retries,
+            source="orcid",
+        )
+        data = resp.json()
+        results = data.get("result", [])
+        if not results:
+            return None
+        orcid_ident = results[0].get("orcid-identifier", {})
+        return orcid_ident.get("path")
 
     async def _fetch_record(self, orcid_id: str) -> dict | None:
         """Fetch the full ORCID record. Returns None on 404."""
         url = f"{BASE_URL}/{orcid_id}/record"
 
-        for attempt in range(1, self.max_retries + 1):
-            await asyncio.sleep(self.request_delay)
-            try:
-                resp = await self._client.get(url, timeout=30.0)
-                if resp.status_code == 404:
-                    return None
-                if resp.status_code == 200:
-                    return resp.json()
-                if resp.status_code in (429, 503):
-                    backoff = min(2**attempt, 30)
-                    log.warning(
-                        "rate_limited",
-                        source="orcid",
-                        status=resp.status_code,
-                        attempt=attempt,
-                        backoff=backoff,
-                    )
-                    await asyncio.sleep(backoff)
-                    continue
-                resp.raise_for_status()
-            except httpx.TimeoutException:
-                if attempt == self.max_retries:
-                    raise
-                backoff = min(2**attempt, 30)
-                log.warning("timeout", source="orcid", attempt=attempt, backoff=backoff)
-                await asyncio.sleep(backoff)
-
-        raise RuntimeError(f"ORCID record failed after {self.max_retries} retries: {orcid_id}")
+        resp = await request_with_retry(
+            self._client,
+            url,
+            timeout=30.0,
+            request_delay=self.request_delay,
+            max_retries=self.max_retries,
+            none_on_404=True,
+            source="orcid",
+        )
+        if resp is None:
+            return None
+        return resp.json()
 
     def _parse_record(self, orcid_id: str, record: dict) -> dict:
         """Extract structured data from an ORCID record."""

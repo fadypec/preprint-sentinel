@@ -19,6 +19,15 @@ const VALID_SORTS = new Set<string>([
   "date_desc", "date_asc",
   "score_desc", "score_asc"
 ]);
+const VALID_DIMENSIONS = new Set<string>([
+  "pathogen_enhancement",
+  "synthesis_barrier_lowering",
+  "select_agent_relevance",
+  "novel_technique",
+  "information_hazard",
+  "defensive_framing",
+]);
+const VALID_DIM_MINS = new Set<number>([1, 2, 3]);
 
 export type PaperQueryParams = {
   page: number;
@@ -28,6 +37,8 @@ export type PaperQueryParams = {
   search?: string | null;
   needsReview?: string | null;
   sort?: string | null;
+  dim?: string | null;
+  dimMin?: string | null;
 };
 
 export type PaperQueryResult = {
@@ -64,6 +75,17 @@ function validSort(v?: string | null): string | undefined {
   return VALID_SORTS.has(v) ? v : "date_desc";
 }
 
+function validDimension(v?: string | null): string | undefined {
+  if (!v || v === "all") return undefined;
+  return VALID_DIMENSIONS.has(v) ? v : undefined;
+}
+
+function validDimMin(v?: string | null): number | undefined {
+  if (!v) return undefined;
+  const n = parseInt(v, 10);
+  return VALID_DIM_MINS.has(n) ? n : undefined;
+}
+
 /**
  * Check whether any filter values are invalid (not just empty/"all", but
  * actually present and not matching a known enum). Used by the API route
@@ -74,6 +96,8 @@ export function invalidFilters(params: {
   source?: string | null;
   status?: string | null;
   sort?: string | null;
+  dim?: string | null;
+  dimMin?: string | null;
 }): string[] {
   const errors: string[] = [];
   if (params.tier && params.tier !== "all") {
@@ -103,6 +127,19 @@ export function invalidFilters(params: {
     !VALID_SORTS.has(params.sort)
   ) {
     errors.push(`Invalid sort: ${params.sort}`);
+  }
+  if (
+    params.dim &&
+    params.dim !== "all" &&
+    !VALID_DIMENSIONS.has(params.dim)
+  ) {
+    errors.push(`Invalid dimension: ${params.dim}`);
+  }
+  if (params.dimMin) {
+    const n = parseInt(params.dimMin, 10);
+    if (!VALID_DIM_MINS.has(n)) {
+      errors.push(`Invalid dim_min: ${params.dimMin} (must be 1, 2, or 3)`);
+    }
   }
   return errors;
 }
@@ -166,9 +203,13 @@ export async function queryPapers(
   const search = params.search?.trim() || undefined;
   const needsReview = params.needsReview === "true" ? true : undefined;
   const sort = validSort(params.sort);
+  const dim = validDimension(params.dim);
+  const dimMin = dim ? validDimMin(params.dimMin) ?? 1 : undefined;
 
-  if (search) {
-    return queryPapersFullText({ page, tiers, source, status, search, needsReview, sort: sort! });
+  // Dimension filtering requires raw SQL (JSONB path query), so route
+  // through the raw SQL path even when there's no full-text search.
+  if (search || dim) {
+    return queryPapersRawSQL({ page, tiers, source, status, search, needsReview, sort: sort!, dim, dimMin });
   }
 
   return queryPapersPrisma({ page, tiers, source, status, needsReview, sort: sort! });
@@ -246,26 +287,33 @@ async function queryPapersPrisma(filters: {
   };
 }
 
-/** Raw SQL path for full-text search via tsvector. */
-async function queryPapersFullText(filters: {
+/** Raw SQL path — used for full-text search (tsvector) and/or dimension filtering (JSONB). */
+async function queryPapersRawSQL(filters: {
   page: number;
   tiers?: RiskTier[];
   source?: SourceServer;
   status?: ReviewStatus;
-  search: string;
+  search?: string;
   needsReview?: boolean;
   sort: string;
+  dim?: string;
+  dimMin?: number;
 }): Promise<PaperQueryResult> {
-  const tsquery = buildSearchQuery(filters.search);
-  if (!tsquery) {
-    return {
-      papers: [],
-      total: 0,
-      totalIngested: 0,
-      page: filters.page,
-      pageSize: PAGE_SIZE,
-      totalPages: 0,
-    };
+  // Full-text search clause (optional)
+  let searchClause = Prisma.empty;
+  if (filters.search) {
+    const tsquery = buildSearchQuery(filters.search);
+    if (!tsquery) {
+      return {
+        papers: [],
+        total: 0,
+        totalIngested: 0,
+        page: filters.page,
+        pageSize: PAGE_SIZE,
+        totalPages: 0,
+      };
+    }
+    searchClause = Prisma.sql`AND search_vector @@ to_tsquery('english', ${tsquery})`;
   }
 
   const tierClause =
@@ -285,16 +333,23 @@ async function queryPapersFullText(filters: {
       ? Prisma.sql`AND needs_manual_review = true`
       : Prisma.empty;
 
+  // Dimension score clause (JSONB path query — dim is validated against a whitelist)
+  const dimClause =
+    filters.dim && filters.dimMin != null
+      ? Prisma.sql`AND (stage2_result->'dimensions'->${filters.dim}->>'score')::int >= ${filters.dimMin}`
+      : Prisma.empty;
+
   const countResult = await prisma.$queryRaw<[{ count: bigint }]>`
     SELECT COUNT(*) as count FROM papers
-    WHERE search_vector @@ to_tsquery('english', ${tsquery})
-      AND pipeline_stage != 'ingested'
+    WHERE pipeline_stage != 'ingested'
       AND coarse_filter_passed = true
       AND is_duplicate_of IS NULL
+      ${searchClause}
       ${tierClause}
       ${sourceClause}
       ${statusClause}
       ${needsReviewClause}
+      ${dimClause}
   `;
   const total = Number(countResult[0].count);
 
@@ -360,14 +415,15 @@ async function queryPapersFullText(filters: {
 
   const rawPapers = await prisma.$queryRaw<Record<string, unknown>[]>`
     SELECT * FROM papers
-    WHERE search_vector @@ to_tsquery('english', ${tsquery})
-      AND pipeline_stage != 'ingested'
+    WHERE pipeline_stage != 'ingested'
       AND coarse_filter_passed = true
       AND is_duplicate_of IS NULL
+      ${searchClause}
       ${tierClause}
       ${sourceClause}
       ${statusClause}
       ${needsReviewClause}
+      ${dimClause}
     ${orderByClause}
     LIMIT ${PAGE_SIZE} OFFSET ${(filters.page - 1) * PAGE_SIZE}
   `;

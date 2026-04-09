@@ -21,12 +21,14 @@ type Props = {
     q?: string;
     needs_review?: string;
     sort?: string;
+    dim?: string;
+    dim_min?: string;
   }>;
 };
 
 function buildPaginationHref(
   targetPage: number,
-  filters: { tier?: string; source?: string; status?: string; q?: string; sort?: string },
+  filters: { tier?: string; source?: string; status?: string; q?: string; sort?: string; dim?: string; dimMin?: string },
 ): string {
   const p = new URLSearchParams();
   p.set("page", String(targetPage));
@@ -35,6 +37,8 @@ function buildPaginationHref(
   if (filters.status && filters.status !== "all") p.set("status", filters.status);
   if (filters.q) p.set("q", filters.q);
   if (filters.sort && filters.sort !== "date_desc") p.set("sort", filters.sort);
+  if (filters.dim && filters.dim !== "all") p.set("dim", filters.dim);
+  if (filters.dim && filters.dim !== "all" && filters.dimMin && filters.dimMin !== "1") p.set("dim_min", filters.dimMin);
   return `/?${p.toString()}`;
 }
 
@@ -47,6 +51,8 @@ export default async function DailyFeedPage({ searchParams }: Props) {
   const search = params.q?.trim();
   const needsReview = params.needs_review;
   const sort = params.sort;
+  const dim = params.dim;
+  const dimMin = params.dim_min;
 
   const { papers, total, totalIngested, totalPages } = await queryPapers({
     page,
@@ -56,9 +62,11 @@ export default async function DailyFeedPage({ searchParams }: Props) {
     search,
     needsReview,
     sort,
+    dim,
+    dimMin,
   });
 
-  const filterState = { tier, source, status, q: search, needsReview, sort };
+  const filterState = { tier, source, status, q: search, needsReview, sort, dim, dimMin };
   const flaggedPct = totalIngested > 0 ? ((total / totalIngested) * 100).toFixed(1) : "0";
 
   return (
@@ -87,6 +95,8 @@ export default async function DailyFeedPage({ searchParams }: Props) {
           q={search ?? ""}
           needsReview={needsReview ?? ""}
           sort={sort ?? "date_desc"}
+          dim={dim ?? "all"}
+          dimMin={dimMin ?? "1"}
         />
       </div>
 

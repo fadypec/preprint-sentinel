@@ -45,6 +45,8 @@ type PaperFiltersProps = {
   q: string;
   needsReview: string;
   sort: string;
+  dim: string;
+  dimMin: string;
 };
 
 /** Build a clean URL with only non-default filter params. */
@@ -55,6 +57,8 @@ function buildUrl(filters: {
   q: string;
   needsReview: string;
   sort: string;
+  dim: string;
+  dimMin: string;
 }): string {
   const p = new URLSearchParams();
   if (filters.tier && filters.tier !== "all") p.set("tier", filters.tier);
@@ -65,6 +69,8 @@ function buildUrl(filters: {
   if (filters.q) p.set("q", filters.q);
   if (filters.needsReview === "true") p.set("needs_review", "true");
   if (filters.sort && filters.sort !== "date_desc") p.set("sort", filters.sort);
+  if (filters.dim && filters.dim !== "all") p.set("dim", filters.dim);
+  if (filters.dim && filters.dim !== "all" && filters.dimMin && filters.dimMin !== "1") p.set("dim_min", filters.dimMin);
   const qs = p.toString();
   return qs ? `/?${qs}` : "/";
 }
@@ -80,7 +86,7 @@ function buildUrl(filters: {
  * parse, independent of React hydration). Falls back to the Go button
  * if JS never loads.
  */
-export function PaperFilters({ tier, source, status, q, needsReview, sort }: PaperFiltersProps) {
+export function PaperFilters({ tier, source, status, q, needsReview, sort, dim, dimMin }: PaperFiltersProps) {
   const selectedTiers = new Set(
     !tier || tier === "all" ? [] : tier.split(","),
   );
@@ -97,6 +103,8 @@ export function PaperFilters({ tier, source, status, q, needsReview, sort }: Pap
       q,
       needsReview,
       sort,
+      dim,
+      dimMin,
     });
   }
 
@@ -106,7 +114,8 @@ export function PaperFilters({ tier, source, status, q, needsReview, sort }: Pap
     (status !== "all" && status !== "") ||
     q !== "" ||
     needsReview === "true" ||
-    (sort !== "date_desc" && sort !== "");
+    (sort !== "date_desc" && sort !== "") ||
+    (dim !== "all" && dim !== "");
 
   const tierValue =
     selectedTiers.size > 0 ? [...selectedTiers].join(",") : "";
@@ -151,6 +160,8 @@ export function PaperFilters({ tier, source, status, q, needsReview, sort }: Pap
           q,
           needsReview: needsReview === "true" ? "" : "true",
           sort,
+          dim,
+          dimMin,
         })}
         role="button"
         aria-pressed={needsReview === "true"}
@@ -225,6 +236,38 @@ export function PaperFilters({ tier, source, status, q, needsReview, sort }: Pap
           <option value="date_asc">Date (Oldest)</option>
           <option value="score_desc">Score (High→Low)</option>
           <option value="score_asc">Score (Low→High)</option>
+        </select>
+
+        <label htmlFor="filter-dim" className="sr-only">Filter by risk dimension</label>
+        <select
+          id="filter-dim"
+          name="dim"
+          defaultValue={dim || "all"}
+          aria-label="Filter by risk dimension"
+          className={selectClasses}
+          data-auto-submit=""
+        >
+          <option value="all">All Dimensions</option>
+          <option value="pathogen_enhancement">Pathogen Enhancement</option>
+          <option value="synthesis_barrier_lowering">Synthesis Barriers</option>
+          <option value="select_agent_relevance">Select Agent</option>
+          <option value="novel_technique">Novel Technique</option>
+          <option value="information_hazard">Information Hazard</option>
+          <option value="defensive_framing">Defensive Framing</option>
+        </select>
+
+        <label htmlFor="filter-dim-min" className="sr-only">Minimum dimension score</label>
+        <select
+          id="filter-dim-min"
+          name="dim_min"
+          defaultValue={dimMin || "1"}
+          aria-label="Minimum dimension score"
+          className={selectClasses}
+          data-auto-submit=""
+        >
+          <option value="1">≥ 1</option>
+          <option value="2">≥ 2</option>
+          <option value="3">= 3</option>
         </select>
 
         <div className="relative flex-1">

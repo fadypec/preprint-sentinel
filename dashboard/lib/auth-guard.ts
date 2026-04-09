@@ -6,8 +6,19 @@ import { checkRateLimit } from "@/lib/rate-limit";
 
 /** Auth is optional in dev when no OAuth providers are configured */
 function authConfigured(): boolean {
-  return !!(process.env.AUTH_GITHUB_ID || process.env.AUTH_GOOGLE_ID);
+  const configured = !!(process.env.AUTH_GITHUB_ID || process.env.AUTH_GOOGLE_ID);
+  if (!configured && !authWarned) {
+    authWarned = true;
+    console.warn(
+      "[SECURITY] No OAuth providers configured (AUTH_GITHUB_ID / AUTH_GOOGLE_ID). " +
+      "Authentication is DISABLED. All routes are publicly accessible. " +
+      "This is expected in development but must not reach production.",
+    );
+  }
+  return configured;
 }
+
+let authWarned = false;
 
 // ---------------------------------------------------------------------------
 // Page guards (redirect on failure)

@@ -8,7 +8,6 @@ Usage:
 
 from __future__ import annotations
 
-import asyncio
 from collections.abc import AsyncGenerator
 from datetime import date
 
@@ -16,6 +15,7 @@ import httpx
 import structlog
 from lxml import etree
 
+from pipeline.http_retry import request_with_retry
 from pipeline.models import SourceServer
 
 log = structlog.get_logger()
@@ -146,38 +146,16 @@ class PubmedClient:
         if self._client is None:
             raise RuntimeError("Use PubmedClient as async context manager")
 
-        for attempt in range(1, self.max_retries + 1):
-            await asyncio.sleep(self.request_delay)
-            try:
-                resp = await self._client.get(url, params=params, timeout=60.0)
-                if resp.status_code == 200:
-                    return resp
-                if resp.status_code in (429, 503):
-                    backoff = min(2**attempt, 30)
-                    log.warning(
-                        "rate_limited",
-                        source="pubmed",
-                        status=resp.status_code,
-                        attempt=attempt,
-                        backoff=backoff,
-                    )
-                    await asyncio.sleep(backoff)
-                    continue
-                resp.raise_for_status()
-            except (httpx.TimeoutException, httpx.RemoteProtocolError) as exc:
-                if attempt == self.max_retries:
-                    raise
-                backoff = min(2**attempt, 30)
-                log.warning(
-                    "request_error",
-                    source="pubmed",
-                    error=str(exc),
-                    attempt=attempt,
-                    backoff=backoff,
-                )
-                await asyncio.sleep(backoff)
-
-        raise RuntimeError(f"PubMed failed after {self.max_retries} retries: {url}")
+        return await request_with_retry(
+            self._client,
+            url,
+            params=params,
+            timeout=60.0,
+            request_delay=self.request_delay,
+            max_retries=self.max_retries,
+            retry_on=(httpx.TimeoutException, httpx.RemoteProtocolError),
+            source="pubmed",
+        )
 
     # -- XML parsing ---------------------------------------------------------
 
