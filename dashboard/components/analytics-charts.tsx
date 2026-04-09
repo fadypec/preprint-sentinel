@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import {
   AreaChart,
   Area,
@@ -51,7 +52,7 @@ type Props = {
   dimensionTrends: DimensionTrendData;
 };
 
-export function AnalyticsCharts({
+export const AnalyticsCharts = memo(function AnalyticsCharts({
   papersOverTime,
   topInstitutions,
   topCategories,
@@ -211,4 +212,4 @@ export function AnalyticsCharts({
       </Card>
     </div>
   );
-}
+});
