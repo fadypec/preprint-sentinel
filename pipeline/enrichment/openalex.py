@@ -125,6 +125,7 @@ class OpenAlexClient:
         url = f"{BASE_URL}/works"
         params = {"filter": f"doi:{doi}", "mailto": self.email}
 
+        assert self._client is not None
         resp = await request_with_retry(
             self._client,
             url,
@@ -146,6 +147,7 @@ class OpenAlexClient:
         url = f"{BASE_URL}/authors/{author_id}"
         params = {"mailto": self.email}
         try:
+            assert self._client is not None
             resp = await request_with_retry(
                 self._client,
                 url,

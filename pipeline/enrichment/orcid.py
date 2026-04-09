@@ -72,6 +72,7 @@ class OrcidClient:
         url = f"{BASE_URL}/search/"
         params = {"q": query, "rows": 1}
 
+        assert self._client is not None
         resp = await request_with_retry(
             self._client,
             url,
@@ -81,6 +82,7 @@ class OrcidClient:
             max_retries=self.max_retries,
             source="orcid",
         )
+        assert resp is not None  # none_on_404 not set
         data = resp.json()
         results = data.get("result", [])
         if not results:
@@ -92,6 +94,7 @@ class OrcidClient:
         """Fetch the full ORCID record. Returns None on 404."""
         url = f"{BASE_URL}/{orcid_id}/record"
 
+        assert self._client is not None
         resp = await request_with_retry(
             self._client,
             url,

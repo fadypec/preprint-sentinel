@@ -83,4 +83,4 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     """Return a cached Settings singleton."""
-    return Settings()
+    return Settings()  # type: ignore[call-arg]  # pydantic loads from env

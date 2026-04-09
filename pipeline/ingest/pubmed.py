@@ -146,7 +146,7 @@ class PubmedClient:
         if self._client is None:
             raise RuntimeError("Use PubmedClient as async context manager")
 
-        return await request_with_retry(
+        resp = await request_with_retry(
             self._client,
             url,
             params=params,
@@ -156,6 +156,8 @@ class PubmedClient:
             retry_on=(httpx.TimeoutException, httpx.RemoteProtocolError),
             source="pubmed",
         )
+        assert resp is not None  # none_on_404 not set, so always Response or raise
+        return resp
 
     # -- XML parsing ---------------------------------------------------------
 

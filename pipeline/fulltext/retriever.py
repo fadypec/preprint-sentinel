@@ -228,7 +228,7 @@ async def _try_europepmc(http: httpx.AsyncClient, doi: str, delay: float) -> tup
     """Source 2: Europe PMC full text XML."""
     # First, find the Europe PMC source/id for this DOI
     search_url = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
-    params = {"query": f"DOI:{doi}", "format": "json", "resultType": "core", "pageSize": 1}
+    params: dict[str, str | int] = {"query": f"DOI:{doi}", "format": "json", "resultType": "core", "pageSize": 1}
     try:
         await asyncio.sleep(delay)
         resp = await http.get(search_url, params=params, timeout=30.0)
@@ -305,7 +305,7 @@ def _extract_from_pdf(pdf_bytes: bytes, doi: str) -> tuple[str, str] | None:
     """Extract text from PDF bytes and identify the methods section."""
     try:
         doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
-        pages = [page.get_text() for page in doc]
+        pages = [page.get_text() for page in doc]  # type: ignore[attr-defined]
         doc.close()
 
         full_text = "\n".join(pages)

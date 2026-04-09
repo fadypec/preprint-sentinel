@@ -95,6 +95,7 @@ class EuropepmcClient:
             max_retries=self.max_retries,
             source="europepmc",
         )
+        assert resp is not None  # none_on_404 not set, so always Response or raise
         return resp.json()
 
     # -- Internal ------------------------------------------------------------

@@ -35,6 +35,8 @@ jobs:
         run: ruff check pipeline/ tests/
       - name: Format check (ruff)
         run: ruff format --check pipeline/ tests/
+      - name: Type check (mypy)
+        run: mypy pipeline/
       - name: Run tests
         env:
           DATABASE_URL: postgresql+asyncpg://durc:test@localhost:5432/durc_triage

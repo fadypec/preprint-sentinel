@@ -122,7 +122,7 @@ class DedupEngine:
         """Tier 1: exact DOI match via indexed lookup."""
         clause = Paper.doi == doi
         if exclude_id is not None:
-            clause = clause & (Paper.id != exclude_id)
+            clause = clause & (Paper.id != exclude_id)  # type: ignore[assignment]
         stmt = select(Paper.id).where(clause).limit(1)
         result = await self._session.execute(stmt)
         row = result.scalar_one_or_none()
@@ -157,7 +157,7 @@ class DedupEngine:
         # the entire date window into memory (can be tens of thousands of rows).
         clause = Paper.posted_date.between(date_from, date_to)
         if exclude_id is not None:
-            clause = clause & (Paper.id != exclude_id)
+            clause = clause & (Paper.id != exclude_id)  # type: ignore[assignment]
         stmt = select(Paper.id, Paper.title, Paper.authors).where(clause)
         result = await self._session.stream(stmt)
 

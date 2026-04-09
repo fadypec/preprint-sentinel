@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
+import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Sidebar } from "@/components/sidebar";
@@ -41,6 +42,7 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const nonce = (await headers()).get("x-nonce") ?? "";
   const session = authConfigured() ? await auth() : null;
   const showDashboard = session || !authConfigured();
   const pipelineStatus = showDashboard ? await getPipelineStatusSafe() : null;
@@ -52,7 +54,7 @@ export default async function RootLayout({
     return (
       <html lang="en" suppressHydrationWarning className={fontClasses}>
         <body>
-          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem nonce={nonce}>
             <NuqsAdapter>
               {children}
             </NuqsAdapter>
@@ -65,7 +67,7 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning className={fontClasses}>
       <body>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem nonce={nonce}>
           <NuqsAdapter>
             <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:bg-blue-600 focus:px-4 focus:py-2 focus:text-white">
               Skip to main content

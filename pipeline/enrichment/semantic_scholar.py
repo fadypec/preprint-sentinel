@@ -92,6 +92,7 @@ class SemanticScholarClient:
             "fields": "title,tldr,citationCount,influentialCitationCount,authors",
         }
 
+        assert self._client is not None
         resp = await request_with_retry(
             self._client,
             url,
@@ -111,6 +112,7 @@ class SemanticScholarClient:
         url = f"{BASE_URL}/author/{author_id}"
         params = {"fields": "name,hIndex,citationCount,paperCount"}
         try:
+            assert self._client is not None
             resp = await request_with_retry(
                 self._client,
                 url,

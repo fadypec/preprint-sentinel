@@ -94,6 +94,7 @@ class BiorxivClient:
             retry_on=(httpx.TimeoutException, httpx.RemoteProtocolError),
             source=self.server,
         )
+        assert resp is not None  # none_on_404 not set, so always Response or raise
         return resp.json()
 
     def _normalise(self, raw: dict) -> dict:

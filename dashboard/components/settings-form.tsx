@@ -70,10 +70,27 @@ export function SettingsForm({ initialSettings }: Props) {
   });
   const [isPending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
 
   function update<K extends keyof SettingsData>(key: K, value: SettingsData[K]) {
     setSettings((prev) => ({ ...prev, [key]: value }));
     setSaved(false);
+  }
+
+  async function testAlert(channel: "slack" | "email") {
+    setTestResult(null);
+    const res = await fetch("/api/alerts/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ channel }),
+    });
+    const data = await res.json();
+    setTestResult(
+      data.ok
+        ? `${channel} test sent!`
+        : `${channel} failed: ${data.error}`,
+    );
+    setTimeout(() => setTestResult(null), 5000);
   }
 
   function save() {
@@ -296,6 +313,38 @@ export function SettingsForm({ initialSettings }: Props) {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+          <div className="flex items-center gap-2 pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              type="button"
+              disabled={
+                isPending ||
+                !settings.alert_slack_webhook ||
+                settings.alert_slack_webhook === "••••••••"
+              }
+              onClick={() => testAlert("slack")}
+            >
+              Test Slack
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              type="button"
+              disabled={isPending || !settings.alert_email_recipients}
+              onClick={() => testAlert("email")}
+            >
+              Test Email
+            </Button>
+            {testResult && (
+              <span
+                className={`text-sm ${testResult.includes("failed") ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}
+                aria-live="polite"
+              >
+                {testResult}
+              </span>
+            )}
           </div>
         </div>
       </Card>

@@ -37,15 +37,15 @@ Based on comprehensive codebase audit conducted 2026-04-09 (see `2026-04-09_AUDI
 - [ ] **#10** Known-case regression test suite — validate triage against ground-truth DURC papers (deferred)
 - [x] **#13** Dimension-level filtering UI — let analysts filter by specific risk dimension scores
 
+### Batch 3 — Security and alerting
+
+- [x] **#7** CSP nonces for script-src (replace `unsafe-inline`) — per-request nonce via proxy.ts, `strict-dynamic`
+- [x] **#12** Alert system: email digests (daily/weekly) + Slack webhook for critical-tier papers
+- [x] **#17** Pre-commit hooks (ruff lint + format) and mypy type checking in CI
+
 ---
 
 ## Upcoming
-
-### Batch 3 — Security and alerting
-
-- [ ] **#7** CSP nonces for script-src (replace `unsafe-inline`)
-- [ ] **#12** Alert system: email digests (daily/weekly) + Slack webhook for critical-tier papers
-- [ ] **#17** Pre-commit hooks (ruff lint + format) and mypy type checking in CI
 
 ### Batch 4 — Coverage expansion
 
