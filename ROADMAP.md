@@ -26,15 +26,10 @@ Based on comprehensive codebase audit conducted 2026-04-09 (see `2026-04-09_AUDI
 - [x] JSON parsing bug fix — recovered 54/65 corrupted papers
 - [x] Data corruption prevention system (validation, monitoring)
 
----
-
-## In Progress
-
 ### Batch 2 — Short-term hardening
 
 - [x] **#11** Auth-disabled warning logging — prevent silent auth bypass in production
 - [x] **#18** Extract shared retry utility — deduplicate retry/backoff logic across 6+ API clients
-- [ ] **#10** Known-case regression test suite — validate triage against ground-truth DURC papers (deferred)
 - [x] **#13** Dimension-level filtering UI — let analysts filter by specific risk dimension scores
 
 ### Batch 3 — Security and alerting
@@ -42,6 +37,12 @@ Based on comprehensive codebase audit conducted 2026-04-09 (see `2026-04-09_AUDI
 - [x] **#7** CSP nonces for script-src (replace `unsafe-inline`) — per-request nonce via proxy.ts, `strict-dynamic`
 - [x] **#12** Alert system: email digests (daily/weekly) + Slack webhook for critical-tier papers
 - [x] **#17** Pre-commit hooks (ruff lint + format) and mypy type checking in CI
+
+---
+
+## Deferred
+
+- [ ] **#10** Known-case regression test suite — validate triage against ground-truth DURC papers (blocked by LLM safety guardrails rejecting synthetic DURC content in test fixtures)
 
 ---
 
