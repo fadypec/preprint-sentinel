@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom"
+      xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/"
+      xmlns:arxiv="http://arxiv.org/schemas/atom">
+  <title>ArXiv Query: cat:q-bio*</title>
+  <id>http://arxiv.org/api/query</id>
+  <opensearch:totalResults>2</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <opensearch:itemsPerPage>100</opensearch:itemsPerPage>
+  <entry>
+    <id>http://arxiv.org/abs/2026.12345v1</id>
+    <title>Novel CRISPR-Based Gene Drive
+  in Anopheles Mosquitoes</title>
+    <summary>We describe a self-propagating gene drive system
+  targeting malaria vectors using a dual-gRNA construct.</summary>
+    <author><name>Alice Smith</name></author>
+    <author><name>Bob Jones</name></author>
+    <published>2026-03-15T00:00:00Z</published>
+    <updated>2026-03-15T12:00:00Z</updated>
+    <link href="http://arxiv.org/abs/2026.12345v1" rel="alternate" type="text/html"/>
+    <link href="http://arxiv.org/pdf/2026.12345v1" rel="related" type="application/pdf" title="pdf"/>
+    <arxiv:primary_category xmlns:arxiv="http://arxiv.org/schemas/atom" term="q-bio.GN"/>
+    <category term="q-bio.GN"/>
+    <category term="q-bio.PE"/>
+    <arxiv:doi xmlns:arxiv="http://arxiv.org/schemas/atom">10.1234/example.2026</arxiv:doi>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2026.67890v2</id>
+    <title>Protein Design via Diffusion Models for Therapeutic Enzymes</title>
+    <summary>We present a diffusion-based approach to de novo protein design optimised for catalytic activity.</summary>
+    <author><name>Carol Zhang</name></author>
+    <published>2026-03-16T00:00:00Z</published>
+    <updated>2026-03-17T09:00:00Z</updated>
+    <link href="http://arxiv.org/abs/2026.67890v2" rel="alternate" type="text/html"/>
+    <link href="http://arxiv.org/pdf/2026.67890v2" rel="related" type="application/pdf" title="pdf"/>
+    <arxiv:primary_category xmlns:arxiv="http://arxiv.org/schemas/atom" term="q-bio.BM"/>
+    <category term="q-bio.BM"/>
+    <category term="cs.AI"/>
+  </entry>
+</feed>
