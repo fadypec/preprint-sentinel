@@ -31,7 +31,7 @@ class TestRunDailyPipeline:
         async def mock_fulltext(session, papers, settings):
             call_order.append("fulltext")
 
-        async def mock_methods(session, llm_client, papers, use_batch, model):
+        async def mock_methods(session, llm_client, papers, use_batch, model, fallback_models=None):
             call_order.append("methods_analysis")
 
         async def mock_enrich(session, papers, settings):
@@ -62,6 +62,7 @@ class TestRunDailyPipeline:
         mock_settings.ncbi_api_key = ""
         mock_settings.pubmed_query_mode = "all"
         mock_settings.pubmed_mesh_query = ""
+        mock_settings.stage2_fallback_models = "claude-opus-4-6"
 
         with (
             patch("pipeline.orchestrator._run_ingest", mock_ingest),

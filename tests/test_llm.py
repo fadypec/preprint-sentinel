@@ -260,6 +260,37 @@ class TestCallTool:
         assert result.tool_input == {}
 
 
+    async def test_call_tool_refusal_returns_specific_error(self):
+        from pipeline.triage.llm import LLMClient
+
+        msg = Message(
+            id="msg_test",
+            content=[],
+            model="claude-sonnet-4-6",
+            role="assistant",
+            stop_reason="refusal",
+            stop_sequence=None,
+            type="message",
+            usage=Usage(input_tokens=500, output_tokens=2),
+        )
+
+        with patch("pipeline.triage.llm.AsyncAnthropic") as MockAnthropic:
+            mock_client = AsyncMock()
+            mock_client.messages.create = AsyncMock(return_value=msg)
+            MockAnthropic.return_value = mock_client
+
+            llm = LLMClient(api_key="test-key")
+            result = await llm.call_tool(
+                model="claude-sonnet-4-6",
+                system_prompt="test",
+                user_message="test",
+                tool=SAMPLE_TOOL,
+            )
+
+        assert result.error == "Model refused to process this content"
+        assert result.tool_input == {}
+
+
 class TestBatchMode:
     """Tests for LLMClient.submit_batch and collect_batch."""
 

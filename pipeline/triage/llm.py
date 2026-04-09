@@ -65,13 +65,14 @@ class LLMClient:
         user_message: str,
         tool: dict,
         max_retries: int = 3,
+        max_tokens: int = 4096,
     ) -> LLMResult:
         """Make a single tool-use call with retry on transient errors."""
         for attempt in range(1, max_retries + 1):
             try:
                 response = await self._anthropic.messages.create(
                     model=model,
-                    max_tokens=1024,
+                    max_tokens=max_tokens,
                     system=system_prompt,
                     tools=[tool],
                     tool_choice={"type": "any"},
@@ -89,13 +90,17 @@ class LLMClient:
                     None,
                 )
                 if tool_block is None:
+                    if response.stop_reason == "refusal":
+                        error_msg = "Model refused to process this content"
+                    else:
+                        error_msg = "No tool_use block in response"
                     return LLMResult(
                         tool_input={},
                         raw_response=raw,
                         input_tokens=in_tok,
                         output_tokens=out_tok,
                         cost_estimate_usd=cost,
-                        error="No tool_use block in response",
+                        error=error_msg,
                     )
 
                 return LLMResult(
@@ -170,6 +175,7 @@ class LLMClient:
         system_prompt: str,
         messages: list[tuple[str, str]],
         tool: dict,
+        max_tokens: int = 4096,
     ) -> str:
         """Submit a message batch. Returns batch_id."""
         requests = [
@@ -177,7 +183,7 @@ class LLMClient:
                 "custom_id": custom_id,
                 "params": {
                     "model": model,
-                    "max_tokens": 1024,
+                    "max_tokens": max_tokens,
                     "system": system_prompt,
                     "tools": [tool],
                     "tool_choice": {"type": "any"},

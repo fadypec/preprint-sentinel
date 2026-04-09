@@ -52,9 +52,14 @@ _TIER_ORDER = {
 
 
 def _tier_meets_threshold(tier: RiskTier | None, min_tier: str) -> bool:
-    """Check if a paper's risk tier meets or exceeds the configured minimum."""
+    """Check if a paper's risk tier meets or exceeds the configured minimum.
+
+    Papers with no risk tier (e.g. methods analysis failed/refused) always
+    meet the threshold so they get Opus review rather than being silently
+    auto-advanced with no assessment.
+    """
     if tier is None:
-        return False
+        return True
     tier_val = _TIER_ORDER.get(tier.value, 0)
     min_val = _TIER_ORDER.get(min_tier, 0)
     return tier_val >= min_val
@@ -164,6 +169,10 @@ async def run_adjudication(
                 paper_id=str(paper.id),
                 error=llm_result.error,
             )
+            # Advance paper so it doesn't retry forever; keep existing risk_tier from Stage 4
+            paper.stage3_result = {"_error": llm_result.error}
+            paper.pipeline_stage = PipelineStage.ADJUDICATED
+            paper.needs_manual_review = True
         else:
             validation_err = _validate_result(llm_result.tool_input)
             if validation_err:
@@ -172,6 +181,9 @@ async def run_adjudication(
                     paper_id=str(paper.id),
                     error=validation_err,
                 )
+                paper.stage3_result = {"_error": validation_err, **llm_result.tool_input}
+                paper.pipeline_stage = PipelineStage.ADJUDICATED
+                paper.needs_manual_review = True
             else:
                 _apply_result(paper, llm_result.tool_input)
                 adjudicated_count += 1

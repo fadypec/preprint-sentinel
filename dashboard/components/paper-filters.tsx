@@ -43,6 +43,7 @@ type PaperFiltersProps = {
   source: string;
   status: string;
   q: string;
+  needsReview: string;
 };
 
 /** Build a clean URL with only non-default filter params. */
@@ -51,6 +52,7 @@ function buildUrl(filters: {
   source: string;
   status: string;
   q: string;
+  needsReview: string;
 }): string {
   const p = new URLSearchParams();
   if (filters.tier && filters.tier !== "all") p.set("tier", filters.tier);
@@ -59,6 +61,7 @@ function buildUrl(filters: {
   if (filters.status && filters.status !== "all")
     p.set("status", filters.status);
   if (filters.q) p.set("q", filters.q);
+  if (filters.needsReview === "true") p.set("needs_review", "true");
   const qs = p.toString();
   return qs ? `/?${qs}` : "/";
 }
@@ -74,7 +77,7 @@ function buildUrl(filters: {
  * parse, independent of React hydration). Falls back to the Go button
  * if JS never loads.
  */
-export function PaperFilters({ tier, source, status, q }: PaperFiltersProps) {
+export function PaperFilters({ tier, source, status, q, needsReview }: PaperFiltersProps) {
   const selectedTiers = new Set(
     !tier || tier === "all" ? [] : tier.split(","),
   );
@@ -89,6 +92,7 @@ export function PaperFilters({ tier, source, status, q }: PaperFiltersProps) {
       source,
       status,
       q,
+      needsReview,
     });
   }
 
@@ -96,7 +100,8 @@ export function PaperFilters({ tier, source, status, q }: PaperFiltersProps) {
     selectedTiers.size > 0 ||
     (source !== "all" && source !== "") ||
     (status !== "all" && status !== "") ||
-    q !== "";
+    q !== "" ||
+    needsReview === "true";
 
   const tierValue =
     selectedTiers.size > 0 ? [...selectedTiers].join(",") : "";
@@ -132,6 +137,27 @@ export function PaperFilters({ tier, source, status, q }: PaperFiltersProps) {
         })}
       </div>
 
+      {/* Needs Manual Review toggle — plain <a> link like tier chips */}
+      <a
+        href={buildUrl({
+          tier,
+          source,
+          status,
+          q,
+          needsReview: needsReview === "true" ? "" : "true",
+        })}
+        role="button"
+        aria-pressed={needsReview === "true"}
+        className={cn(
+          "rounded-md border px-2.5 py-1 text-xs font-medium no-underline transition-colors",
+          needsReview === "true"
+            ? "bg-amber-500 text-white border-amber-500 dark:bg-amber-600 dark:border-amber-600"
+            : "border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-900/30",
+        )}
+      >
+        Needs Review
+      </a>
+
       {/* Source / Status / Search — HTML form, no React hydration needed */}
       <form
         method="GET"
@@ -139,9 +165,12 @@ export function PaperFilters({ tier, source, status, q }: PaperFiltersProps) {
         className="contents"
         data-filter-form=""
       >
-        {/* Preserve tier selection when form submits */}
+        {/* Preserve tier and needs_review selection when form submits */}
         {tierValue && (
           <input type="hidden" name="tier" value={tierValue} />
+        )}
+        {needsReview === "true" && (
+          <input type="hidden" name="needs_review" value="true" />
         )}
 
         <select

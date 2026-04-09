@@ -170,6 +170,7 @@ class Paper(Base):
         default=ReviewStatus.UNREVIEWED,
         index=True,
     )
+    needs_manual_review: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     analyst_notes: Mapped[str | None] = mapped_column(Text)
 
     # Dedup

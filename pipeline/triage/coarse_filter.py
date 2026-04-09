@@ -99,7 +99,7 @@ async def _run_sync(
     papers: list[Paper],
     model: str,
     threshold: float,
-    concurrency: int = 10,
+    concurrency: int = 30,
 ) -> list[Paper]:
     """Process papers concurrently with a semaphore."""
     passed: list[Paper] = []
@@ -109,14 +109,23 @@ async def _run_sync(
 
     async def _classify(paper: Paper) -> None:
         nonlocal processed
-        async with sem:
-            user_msg = format_coarse_filter_message(paper.title, paper.abstract or "")
-            llm_result = await llm_client.call_tool(
-                model=model,
-                system_prompt=COARSE_FILTER_SYSTEM_PROMPT,
-                user_message=user_msg,
-                tool=CLASSIFY_PAPER_TOOL,
+        try:
+            async with sem:
+                user_msg = format_coarse_filter_message(paper.title, paper.abstract or "")
+                llm_result = await llm_client.call_tool(
+                    model=model,
+                    system_prompt=COARSE_FILTER_SYSTEM_PROMPT,
+                    user_message=user_msg,
+                    tool=CLASSIFY_PAPER_TOOL,
+                )
+        except Exception as exc:
+            log.warning(
+                "coarse_filter_exception",
+                paper_id=str(paper.id),
+                error=f"{type(exc).__name__}: {exc}",
             )
+            processed += 1
+            return
 
         _create_assessment_log(session, paper, llm_result, model, user_msg)
 

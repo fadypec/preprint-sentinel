@@ -48,6 +48,11 @@ def main() -> None:
         default=None,
         help="PubMed query mode. Overrides config setting.",
     )
+    parser.add_argument(
+        "--skip-backlog",
+        action="store_true",
+        help="Only process papers within the date range; skip backlog from previous runs.",
+    )
     args = parser.parse_args()
 
     if args.schedule:
@@ -57,6 +62,7 @@ def main() -> None:
             from_date=args.from_date,
             to_date=args.to_date,
             pubmed_query_mode=args.pubmed_query_mode,
+            include_backlog=not args.skip_backlog,
         )
 
 
@@ -64,6 +70,7 @@ def _run_oneshot(
     from_date: date | None = None,
     to_date: date | None = None,
     pubmed_query_mode: str | None = None,
+    include_backlog: bool = True,
 ) -> None:
     """Execute a single pipeline run and exit."""
     from pipeline.orchestrator import run_daily_pipeline
@@ -73,6 +80,7 @@ def _run_oneshot(
         from_date=str(from_date) if from_date else "default",
         to_date=str(to_date) if to_date else "default",
         pubmed_query_mode=pubmed_query_mode or "config default",
+        include_backlog=include_backlog,
     )
     stats = asyncio.run(
         run_daily_pipeline(
@@ -80,6 +88,7 @@ def _run_oneshot(
             from_date=from_date,
             to_date=to_date,
             pubmed_query_mode_override=pubmed_query_mode,
+            include_backlog=include_backlog,
         )
     )
     log.info(

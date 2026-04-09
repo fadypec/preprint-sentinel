@@ -8,7 +8,7 @@ enabling prompt regression tracking.
 # Versions
 # ---------------------------------------------------------------------------
 
-COARSE_FILTER_VERSION = "v1.0"
+COARSE_FILTER_VERSION = "v1.1"
 METHODS_ANALYSIS_VERSION = "v1.0"
 ADJUDICATION_VERSION = "v1.0"
 
@@ -24,7 +24,8 @@ of concern (DURC) in the biological sciences.
 A paper is RELEVANT if its abstract suggests ANY of the following:
 - Enhancement of pathogen transmissibility, virulence, host range, or immune evasion
 - Reconstruction or synthesis of dangerous pathogens (select agents, PPPs, or novel threats)
-- Novel methods for producing biological toxins or bioactive compounds with harm potential
+- Novel methods for producing biological toxins, venoms, or biologically-derived compounds \
+with harm potential (NOT illicit drugs or purely synthetic chemicals)
 - Techniques that could lower barriers to creating biological weapons (simplified reverse \
 genetics, benchtop synthesis protocols, democratised access to dangerous capabilities)
 - Gain-of-function research on potential pandemic pathogens
@@ -46,6 +47,15 @@ enhanced pathogens)
 with crossover potential)
 - Pure computational biology, bioinformatics methods papers (unless specifically applied \
 to the above)
+- Pure synthetic/organic chemistry, forensic chemistry, or analytical chemistry not \
+involving biological agents, toxins, or pathogens
+- Purely chemical synthesis of illicit drugs, controlled substance characterisation, or \
+pharmaceutical chemistry where no biological system (microorganism, engineered cell, \
+enzyme) is involved in production — these may be dual-use concerns but are outside the \
+scope of biological DURC. However, biosynthesis of controlled substances using engineered \
+organisms IS relevant
+- Explosives, energetic materials, radiological, nuclear, or chemical weapons research — \
+these are security concerns but not biological DURC
 
 You MUST err on the side of flagging. If there is ANY ambiguity, flag it as RELEVANT.
 

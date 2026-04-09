@@ -27,11 +27,9 @@ function getCellColor(status: string | undefined): string {
 function getCellTitle(dateStr: string, status: string | undefined): string {
   switch (status) {
     case "full":
-      return `${dateStr}: Full ingest`;
+      return `${dateStr}: Preprints + PubMed`;
     case "mesh":
-      return `${dateStr}: MeSH filtered`;
-    case "error":
-      return `${dateStr}: Ingest error`;
+      return `${dateStr}: Preprints only`;
     default:
       return `${dateStr}: No data`;
   }
@@ -168,15 +166,11 @@ export function CoverageHeatmap() {
         </div>
         <div className="flex items-center gap-1">
           <div className="h-[11px] w-[11px] rounded-[2px] bg-amber-500" />
-          <span className="text-[10px] text-slate-500 dark:text-slate-400">MeSH</span>
+          <span className="text-[10px] text-slate-500 dark:text-slate-400">Preprints</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="h-[11px] w-[11px] rounded-[2px] bg-green-500" />
-          <span className="text-[10px] text-slate-500 dark:text-slate-400">Full</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="h-[11px] w-[11px] rounded-[2px] bg-red-500" />
-          <span className="text-[10px] text-slate-500 dark:text-slate-400">Error</span>
+          <span className="text-[10px] text-slate-500 dark:text-slate-400">+ PubMed</span>
         </div>
       </div>
     </div>

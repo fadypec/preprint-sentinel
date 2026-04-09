@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 export async function triggerPipeline(
   fromDate: string,
   toDate: string,
+  includeBacklog: boolean = true,
 ): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
   // Check if already running
   const running = await prisma.pipelineRun.findFirst({
@@ -39,6 +40,7 @@ export async function triggerPipeline(
   if (fromDate) args.push("--from-date", fromDate);
   if (toDate) args.push("--to-date", toDate);
   args.push("--pubmed-query-mode", pubmedMode);
+  if (!includeBacklog) args.push("--skip-backlog");
 
   const projectRoot = path.resolve(process.cwd(), "..");
   const pythonCmd =
@@ -85,9 +87,10 @@ export async function triggerPipeline(
   }
 
   const modeLabel = pubmedMode === "all" ? "Full" : "MeSH";
+  const backlogLabel = includeBacklog ? "" : ", no backlog";
   return {
     ok: true,
-    message: `Pipeline started (${fromDate || "2 days ago"} \u2192 ${toDate || "today"}, PubMed: ${modeLabel})`,
+    message: `Pipeline started (${fromDate || "2 days ago"} \u2192 ${toDate || "today"}, PubMed: ${modeLabel}${backlogLabel})`,
   };
 }
 

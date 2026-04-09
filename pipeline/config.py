@@ -38,6 +38,11 @@ class Settings(BaseSettings):
     daily_run_hour: int = 6
     use_batch_api: bool = False
 
+    # Comma-separated fallback models for methods analysis when the primary
+    # model refuses to process a paper (e.g. safety refusals on biosecurity
+    # content).  Tried in order after the primary stage2_model.
+    stage2_fallback_models: str = "claude-opus-4-6"
+
     # Rate limits (seconds between requests)
     biorxiv_request_delay: float = 1.0
     pubmed_request_delay: float = 0.1

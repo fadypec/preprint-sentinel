@@ -105,6 +105,7 @@ model Paper {
   recommendedAction        RecommendedAction?  @map("recommended_action")
   aggregateScore           Int?                @map("aggregate_score")
   reviewStatus             ReviewStatus        @default(unreviewed) @map("review_status")
+  needsManualReview        Boolean             @default(false) @map("needs_manual_review")
   analystNotes             String?             @map("analyst_notes")
   isDuplicateOf            String?             @map("is_duplicate_of") @db.Uuid
   createdAt                DateTime            @default(now()) @map("created_at") @db.Timestamptz
@@ -119,6 +120,7 @@ model Paper {
   @@index([pipelineStage])
   @@index([riskTier])
   @@index([reviewStatus])
+  @@index([needsManualReview])
   @@index([coarseFilterPassed])
   @@index([isDuplicateOf])
   @@index([postedDate, pipelineStage], map: "ix_papers_posted_date_stage")

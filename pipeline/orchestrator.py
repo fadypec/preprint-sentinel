@@ -66,6 +66,7 @@ async def run_daily_pipeline(
     from_date: date | None = None,
     to_date: date | None = None,
     pubmed_query_mode_override: str | None = None,
+    include_backlog: bool = True,
 ) -> PipelineRunStats:
     """Run the complete daily triage pipeline.
 
@@ -74,6 +75,8 @@ async def run_daily_pipeline(
         session_factory: SQLAlchemy async session factory. If None, creates one.
         trigger: "scheduled" or "manual" -- recorded in PipelineRun.
         pubmed_query_mode_override: If set, overrides settings.pubmed_query_mode.
+        include_backlog: If False, only process papers with posted_date within
+            the run's date range — skip backlog from previous runs.
     """
     if settings is None:
         from pipeline.config import get_settings
@@ -140,7 +143,20 @@ async def run_daily_pipeline(
         rec.to_date = to_date
         await s.commit()
 
-    log.info("pipeline_started", from_date=str(from_date), to_date=str(to_date), trigger=trigger)
+    log.info(
+        "pipeline_started",
+        from_date=str(from_date),
+        to_date=str(to_date),
+        trigger=trigger,
+        include_backlog=include_backlog,
+    )
+
+    # When skipping backlog, restrict stage queries to the run's date range
+    def _date_filter():
+        """Return SQLAlchemy filter clauses to restrict to the run's date range."""
+        if include_backlog:
+            return []
+        return [Paper.posted_date >= from_date, Paper.posted_date <= to_date]
 
     async with session_factory() as session:
         # Stage 1: Ingest
@@ -190,7 +206,6 @@ async def run_daily_pipeline(
             stmt = select(Paper).where(
                 Paper.pipeline_stage == PipelineStage.INGESTED,
                 Paper.is_duplicate_of.is_(None),
-                Paper.posted_date >= from_date,
                 Paper.language.isnot(None),
                 Paper.language != "eng",
             )
@@ -216,7 +231,7 @@ async def run_daily_pipeline(
             stmt = select(Paper).where(
                 Paper.pipeline_stage == PipelineStage.INGESTED,
                 Paper.is_duplicate_of.is_(None),
-                Paper.posted_date >= from_date,
+                *_date_filter(),
             )
             result = await session.execute(stmt)
             ingested = result.scalars().all()
@@ -239,7 +254,7 @@ async def run_daily_pipeline(
 
             if skipped:
                 log.info("coarse_filter_skipped_empty", skipped=skipped)
-            backlog = sum(1 for p in papers_list if p.created_at < stats.started_at)
+            backlog = sum(1 for p in papers_list if p.posted_date < from_date or p.posted_date > to_date)
             if backlog:
                 stats.backlog["coarse_filter"] = backlog
             log.info("stage_starting", stage="coarse_filter", papers_to_process=len(papers_list), backlog=backlog)
@@ -273,12 +288,12 @@ async def run_daily_pipeline(
             stmt = select(Paper).where(
                 Paper.pipeline_stage == PipelineStage.COARSE_FILTERED,
                 Paper.coarse_filter_passed.is_(True),
-                Paper.posted_date >= from_date,
+                *_date_filter(),
             )
             result = await session.execute(stmt)
             coarse_passed = list(result.scalars().all())
 
-            backlog = sum(1 for p in coarse_passed if p.created_at < stats.started_at)
+            backlog = sum(1 for p in coarse_passed if p.posted_date < from_date or p.posted_date > to_date)
             if backlog:
                 stats.backlog["fulltext"] = backlog
             log.info(
@@ -309,10 +324,10 @@ async def run_daily_pipeline(
         try:
             stmt = select(Paper).where(
                 Paper.pipeline_stage == PipelineStage.FULLTEXT_RETRIEVED,
-                Paper.posted_date >= from_date,
                 Paper.full_text_retrieved.is_(True),
                 Paper.language.isnot(None),
                 Paper.language != "eng",
+                *_date_filter(),
             )
             result = await session.execute(stmt)
             non_english_ft = list(result.scalars().all())
@@ -344,12 +359,12 @@ async def run_daily_pipeline(
         try:
             stmt = select(Paper).where(
                 Paper.pipeline_stage == PipelineStage.FULLTEXT_RETRIEVED,
-                Paper.posted_date >= from_date,
+                *_date_filter(),
             )
             result = await session.execute(stmt)
             fulltext_papers = list(result.scalars().all())
 
-            backlog = sum(1 for p in fulltext_papers if p.created_at < stats.started_at)
+            backlog = sum(1 for p in fulltext_papers if p.posted_date < from_date or p.posted_date > to_date)
             if backlog:
                 stats.backlog["methods_analysis"] = backlog
             log.info(
@@ -358,14 +373,22 @@ async def run_daily_pipeline(
                 papers_to_process=len(fulltext_papers),
                 backlog=backlog,
             )
+            fallback_models = [
+                m.strip()
+                for m in settings.stage2_fallback_models.split(",")
+                if m.strip()
+            ]
             await run_methods_analysis(
                 session=session,
                 llm_client=llm_client,
                 papers=fulltext_papers,
                 use_batch=settings.use_batch_api,
                 model=settings.stage2_model,
+                fallback_models=fallback_models,
             )
-            stats.papers_methods_analysed = len(fulltext_papers)
+            stats.papers_methods_analysed = sum(
+                1 for p in fulltext_papers if p.risk_tier is not None
+            )
             await session.commit()
             await _flush_progress()
             log.info("stage_complete", stage="methods_analysis", total=len(fulltext_papers))
@@ -381,12 +404,12 @@ async def run_daily_pipeline(
         try:
             stmt = select(Paper).where(
                 Paper.pipeline_stage == PipelineStage.METHODS_ANALYSED,
-                Paper.posted_date >= from_date,
+                *_date_filter(),
             )
             result = await session.execute(stmt)
             methods_papers = list(result.scalars().all())
 
-            backlog = sum(1 for p in methods_papers if p.created_at < stats.started_at)
+            backlog = sum(1 for p in methods_papers if p.posted_date < from_date or p.posted_date > to_date)
             if backlog:
                 stats.backlog["enrichment"] = backlog
             log.info("stage_starting", stage="enrichment", papers_to_process=len(methods_papers), backlog=backlog)
@@ -412,12 +435,12 @@ async def run_daily_pipeline(
         try:
             stmt = select(Paper).where(
                 Paper.pipeline_stage == PipelineStage.METHODS_ANALYSED,
-                Paper.posted_date >= from_date,
+                *_date_filter(),
             )
             result = await session.execute(stmt)
             to_adjudicate = list(result.scalars().all())
 
-            backlog = sum(1 for p in to_adjudicate if p.created_at < stats.started_at)
+            backlog = sum(1 for p in to_adjudicate if p.posted_date < from_date or p.posted_date > to_date)
             if backlog:
                 stats.backlog["adjudication"] = backlog
             log.info("stage_starting", stage="adjudication", papers_to_process=len(to_adjudicate), backlog=backlog)
@@ -595,8 +618,9 @@ async def _run_fulltext(
     for i, (paper, result) in enumerate(fetch_results, 1):
         if result is not None:
             full_text, methods = result
-            paper.full_text_content = full_text
-            paper.methods_section = methods
+            # Strip null bytes — PostgreSQL rejects \x00 in text columns
+            paper.full_text_content = full_text.replace("\x00", "") if full_text else full_text
+            paper.methods_section = methods.replace("\x00", "") if methods else methods
             paper.full_text_retrieved = True
             retrieved += 1
         else:

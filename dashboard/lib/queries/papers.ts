@@ -22,6 +22,7 @@ export type PaperQueryParams = {
   source?: string | null;
   status?: string | null;
   search?: string | null;
+  needsReview?: string | null;
 };
 
 export type PaperQueryResult = {
@@ -123,6 +124,7 @@ function mapRawToPaper(row: Record<string, unknown>): Paper {
     recommendedAction: row.recommended_action ?? null,
     aggregateScore: row.aggregate_score ?? null,
     reviewStatus: row.review_status,
+    needsManualReview: row.needs_manual_review ?? false,
     analystNotes: row.analyst_notes ?? null,
     isDuplicateOf: row.is_duplicate_of ?? null,
     createdAt: row.created_at,
@@ -145,12 +147,13 @@ export async function queryPapers(
   const source = validSource(params.source);
   const status = validStatus(params.status);
   const search = params.search?.trim() || undefined;
+  const needsReview = params.needsReview === "true" ? true : undefined;
 
   if (search) {
-    return queryPapersFullText({ page, tiers, source, status, search });
+    return queryPapersFullText({ page, tiers, source, status, search, needsReview });
   }
 
-  return queryPapersPrisma({ page, tiers, source, status });
+  return queryPapersPrisma({ page, tiers, source, status, needsReview });
 }
 
 /** Standard Prisma query path (no full-text search). */
@@ -159,6 +162,7 @@ async function queryPapersPrisma(filters: {
   tiers?: RiskTier[];
   source?: SourceServer;
   status?: ReviewStatus;
+  needsReview?: boolean;
 }): Promise<PaperQueryResult> {
   const where: Prisma.PaperWhereInput = {
     pipelineStage: { not: PipelineStage.ingested },
@@ -169,6 +173,7 @@ async function queryPapersPrisma(filters: {
   if (filters.tiers) where.riskTier = { in: filters.tiers };
   if (filters.source) where.sourceServer = filters.source;
   if (filters.status) where.reviewStatus = filters.status;
+  if (filters.needsReview) where.needsManualReview = true;
 
   const [total, totalIngested, papers] = await Promise.all([
     prisma.paper.count({ where }),
@@ -201,6 +206,7 @@ async function queryPapersFullText(filters: {
   source?: SourceServer;
   status?: ReviewStatus;
   search: string;
+  needsReview?: boolean;
 }): Promise<PaperQueryResult> {
   const tsquery = buildSearchQuery(filters.search);
   if (!tsquery) {
@@ -226,6 +232,10 @@ async function queryPapersFullText(filters: {
     filters.status
       ? Prisma.sql`AND review_status = ${filters.status}::review_status`
       : Prisma.empty;
+  const needsReviewClause =
+    filters.needsReview
+      ? Prisma.sql`AND needs_manual_review = true`
+      : Prisma.empty;
 
   const countResult = await prisma.$queryRaw<[{ count: bigint }]>`
     SELECT COUNT(*) as count FROM papers
@@ -236,6 +246,7 @@ async function queryPapersFullText(filters: {
       ${tierClause}
       ${sourceClause}
       ${statusClause}
+      ${needsReviewClause}
   `;
   const total = Number(countResult[0].count);
 
@@ -248,6 +259,7 @@ async function queryPapersFullText(filters: {
       ${tierClause}
       ${sourceClause}
       ${statusClause}
+      ${needsReviewClause}
     ORDER BY ts_rank(search_vector, to_tsquery('english', ${tsquery})) DESC
     LIMIT ${PAGE_SIZE} OFFSET ${(filters.page - 1) * PAGE_SIZE}
   `;

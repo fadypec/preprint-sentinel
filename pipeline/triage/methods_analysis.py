@@ -3,6 +3,10 @@
 Processes papers that passed the coarse filter, assessing their methods
 section (or abstract if full text was unavailable) against a detailed
 dual-use risk rubric.
+
+Supports a cascading model fallback for refusals: if the primary model
+refuses to process a paper (common with biosecurity content), fallback
+models are tried in order before giving up.
 """
 
 from __future__ import annotations
@@ -94,12 +98,16 @@ def _apply_result(paper: Paper, tool_input: dict) -> None:
     paper.pipeline_stage = PipelineStage.METHODS_ANALYSED
 
 
+_REFUSAL_ERROR = "Model refused to process this content"
+
+
 async def run_methods_analysis(
     session: AsyncSession,
     llm_client: LLMClient,
     papers: list[Paper],
     use_batch: bool,
     model: str,
+    fallback_models: list[str] | None = None,
 ) -> None:
     """Run Stage 4 methods analysis on a list of papers."""
     if not papers:
@@ -108,7 +116,7 @@ async def run_methods_analysis(
     if use_batch:
         await _run_batch(session, llm_client, papers, model)
     else:
-        await _run_sync(session, llm_client, papers, model)
+        await _run_sync(session, llm_client, papers, model, fallback_models or [])
 
 
 async def _run_sync(
@@ -116,25 +124,54 @@ async def _run_sync(
     llm_client: LLMClient,
     papers: list[Paper],
     model: str,
+    fallback_models: list[str],
 ) -> None:
-    """Process papers one at a time."""
+    """Process papers one at a time, with cascading model fallback on refusal."""
     total = len(papers)
+    models_chain = [model] + fallback_models
+    escalated = 0
+
     for i, paper in enumerate(papers, 1):
         user_msg = format_methods_analysis_message(
             paper.title, paper.abstract or "", methods=paper.methods_section
         )
 
-        llm_result = await llm_client.call_tool(
-            model=model,
-            system_prompt=METHODS_ANALYSIS_SYSTEM_PROMPT,
-            user_message=user_msg,
-            tool=ASSESS_DURC_RISK_TOOL,
-        )
+        # Try each model in the chain; stop on first non-refusal
+        llm_result: LLMResult | None = None
+        used_model = model
+        for m in models_chain:
+            llm_result = await llm_client.call_tool(
+                model=m,
+                system_prompt=METHODS_ANALYSIS_SYSTEM_PROMPT,
+                user_message=user_msg,
+                tool=ASSESS_DURC_RISK_TOOL,
+            )
+            used_model = m
+            if llm_result.error != _REFUSAL_ERROR:
+                break
+            # Log the refusal and try next model
+            _create_assessment_log(session, paper, llm_result, m, user_msg)
+            next_idx = models_chain.index(m) + 1
+            if next_idx < len(models_chain):
+                log.info(
+                    "methods_analysis_refusal_escalating",
+                    paper_id=str(paper.id),
+                    refused_by=m,
+                    escalating_to=models_chain[next_idx],
+                )
+                escalated += 1
 
-        _create_assessment_log(session, paper, llm_result, model, user_msg)
+        assert llm_result is not None  # models_chain is always non-empty
+
+        # Log the final attempt (skip if already logged as refusal above)
+        if llm_result.error != _REFUSAL_ERROR or used_model == models_chain[-1]:
+            _create_assessment_log(session, paper, llm_result, used_model, user_msg)
 
         if llm_result.error:
-            log.warning("methods_analysis_error", paper_id=str(paper.id), error=llm_result.error)
+            log.warning("methods_analysis_error", paper_id=str(paper.id), error=llm_result.error, model=used_model)
+            paper.stage2_result = {"_error": llm_result.error, "_model": used_model}
+            paper.pipeline_stage = PipelineStage.METHODS_ANALYSED
+            paper.needs_manual_review = True
         else:
             validation_err = _validate_result(llm_result.tool_input)
             if validation_err:
@@ -143,13 +180,19 @@ async def _run_sync(
                     paper_id=str(paper.id),
                     error=validation_err,
                 )
+                paper.stage2_result = {"_error": validation_err, "_model": used_model, **llm_result.tool_input}
+                paper.pipeline_stage = PipelineStage.METHODS_ANALYSED
+                paper.needs_manual_review = True
             else:
                 _apply_result(paper, llm_result.tool_input)
+                if used_model != model:
+                    paper.stage2_result["_model"] = used_model
                 log.info(
                     "methods_analysis_result",
                     paper_id=str(paper.id),
                     risk_tier=paper.risk_tier,
                     aggregate_score=paper.aggregate_score,
+                    model=used_model,
                     progress=f"{i}/{total}",
                 )
         await session.flush()
@@ -157,7 +200,7 @@ async def _run_sync(
         if i % 10 == 0 or i == total:
             log.info("methods_analysis_progress", processed=i, total=total)
 
-    log.info("methods_analysis_sync_complete", total=total)
+    log.info("methods_analysis_sync_complete", total=total, escalated=escalated)
 
 
 async def _run_batch(
@@ -212,6 +255,8 @@ async def _run_batch(
 
         if llm_result.error:
             log.warning("methods_analysis_error", paper_id=custom_id, error=llm_result.error)
+            paper.stage2_result = {"_error": llm_result.error}
+            paper.pipeline_stage = PipelineStage.METHODS_ANALYSED
             continue
 
         validation_err = _validate_result(llm_result.tool_input)
@@ -221,6 +266,8 @@ async def _run_batch(
                 paper_id=custom_id,
                 error=validation_err,
             )
+            paper.stage2_result = {"_error": validation_err, **llm_result.tool_input}
+            paper.pipeline_stage = PipelineStage.METHODS_ANALYSED
             continue
 
         _apply_result(paper, llm_result.tool_input)

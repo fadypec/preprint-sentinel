@@ -19,6 +19,7 @@ type Props = {
     source?: string;
     status?: string;
     q?: string;
+    needs_review?: string;
   }>;
 };
 
@@ -42,6 +43,7 @@ export default async function DailyFeedPage({ searchParams }: Props) {
   const source = params.source;
   const status = params.status;
   const search = params.q?.trim();
+  const needsReview = params.needs_review;
 
   const { papers, total, totalIngested, totalPages } = await queryPapers({
     page,
@@ -49,9 +51,10 @@ export default async function DailyFeedPage({ searchParams }: Props) {
     source,
     status,
     search,
+    needsReview,
   });
 
-  const filterState = { tier, source, status, q: search };
+  const filterState = { tier, source, status, q: search, needsReview };
   const flaggedPct = totalIngested > 0 ? ((total / totalIngested) * 100).toFixed(1) : "0";
 
   return (
@@ -78,6 +81,7 @@ export default async function DailyFeedPage({ searchParams }: Props) {
           source={source ?? "all"}
           status={status ?? "all"}
           q={search ?? ""}
+          needsReview={needsReview ?? ""}
         />
       </div>
 

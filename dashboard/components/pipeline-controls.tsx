@@ -19,7 +19,7 @@ type ActionResult =
 
 type Props = {
   initialStatus: PipelineStatus | null;
-  triggerAction: (from: string, to: string) => Promise<ActionResult>;
+  triggerAction: (from: string, to: string, includeBacklog: boolean) => Promise<ActionResult>;
   cancelAction: () => Promise<ActionResult>;
   pubmedMode: string;
   togglePubmedMode: () => Promise<string>;
@@ -44,6 +44,7 @@ export function PipelineControls({
   const [success, setSuccess] = useState<string | null>(null);
   const [currentPubmedMode, setCurrentPubmedMode] = useState(initialPubmedMode);
   const [toggling, setToggling] = useState(false);
+  const [includeBacklog, setIncludeBacklog] = useState(true);
 
   // Default range: last 2 days → today
   const today = fmtDate(new Date());
@@ -58,7 +59,7 @@ export function PipelineControls({
     setError(null);
     setSuccess(null);
     try {
-      const result = await triggerAction(fromDate, toDate);
+      const result = await triggerAction(fromDate, toDate, includeBacklog);
       if (result.ok) {
         setSuccess(result.message);
         setStatus({ running: true, paused: false });
@@ -168,6 +169,28 @@ export function PipelineControls({
           {currentPubmedMode === "all"
             ? "~30K papers/day"
             : "~800 papers/day"}
+        </span>
+      </div>
+
+      {/* Include backlog */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+          Backlog:
+        </span>
+        <button
+          type="button"
+          onClick={() => setIncludeBacklog((v) => !v)}
+          disabled={pending || isRunning}
+          className="cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <Badge variant={includeBacklog ? "default" : "outline"}>
+            {includeBacklog ? "Include" : "Skip"}
+          </Badge>
+        </button>
+        <span className="text-[10px] text-slate-400">
+          {includeBacklog
+            ? "Process all pending papers"
+            : "Only papers in date range"}
         </span>
       </div>
 

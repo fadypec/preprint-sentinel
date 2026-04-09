@@ -151,7 +151,7 @@ function fmtBacklog(value: number, backlogKey: string, backlog: Record<string, n
   const bl = backlog?.[backlogKey] ?? 0;
   if (bl === 0) return String(value);
   const fresh = value - bl;
-  return `${value} (${fresh} new + ${bl} backlog)`;
+  return `${value} (${fresh} in range + ${bl} prior)`;
 }
 
 function RunDetail({ run, errors }: { run: PipelineRun; errors: unknown[] }) {
