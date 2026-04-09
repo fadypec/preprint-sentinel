@@ -339,20 +339,6 @@ async function queryPapersRawSQL(filters: {
       ? Prisma.sql`AND (stage2_result->'dimensions'->${filters.dim}->>'score')::int >= ${filters.dimMin}`
       : Prisma.empty;
 
-  const countResult = await prisma.$queryRaw<[{ count: bigint }]>`
-    SELECT COUNT(*) as count FROM papers
-    WHERE pipeline_stage != 'ingested'
-      AND coarse_filter_passed = true
-      AND is_duplicate_of IS NULL
-      ${searchClause}
-      ${tierClause}
-      ${sourceClause}
-      ${statusClause}
-      ${needsReviewClause}
-      ${dimClause}
-  `;
-  const total = Number(countResult[0].count);
-
   // Build ORDER BY clause based on sort parameter
   let orderByClause: Prisma.Sql;
   switch (filters.sort) {
@@ -413,24 +399,39 @@ async function queryPapersRawSQL(filters: {
       break;
   }
 
-  const rawPapers = await prisma.$queryRaw<Record<string, unknown>[]>`
-    SELECT * FROM papers
-    WHERE pipeline_stage != 'ingested'
-      AND coarse_filter_passed = true
-      AND is_duplicate_of IS NULL
-      ${searchClause}
-      ${tierClause}
-      ${sourceClause}
-      ${statusClause}
-      ${needsReviewClause}
-      ${dimClause}
-    ${orderByClause}
-    LIMIT ${PAGE_SIZE} OFFSET ${(filters.page - 1) * PAGE_SIZE}
-  `;
-
-  const totalIngestedResult = await prisma.$queryRaw<[{ count: bigint }]>`
-    SELECT COUNT(*) as count FROM papers WHERE is_duplicate_of IS NULL
-  `;
+  // Run count, totalIngested, and data queries in parallel
+  const [countResult, totalIngestedResult, rawPapers] = await Promise.all([
+    prisma.$queryRaw<[{ count: bigint }]>`
+      SELECT COUNT(*) as count FROM papers
+      WHERE pipeline_stage != 'ingested'
+        AND coarse_filter_passed = true
+        AND is_duplicate_of IS NULL
+        ${searchClause}
+        ${tierClause}
+        ${sourceClause}
+        ${statusClause}
+        ${needsReviewClause}
+        ${dimClause}
+    `,
+    prisma.$queryRaw<[{ count: bigint }]>`
+      SELECT COUNT(*) as count FROM papers WHERE is_duplicate_of IS NULL
+    `,
+    prisma.$queryRaw<Record<string, unknown>[]>`
+      SELECT * FROM papers
+      WHERE pipeline_stage != 'ingested'
+        AND coarse_filter_passed = true
+        AND is_duplicate_of IS NULL
+        ${searchClause}
+        ${tierClause}
+        ${sourceClause}
+        ${statusClause}
+        ${needsReviewClause}
+        ${dimClause}
+      ${orderByClause}
+      LIMIT ${PAGE_SIZE} OFFSET ${(filters.page - 1) * PAGE_SIZE}
+    `,
+  ]);
+  const total = Number(countResult[0].count);
   const totalIngested = Number(totalIngestedResult[0].count);
 
   const papers = rawPapers.map(mapRawToPaper);
