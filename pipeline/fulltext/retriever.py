@@ -104,8 +104,9 @@ async def retrieve_full_text(
 
     if result is not None:
         full_text, methods = result
-        paper.full_text_content = full_text
-        paper.methods_section = methods
+        # Strip null bytes — PostgreSQL rejects \x00 in text columns
+        paper.full_text_content = full_text.replace("\x00", "") if full_text else full_text
+        paper.methods_section = methods.replace("\x00", "") if methods else methods
         paper.full_text_retrieved = True
         log.info("fulltext_retrieved", paper_id=str(paper.id))
     else:

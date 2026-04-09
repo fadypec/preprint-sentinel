@@ -1,0 +1,249 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1120" font-family="'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#f1f5f9"/>
+    </linearGradient>
+    <linearGradient id="ingestGrad" x1="0%" y1="0%" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+    <linearGradient id="dedupGrad" x1="0%" y1="0%" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#4f46e5"/>
+    </linearGradient>
+    <linearGradient id="coarseGrad" x1="0%" y1="0%" x2="1" y2="1">
+      <stop offset="0%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="fulltextGrad" x1="0%" y1="0%" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0ea5e9"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+    <linearGradient id="methodsGrad" x1="0%" y1="0%" x2="1" y2="1">
+      <stop offset="0%" stop-color="#a855f7"/>
+      <stop offset="100%" stop-color="#9333ea"/>
+    </linearGradient>
+    <linearGradient id="enrichGrad" x1="0%" y1="0%" x2="1" y2="1">
+      <stop offset="0%" stop-color="#14b8a6"/>
+      <stop offset="100%" stop-color="#0d9488"/>
+    </linearGradient>
+    <linearGradient id="adjGrad" x1="0%" y1="0%" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f43f5e"/>
+      <stop offset="100%" stop-color="#e11d48"/>
+    </linearGradient>
+    <linearGradient id="dashGrad" x1="0%" y1="0%" x2="1" y2="1">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <linearGradient id="rejectGrad" x1="0%" y1="0%" x2="1" y2="0">
+      <stop offset="0%" stop-color="#fecaca"/>
+      <stop offset="100%" stop-color="#fee2e2"/>
+    </linearGradient>
+
+    <!-- Shadow filter -->
+    <filter id="shadow" x="-4%" y="-4%" width="108%" height="112%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#0f172a" flood-opacity="0.08"/>
+    </filter>
+    <filter id="shadowSm" x="-4%" y="-4%" width="108%" height="112%">
+      <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#0f172a" flood-opacity="0.06"/>
+    </filter>
+
+    <!-- Arrow marker -->
+    <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"/>
+    </marker>
+    <marker id="arrowRed" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#f87171"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="1120" rx="16" fill="url(#bgGrad)"/>
+
+  <!-- Title -->
+  <text x="450" y="48" text-anchor="middle" font-size="22" font-weight="700" fill="#0f172a" letter-spacing="-0.02em">DURC Preprint Triage Pipeline</text>
+  <text x="450" y="72" text-anchor="middle" font-size="13" fill="#64748b">Daily screening of life sciences literature for dual-use research indicators</text>
+
+  <!-- ==================== DATA SOURCES ==================== -->
+  <!-- Source boxes -->
+  <g filter="url(#shadowSm)">
+    <rect x="90" y="100" width="155" height="54" rx="8" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+    <rect x="90" y="100" width="155" height="4" rx="2" fill="#3b82f6"/>
+    <text x="167" y="125" text-anchor="middle" font-size="12" font-weight="600" fill="#1e293b">bioRxiv</text>
+    <text x="167" y="142" text-anchor="middle" font-size="11" fill="#64748b">6,579 papers</text>
+  </g>
+  <g filter="url(#shadowSm)">
+    <rect x="265" y="100" width="155" height="54" rx="8" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+    <rect x="265" y="100" width="155" height="4" rx="2" fill="#3b82f6"/>
+    <text x="342" y="125" text-anchor="middle" font-size="12" font-weight="600" fill="#1e293b">medRxiv</text>
+    <text x="342" y="142" text-anchor="middle" font-size="11" fill="#64748b">1,913 papers</text>
+  </g>
+  <g filter="url(#shadowSm)">
+    <rect x="440" y="100" width="155" height="54" rx="8" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+    <rect x="440" y="100" width="155" height="4" rx="2" fill="#60a5fa"/>
+    <text x="517" y="125" text-anchor="middle" font-size="12" font-weight="600" fill="#1e293b">PubMed</text>
+    <text x="517" y="142" text-anchor="middle" font-size="11" fill="#64748b">8,452 papers</text>
+  </g>
+  <g filter="url(#shadowSm)">
+    <rect x="615" y="100" width="155" height="54" rx="8" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+    <rect x="615" y="100" width="155" height="4" rx="2" fill="#60a5fa"/>
+    <text x="692" y="125" text-anchor="middle" font-size="12" font-weight="600" fill="#1e293b">Europe PMC</text>
+    <text x="692" y="142" text-anchor="middle" font-size="11" fill="#64748b">11,812 papers</text>
+  </g>
+
+  <!-- Converging arrows from sources -->
+  <line x1="167" y1="154" x2="430" y2="192" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4 3"/>
+  <line x1="342" y1="154" x2="430" y2="192" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4 3"/>
+  <line x1="517" y1="154" x2="450" y2="192" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4 3"/>
+  <line x1="692" y1="154" x2="470" y2="192" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4 3"/>
+
+  <!-- ==================== INGESTION ==================== -->
+  <g filter="url(#shadow)">
+    <rect x="240" y="190" width="420" height="62" rx="10" fill="url(#ingestGrad)"/>
+    <text x="450" y="217" text-anchor="middle" font-size="14" font-weight="600" fill="white">Ingestion &amp; Normalisation</text>
+    <text x="450" y="238" text-anchor="middle" font-size="12" fill="#bfdbfe">28,756 papers collected</text>
+  </g>
+
+  <!-- Arrow -->
+  <line x1="450" y1="252" x2="450" y2="278" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ==================== DEDUPLICATION ==================== -->
+  <g filter="url(#shadow)">
+    <rect x="240" y="285" width="420" height="72" rx="10" fill="url(#dedupGrad)"/>
+    <text x="450" y="314" text-anchor="middle" font-size="14" font-weight="600" fill="white">Deduplication</text>
+    <text x="450" y="333" text-anchor="middle" font-size="11" fill="#c7d2fe">DOI match &#8594; fuzzy title+author &#8594; title+date</text>
+    <text x="450" y="349" text-anchor="middle" font-size="12" fill="#e0e7ff">28,756 unique papers</text>
+  </g>
+
+  <!-- Arrow -->
+  <line x1="450" y1="357" x2="450" y2="383" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ==================== COARSE FILTER ==================== -->
+  <g filter="url(#shadow)">
+    <rect x="240" y="390" width="420" height="82" rx="10" fill="url(#coarseGrad)"/>
+    <!-- Model badge -->
+    <rect x="575" y="396" width="74" height="20" rx="10" fill="rgba(255,255,255,0.2)"/>
+    <text x="612" y="410" text-anchor="middle" font-size="10" font-weight="600" fill="white">Haiku</text>
+    <text x="450" y="420" text-anchor="middle" font-size="14" font-weight="600" fill="white">Stage 1: Coarse Filter</text>
+    <text x="450" y="439" text-anchor="middle" font-size="11" fill="#ddd6fe">Binary DURC relevance on title + abstract</text>
+    <text x="450" y="461" text-anchor="middle" font-size="13" font-weight="600" fill="#fef3c7">260 flagged (0.9%)</text>
+  </g>
+
+  <!-- Rejection branch -->
+  <line x1="660" y1="431" x2="682" y2="431" stroke="#f87171" stroke-width="1.5" marker-end="url(#arrowRed)"/>
+  <g filter="url(#shadowSm)">
+    <rect x="690" y="410" width="185" height="42" rx="8" fill="url(#rejectGrad)" stroke="#fca5a5" stroke-width="1"/>
+    <text x="782" y="429" text-anchor="middle" font-size="11" font-weight="600" fill="#dc2626">28,496 filtered out</text>
+    <text x="782" y="444" text-anchor="middle" font-size="10" fill="#ef4444">99.1% removed</text>
+  </g>
+
+  <!-- Arrow -->
+  <line x1="450" y1="472" x2="450" y2="498" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ==================== FULL TEXT ==================== -->
+  <g filter="url(#shadow)">
+    <rect x="240" y="505" width="420" height="72" rx="10" fill="url(#fulltextGrad)"/>
+    <text x="450" y="534" text-anchor="middle" font-size="14" font-weight="600" fill="white">Stage 2: Full-Text Retrieval</text>
+    <text x="450" y="553" text-anchor="middle" font-size="11" fill="#bae6fd">JATS XML &#8594; HTML &#8594; Europe PMC &#8594; PMC OA &#8594; Unpaywall</text>
+    <text x="450" y="569" text-anchor="middle" font-size="11" fill="#e0f2fe">Methods section extraction</text>
+  </g>
+
+  <!-- Arrow -->
+  <line x1="450" y1="577" x2="450" y2="603" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ==================== METHODS ANALYSIS ==================== -->
+  <g filter="url(#shadow)">
+    <rect x="240" y="610" width="420" height="105" rx="10" fill="url(#methodsGrad)"/>
+    <!-- Model badge -->
+    <rect x="572" y="616" width="78" height="20" rx="10" fill="rgba(255,255,255,0.2)"/>
+    <text x="611" y="630" text-anchor="middle" font-size="10" font-weight="600" fill="white">Sonnet</text>
+    <text x="450" y="640" text-anchor="middle" font-size="14" font-weight="600" fill="white">Stage 3: Methods Analysis</text>
+    <text x="450" y="659" text-anchor="middle" font-size="11" fill="#e9d5ff">6-dimension risk rubric (scored 0-18)</text>
+    <!-- Dimension chips -->
+    <text x="270" y="682" font-size="9" fill="#f3e8ff">Pathogen Enhancement</text>
+    <text x="415" y="682" font-size="9" fill="#f3e8ff">Synthesis Barriers</text>
+    <text x="560" y="682" font-size="9" fill="#f3e8ff">Select Agents</text>
+    <text x="270" y="700" font-size="9" fill="#f3e8ff">Novel Techniques</text>
+    <text x="405" y="700" font-size="9" fill="#f3e8ff">Information Hazard</text>
+    <text x="545" y="700" font-size="9" fill="#f3e8ff">Defensive Framing</text>
+  </g>
+
+  <!-- Arrow -->
+  <line x1="450" y1="715" x2="450" y2="741" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ==================== ENRICHMENT ==================== -->
+  <g filter="url(#shadow)">
+    <rect x="240" y="748" width="420" height="62" rx="10" fill="url(#enrichGrad)"/>
+    <text x="450" y="775" text-anchor="middle" font-size="14" font-weight="600" fill="white">Enrichment</text>
+    <text x="450" y="798" text-anchor="middle" font-size="11" fill="#ccfbf1">OpenAlex + Semantic Scholar + ORCID</text>
+  </g>
+
+  <!-- Enrichment detail boxes -->
+  <g filter="url(#shadowSm)">
+    <rect x="30" y="755" width="185" height="48" rx="8" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+    <text x="122" y="776" text-anchor="middle" font-size="10" font-weight="600" fill="#0d9488">Author context</text>
+    <text x="122" y="793" text-anchor="middle" font-size="9.5" fill="#64748b">h-index, citations, affiliations</text>
+  </g>
+  <g filter="url(#shadowSm)">
+    <rect x="690" y="755" width="185" height="48" rx="8" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+    <text x="782" y="776" text-anchor="middle" font-size="10" font-weight="600" fill="#0d9488">Institutional context</text>
+    <text x="782" y="793" text-anchor="middle" font-size="9.5" fill="#64748b">Oversight, funding, reputation</text>
+  </g>
+  <line x1="240" y1="779" x2="215" y2="779" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4 3"/>
+  <line x1="660" y1="779" x2="690" y2="779" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4 3"/>
+
+  <!-- Arrow -->
+  <line x1="450" y1="810" x2="450" y2="836" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ==================== ADJUDICATION ==================== -->
+  <g filter="url(#shadow)">
+    <rect x="240" y="843" width="420" height="72" rx="10" fill="url(#adjGrad)"/>
+    <!-- Model badge -->
+    <rect x="575" y="849" width="74" height="20" rx="10" fill="rgba(255,255,255,0.2)"/>
+    <text x="612" y="863" text-anchor="middle" font-size="10" font-weight="600" fill="white">Opus</text>
+    <text x="450" y="873" text-anchor="middle" font-size="14" font-weight="600" fill="white">Stage 4: Adjudication</text>
+    <text x="450" y="892" text-anchor="middle" font-size="11" fill="#ffe4e6">Contextual review &#8212; risk tier adjusted up or down</text>
+    <text x="450" y="908" text-anchor="middle" font-size="12" fill="#fecdd3">30 papers adjudicated</text>
+  </g>
+
+  <!-- Arrow -->
+  <line x1="450" y1="915" x2="450" y2="941" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ==================== OUTPUT TIERS ==================== -->
+  <g filter="url(#shadow)">
+    <rect x="190" y="948" width="520" height="68" rx="10" fill="white" stroke="#e2e8f0" stroke-width="1.5"/>
+    <text x="450" y="972" text-anchor="middle" font-size="13" font-weight="600" fill="#1e293b">Analyst Dashboard</text>
+
+    <!-- Tier badges -->
+    <rect x="238" y="983" width="75" height="24" rx="12" fill="#dcfce7"/>
+    <text x="275" y="999" text-anchor="middle" font-size="11" font-weight="600" fill="#16a34a">19 Low</text>
+
+    <rect x="328" y="983" width="95" height="24" rx="12" fill="#fef9c3"/>
+    <text x="375" y="999" text-anchor="middle" font-size="11" font-weight="600" fill="#ca8a04">3 Medium</text>
+
+    <rect x="438" y="983" width="75" height="24" rx="12" fill="#fed7aa"/>
+    <text x="475" y="999" text-anchor="middle" font-size="11" font-weight="600" fill="#ea580c">0 High</text>
+
+    <rect x="528" y="983" width="90" height="24" rx="12" fill="#fecaca"/>
+    <text x="573" y="999" text-anchor="middle" font-size="11" font-weight="600" fill="#dc2626">0 Critical</text>
+  </g>
+
+  <!-- ==================== FOOTER ==================== -->
+  <text x="450" y="1050" text-anchor="middle" font-size="11" fill="#94a3b8">Figures from production data: 28,756 papers across 230 days</text>
+  <text x="450" y="1068" text-anchor="middle" font-size="11" fill="#94a3b8">Sources: bioRxiv, medRxiv, PubMed (MeSH-filtered), Europe PMC</text>
+
+  <!-- Cost annotation -->
+  <g filter="url(#shadowSm)">
+    <rect x="30" y="420" width="185" height="96" rx="8" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+    <text x="122" y="442" text-anchor="middle" font-size="11" font-weight="600" fill="#1e293b">Estimated daily cost</text>
+    <line x1="48" y1="450" x2="198" y2="450" stroke="#e2e8f0" stroke-width="1"/>
+    <text x="48" y="468" font-size="10" fill="#64748b">Haiku (coarse filter)</text>
+    <text x="200" y="468" text-anchor="end" font-size="10" font-weight="600" fill="#1e293b">~$0.70</text>
+    <text x="48" y="484" font-size="10" fill="#64748b">Sonnet (methods)</text>
+    <text x="200" y="484" text-anchor="end" font-size="10" font-weight="600" fill="#1e293b">~$6.50</text>
+    <text x="48" y="500" font-size="10" fill="#64748b">Opus (adjudication)</text>
+    <text x="200" y="500" text-anchor="end" font-size="10" font-weight="600" fill="#1e293b">~$4.00</text>
+  </g>
+</svg>
