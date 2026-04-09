@@ -11,8 +11,19 @@ import re
 from lxml import etree
 
 # Heading patterns that indicate a methods section (case-insensitive)
+# Optional leading section number: "4 Methods", "4. Methods", "IV. Methods", etc.
+_SECTION_NUM_PREFIX = r"(?:[\dIVXivx]+\.?\s+)?"
+_METHODS_CORE = (
+    r"materials?\s*(?:and|&)\s*methods"
+    r"|methods?\s*(?:details|summary|section)?"
+    r"|experimental\s*(?:procedures|methods|model\s*details|design)"
+    r"|study\s*methods"
+    r"|star\s*methods"
+    r"|online\s*methods"
+    r"|supplementa(?:l|ry)\s*experimental\s*procedures"
+)
 _METHODS_HEADINGS = re.compile(
-    r"^(materials?\s*(and|&)\s*methods|methods|experimental\s*(procedures|methods)|study\s*methods)$",
+    _SECTION_NUM_PREFIX + r"(" + _METHODS_CORE + r")$",
     re.IGNORECASE,
 )
 

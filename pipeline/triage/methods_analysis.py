@@ -89,6 +89,48 @@ def _validate_result(result: dict) -> str | None:
 
 def _apply_result(paper: Paper, tool_input: dict) -> None:
     """Apply the LLM assessment result to the paper record."""
+    # Additional validation to prevent malformed data
+    if not isinstance(tool_input, dict):
+        log.error("tool_input_not_dict", paper_id=str(paper.id), tool_input_type=type(tool_input))
+        raise ValueError(f"tool_input must be dict, got {type(tool_input)}")
+
+    # Check for string pollution in dimensions field
+    dimensions = tool_input.get("dimensions")
+    if isinstance(dimensions, str):
+        log.error(
+            "dimensions_field_is_string",
+            paper_id=str(paper.id),
+            dimensions_preview=dimensions[:200],
+            all_keys=list(tool_input.keys())
+        )
+        raise ValueError("Corrupted tool_input: dimensions field contains string instead of object")
+
+    # Validate dimensions structure
+    if not isinstance(dimensions, dict):
+        log.error("dimensions_not_dict", paper_id=str(paper.id), dimensions_type=type(dimensions))
+        raise ValueError(f"dimensions must be dict, got {type(dimensions)}")
+
+    # Check for required dimension keys
+    required_dims = {
+        "pathogen_enhancement", "synthesis_barrier_lowering", "select_agent_relevance",
+        "novel_technique", "information_hazard", "defensive_framing"
+    }
+    missing_dims = required_dims - set(dimensions.keys())
+    if missing_dims:
+        log.error("missing_dimension_keys", paper_id=str(paper.id), missing=list(missing_dims))
+        raise ValueError(f"Missing dimension keys: {missing_dims}")
+
+    # Validate dimension structure
+    for dim_name, dim_value in dimensions.items():
+        if not isinstance(dim_value, dict) or "score" not in dim_value or "justification" not in dim_value:
+            log.error(
+                "malformed_dimension",
+                paper_id=str(paper.id),
+                dimension=dim_name,
+                structure=dim_value
+            )
+            raise ValueError(f"Dimension '{dim_name}' has invalid structure")
+
     # stage2_result = second LLM stage (methods analysis);
     # column naming is sequential (stage1/2/3), not by pipeline stage number.
     paper.stage2_result = tool_input
@@ -184,17 +226,39 @@ async def _run_sync(
                 paper.pipeline_stage = PipelineStage.METHODS_ANALYSED
                 paper.needs_manual_review = True
             else:
-                _apply_result(paper, llm_result.tool_input)
-                if used_model != model:
-                    paper.stage2_result["_model"] = used_model
-                log.info(
-                    "methods_analysis_result",
-                    paper_id=str(paper.id),
-                    risk_tier=paper.risk_tier,
-                    aggregate_score=paper.aggregate_score,
-                    model=used_model,
-                    progress=f"{i}/{total}",
-                )
+                # Enhanced error handling for malformed tool_input structure
+                try:
+                    _apply_result(paper, llm_result.tool_input)
+                    if used_model != model:
+                        paper.stage2_result["_model"] = used_model
+                    log.info(
+                        "methods_analysis_result",
+                        paper_id=str(paper.id),
+                        risk_tier=paper.risk_tier,
+                        aggregate_score=paper.aggregate_score,
+                        model=used_model,
+                        progress=f"{i}/{total}",
+                    )
+                except (ValueError, TypeError) as e:
+                    # Catch structural issues with tool_input
+                    error_msg = f"Malformed tool_input structure: {str(e)}"
+                    log.error(
+                        "methods_analysis_structural_error",
+                        paper_id=str(paper.id),
+                        error=error_msg,
+                        tool_input_preview=str(llm_result.tool_input)[:500] if llm_result.tool_input else None,
+                        model=used_model
+                    )
+
+                    # Store error but preserve the raw tool_input for debugging
+                    paper.stage2_result = {
+                        "_error": error_msg,
+                        "_model": used_model,
+                        "_raw_tool_input": llm_result.tool_input,
+                        "_corruption_detected": True,
+                    }
+                    paper.pipeline_stage = PipelineStage.METHODS_ANALYSED
+                    paper.needs_manual_review = True
         await session.flush()
 
         if i % 10 == 0 or i == total:
@@ -270,7 +334,30 @@ async def _run_batch(
             paper.pipeline_stage = PipelineStage.METHODS_ANALYSED
             continue
 
-        _apply_result(paper, llm_result.tool_input)
+        # Enhanced error handling for malformed tool_input structure (batch path)
+        try:
+            _apply_result(paper, llm_result.tool_input)
+        except (ValueError, TypeError) as e:
+            # Catch structural issues with tool_input
+            error_msg = f"Malformed tool_input structure: {str(e)}"
+            log.error(
+                "methods_analysis_structural_error_batch",
+                paper_id=custom_id,
+                error=error_msg,
+                tool_input_preview=str(llm_result.tool_input)[:500] if llm_result.tool_input else None,
+                model=model
+            )
+
+            # Store error but preserve the raw tool_input for debugging
+            paper.stage2_result = {
+                "_error": error_msg,
+                "_model": model,
+                "_raw_tool_input": llm_result.tool_input,
+                "_corruption_detected": True,
+            }
+            paper.pipeline_stage = PipelineStage.METHODS_ANALYSED
+            paper.needs_manual_review = True
+            continue
 
     await session.flush()
     log.info("methods_analysis_batch_complete", total=len(papers))

@@ -11,13 +11,30 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pipeline.models import PipelineStage, SourceServer
 from tests.conftest import insert_paper
 
-# Minimal JATS with a methods section
+# Expanded JATS with realistic content to pass quality gate
 SAMPLE_JATS = b"""\
 <?xml version="1.0"?>
 <article><body>
-<sec><title>Introduction</title><p>Intro.</p></sec>
-<sec sec-type="methods"><title>Methods</title><p>We used PCR.</p></sec>
-<sec><title>Results</title><p>It worked.</p></sec>
+<sec><title>Introduction</title>
+<p>This paper describes a novel method for analyzing biological samples using molecular techniques.
+The approach builds on previous work by Smith et al. and represents a significant advance in the field.</p>
+<p>Our hypothesis is that this new method will provide more accurate results than existing approaches.</p>
+</sec>
+<sec sec-type="methods"><title>Methods</title>
+<p>We used PCR amplification followed by gel electrophoresis to analyze DNA samples from 50 subjects.</p>
+<p>Sample collection was performed according to standard protocols with appropriate consent procedures.</p>
+<p>Statistical analysis was performed using R software with significance set at p&lt;0.05.</p>
+<p>All experiments were conducted in triplicate and results averaged for analysis.</p>
+</sec>
+<sec><title>Results</title>
+<p>The method successfully amplified target sequences in 47 of 50 samples (94% success rate).</p>
+<p>No significant differences were observed between treatment groups (p=0.23).</p>
+<p>Quality control samples performed within expected ranges throughout the study.</p>
+</sec>
+<sec><title>Discussion</title>
+<p>These results demonstrate the effectiveness of the new approach for sample analysis.</p>
+<p>Further validation studies are needed to confirm these preliminary findings.</p>
+</sec>
 </body></article>"""
 
 SAMPLE_HTML = b"""\
@@ -53,7 +70,7 @@ class TestRetrieveCascade:
         await retrieve_full_text(db_session, paper, settings)
 
         assert paper.full_text_retrieved is True
-        assert "We used PCR." in paper.methods_section
+        assert "PCR amplification" in paper.methods_section
         assert paper.pipeline_stage == PipelineStage.FULLTEXT_RETRIEVED
 
     @respx.mock
@@ -92,7 +109,7 @@ class TestRetrieveCascade:
         await retrieve_full_text(db_session, paper, settings)
 
         assert paper.full_text_retrieved is True
-        assert "We used PCR." in paper.methods_section
+        assert "PCR amplification" in paper.methods_section
 
     @respx.mock
     async def test_all_sources_fail_gracefully(self, db_session: AsyncSession):

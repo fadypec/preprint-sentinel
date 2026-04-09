@@ -230,9 +230,119 @@ async def resume(start_from: str | None = None) -> None:
     await engine.dispose()
 
 
+async def reextract_methods(dry_run: bool = True) -> None:
+    """Re-fetch fulltext and re-extract methods for papers where extraction failed.
+
+    Targets papers where methods_section == full_text_content (i.e. the methods
+    section was never isolated). Re-runs the fulltext retrieval cascade with the
+    updated parsers, then resets the pipeline_stage back to FULLTEXT_RETRIEVED
+    for any paper whose methods section actually changed — so the next pipeline
+    run (or ``resume_pipeline --from methods``) will re-analyse only those.
+
+    Zero LLM cost — this only does HTTP fetches.
+
+    Usage:
+        python -m scripts.resume_pipeline --reextract-methods             # dry run
+        python -m scripts.resume_pipeline --reextract-methods --apply     # actually do it
+    """
+    settings = get_settings()
+    engine = make_engine(settings.database_url.get_secret_value())
+    session_factory = make_session_factory(engine)
+
+    async with session_factory() as session:
+        # Find papers where methods were not isolated
+        stmt = select(Paper).where(
+            Paper.full_text_retrieved.is_(True),
+            Paper.full_text_content.isnot(None),
+            Paper.methods_section.isnot(None),
+            Paper.full_text_content == Paper.methods_section,
+        )
+        result = await session.execute(stmt)
+        affected = list(result.scalars().all())
+
+        log.info("reextract_found", affected=len(affected))
+        if not affected:
+            log.info("reextract_nothing_to_do")
+            await engine.dispose()
+            return
+
+        if dry_run:
+            log.info(
+                "reextract_dry_run",
+                message=f"Would re-fetch fulltext for {len(affected)} papers. "
+                "Run with --apply to execute.",
+            )
+            for p in affected[:10]:
+                log.info(
+                    "reextract_sample",
+                    doi=p.doi,
+                    title=(p.title or "")[:80],
+                    fulltext_len=len(p.full_text_content or ""),
+                )
+            if len(affected) > 10:
+                log.info("reextract_sample_truncated", remaining=len(affected) - 10)
+            await engine.dispose()
+            return
+
+        # Re-fetch fulltext concurrently
+        sem = asyncio.Semaphore(10)
+        improved = 0
+        failed = 0
+        unchanged = 0
+
+        async def _refetch(paper: Paper) -> None:
+            nonlocal improved, failed, unchanged
+            async with sem:
+                ft_result = await fetch_full_text_content(paper, settings)
+
+            if ft_result is None:
+                failed += 1
+                log.debug("reextract_fetch_failed", doi=paper.doi)
+                return
+
+            full_text, methods = ft_result
+            # Strip null bytes
+            full_text = full_text.replace("\x00", "") if full_text else full_text
+            methods = methods.replace("\x00", "") if methods else methods
+
+            if methods != full_text and methods:
+                # Methods successfully isolated — update and reset stage
+                paper.full_text_content = full_text
+                paper.methods_section = methods
+                paper.pipeline_stage = PipelineStage.FULLTEXT_RETRIEVED
+                improved += 1
+                log.info(
+                    "reextract_improved",
+                    doi=paper.doi,
+                    old_len=len(paper.full_text_content or ""),
+                    new_methods_len=len(methods),
+                )
+            else:
+                unchanged += 1
+                log.debug("reextract_unchanged", doi=paper.doi)
+
+        await asyncio.gather(*[_refetch(p) for p in affected])
+        await session.commit()
+
+        log.info(
+            "reextract_complete",
+            affected=len(affected),
+            improved=improved,
+            unchanged=unchanged,
+            failed=failed,
+            message=f"{improved} papers will be re-analysed on next pipeline run.",
+        )
+
+    await engine.dispose()
+
+
 if __name__ == "__main__":
-    start = None
-    if "--from" in sys.argv:
-        idx = sys.argv.index("--from")
-        start = sys.argv[idx + 1]
-    asyncio.run(resume(start))
+    if "--reextract-methods" in sys.argv:
+        dry = "--apply" not in sys.argv
+        asyncio.run(reextract_methods(dry_run=dry))
+    else:
+        start = None
+        if "--from" in sys.argv:
+            idx = sys.argv.index("--from")
+            start = sys.argv[idx + 1]
+        asyncio.run(resume(start))

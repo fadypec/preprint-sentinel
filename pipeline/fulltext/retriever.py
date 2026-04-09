@@ -105,16 +105,55 @@ async def retrieve_full_text(
     if result is not None:
         full_text, methods = result
         # Strip null bytes — PostgreSQL rejects \x00 in text columns
-        paper.full_text_content = full_text.replace("\x00", "") if full_text else full_text
-        paper.methods_section = methods.replace("\x00", "") if methods else methods
-        paper.full_text_retrieved = True
-        log.info("fulltext_retrieved", paper_id=str(paper.id))
+        full_text = full_text.replace("\x00", "") if full_text else full_text
+        methods = methods.replace("\x00", "") if methods else methods
+
+        # Quality gate: reject content that isn't usable article text
+        if _is_usable_fulltext(full_text, paper.abstract or ""):
+            paper.full_text_content = full_text
+            paper.methods_section = methods
+            paper.full_text_retrieved = True
+            log.info("fulltext_retrieved", paper_id=str(paper.id))
+        else:
+            paper.full_text_content = None
+            paper.methods_section = None
+            paper.full_text_retrieved = False
+            log.info(
+                "fulltext_rejected_quality",
+                paper_id=str(paper.id),
+                content_len=len(full_text or ""),
+            )
     else:
         paper.full_text_retrieved = False
         log.info("fulltext_not_found", paper_id=str(paper.id))
 
     paper.pipeline_stage = PipelineStage.FULLTEXT_RETRIEVED
     await session.flush()
+
+
+def _is_usable_fulltext(content: str | None, abstract: str) -> bool:
+    """Check if retrieved content is usable article text.
+
+    Rejects empty content, raw PDF bytes, and content that is barely
+    longer than the abstract (likely a landing page or paywall stub).
+    """
+    if not content or not content.strip():
+        return False
+
+    # Raw PDF bytes that weren't extracted
+    if content.lstrip().startswith("%PDF"):
+        return False
+
+    # Absolute minimum: at least 1000 chars for a research article
+    if len(content) < 1000:
+        return False
+
+    # If we have a substantial abstract, content should be meaningfully longer
+    abstract_len = len(abstract)
+    if abstract_len > 500 and len(content) < abstract_len * 2:
+        return False
+
+    return True
 
 
 def _extract_pmc_id(url: str) -> str | None:
@@ -138,6 +177,11 @@ async def _try_preprint_xml(
         await asyncio.sleep(delay)
         resp = await http.get(url, timeout=30.0, follow_redirects=True)
         if resp.status_code == 200:
+            # Check if response is actually HTML (bioRxiv XML endpoints broken as of 2026)
+            content_type = resp.headers.get("content-type", "").lower()
+            if "text/html" in content_type:
+                log.debug("preprint_xml_returns_html", doi=doi, url=url)
+                return None
             return jats_extract(resp.content)
     except (httpx.HTTPError, etree.Error, ValueError) as exc:
         log.debug("preprint_xml_error", doi=doi, error=str(exc))
@@ -277,24 +321,53 @@ def _extract_from_pdf(pdf_bytes: bytes, doi: str) -> tuple[str, str] | None:
 
 
 _METHODS_HEADING_RE = re.compile(
-    r"^(materials?\s*(?:and|&)\s*methods|methods|experimental\s*(?:procedures|methods)|study\s*methods)\s*$",
+    r"^(?:[\dIVXivx]+\.?\s+)?"
+    r"(materials?\s*(?:and|&)\s*methods"
+    r"|methods?\s*(?:details|summary|section)?"
+    r"|experimental\s*(?:procedures|methods|model\s*details|design)"
+    r"|study\s*methods"
+    r"|star\s*methods"
+    r"|online\s*methods"
+    r"|supplementa(?:l|ry)\s*experimental\s*procedures"
+    r")\s*$",
     re.IGNORECASE | re.MULTILINE,
 )
 
 _SECTION_HEADING_RE = re.compile(
-    r"^(results|discussion|acknowledgements?|references|conclusions?|data\s*availability|supplementary|funding)\s*$",
+    r"^(results|discussion|acknowledgements?|references|conclusions?|data\s*(?:and\s*code\s*)?availability|supplementary|funding|author\s*contributions?|declaration\s*of\s*interests?|resource\s*availability|supporting\s*information)\s*$",
     re.IGNORECASE | re.MULTILINE,
 )
 
 
 def _find_methods_in_text(text: str) -> str:
     """Find the methods section in plain text by heading patterns."""
+    # Try numbered methods section first (most common)
     match = _METHODS_HEADING_RE.search(text)
-    if not match:
-        return text
+    if match:
+        start = match.start()
+        end_match = _SECTION_HEADING_RE.search(text, match.end())
+        end = end_match.start() if end_match else len(text)
+        methods = text[start:end].strip()
+        if methods and len(methods) < len(text) * 0.9:  # Sanity check
+            return methods
 
-    start = match.start()
-    end_match = _SECTION_HEADING_RE.search(text, match.end())
-    end = end_match.start() if end_match else len(text)
-    methods = text[start:end].strip()
-    return methods if methods else text
+    # Try unnumbered "Methods" section
+    plain_methods_re = re.compile(
+        r'\n\s*(materials?\s*(?:and|&)\s*methods|methods|experimental\s*(?:procedures|methods))\s*\n',
+        re.IGNORECASE | re.MULTILINE,
+    )
+    match = plain_methods_re.search(text)
+    if match:
+        start = match.start()
+        # Look for next major section
+        next_section_re = re.compile(
+            r'\n\s*(?:results|discussion|conclusion|acknowledgements?|references|data\s*availability|author\s*contributions?)\s*\n',
+            re.IGNORECASE | re.MULTILINE,
+        )
+        end_match = next_section_re.search(text, match.end())
+        end = end_match.start() if end_match else len(text)
+        methods = text[start:end].strip()
+        if methods and 200 < len(methods) < len(text) * 0.8:
+            return methods
+
+    return text
