@@ -53,22 +53,22 @@ export const AnalyticsCharts = memo(function AnalyticsCharts({
   const gridColor = resolvedTheme === "dark" ? "#334155" : "#e2e8f0";
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="grid gap-4 lg:grid-cols-2">
       {/* Top flagged institutions — horizontal bar */}
       <Card className="p-4">
         <h3 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
           Top Flagged Institutions
         </h3>
         {topInstitutions.length > 0 ? (
-          <ResponsiveContainer width="100%" height={250}>
+          <ResponsiveContainer width="100%" height={320}>
             <BarChart data={topInstitutions} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
               <XAxis type="number" tick={{ fill: textColor, fontSize: 10 }} />
               <YAxis
                 type="category"
                 dataKey="name"
-                tick={{ fill: textColor, fontSize: 10 }}
-                width={150}
+                tick={{ fill: textColor, fontSize: 9 }}
+                width={180}
               />
               <Tooltip />
               <Bar dataKey="count" fill="#3b82f6" radius={[0, 4, 4, 0]} />
@@ -87,7 +87,7 @@ export const AnalyticsCharts = memo(function AnalyticsCharts({
           Top Flagged Categories
         </h3>
         {topCategories.length > 0 ? (
-          <ResponsiveContainer width="100%" height={250}>
+          <ResponsiveContainer width="100%" height={320}>
             <BarChart data={topCategories} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
               <XAxis type="number" tick={{ fill: textColor, fontSize: 10 }} />
@@ -114,7 +114,7 @@ export const AnalyticsCharts = memo(function AnalyticsCharts({
           Top Countries
         </h3>
         {topCountries.length > 0 ? (
-          <ResponsiveContainer width="100%" height={250}>
+          <ResponsiveContainer width="100%" height={320}>
             <BarChart data={topCountries} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
               <XAxis type="number" tick={{ fill: textColor, fontSize: 10 }} />
@@ -141,7 +141,7 @@ export const AnalyticsCharts = memo(function AnalyticsCharts({
           Risk Dimension Trends (Weekly Avg Score)
         </h3>
         {dimensionTrends.length > 0 ? (
-          <ResponsiveContainer width="100%" height={250}>
+          <ResponsiveContainer width="100%" height={320}>
             <LineChart data={dimensionTrends}>
               <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
               <XAxis dataKey="date" tick={{ fill: textColor, fontSize: 10 }} />

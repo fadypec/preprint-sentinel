@@ -294,10 +294,8 @@ export function PaperCoverageHeatmap() {
                         <td key={src} className="px-1.5 py-1 text-center tabular-nums">
                           {count ? (
                             <span className="text-green-600 dark:text-green-400">{count}</span>
-                          ) : weekday ? (
-                            <span className="text-slate-300 dark:text-slate-600">&mdash;</span>
                           ) : (
-                            <span className="text-slate-300 dark:text-slate-700">&middot;</span>
+                            <span className="text-slate-300 dark:text-slate-600">&mdash;</span>
                           )}
                         </td>
                       );
