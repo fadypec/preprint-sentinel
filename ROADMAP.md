@@ -54,6 +54,21 @@ Based on comprehensive codebase audit conducted 2026-04-09 (see `2026-04-09_AUDI
 - [x] Dedup thresholds moved from hardcoded class constants to config settings (audit medium-severity)
 - [x] Accessibility: aria-controls on audit trail expandable buttons (audit low-severity)
 
+### Batch 6 — Analyst workflow (2026-04-10)
+
+- [x] Dimension-level trend analytics — already implemented (weekly avg per-dimension line chart)
+- [x] Analyst feedback export endpoint (`/api/feedback`) for prompt refinement analysis
+- [x] Related papers section on paper detail page (by institution and first author)
+- [x] Country distribution chart in analytics (from OpenAlex enrichment JSONB)
+
+### Batch 7 — Final audit remediation (2026-04-10)
+
+- [x] NCBI API key moved from URL query params to httpx client defaults (audit high-severity security)
+- [x] Methods section passage highlighting using key_methods_of_concern (audit high-priority UX gap)
+- [x] Batch DOI lookup in dedup — single IN query replaces N sequential lookups (audit high-severity efficiency)
+- [x] Version tracking — detect paper version upgrades and flag for re-screening (backlog)
+- [x] Slack webhook placeholder replaced with generic text (audit medium-severity security)
+
 ---
 
 ## Deferred
@@ -62,23 +77,19 @@ Based on comprehensive codebase audit conducted 2026-04-09 (see `2026-04-09_AUDI
 
 ---
 
-### Batch 6 — Analyst workflow (2026-04-10)
+## Documented Limitations
 
-- [x] Dimension-level trend analytics — already implemented (weekly avg per-dimension line chart)
-- [x] Analyst feedback export endpoint (`/api/feedback`) for prompt refinement analysis
-- [x] Related papers section on paper detail page (by institution and first author)
-- [x] Country distribution chart in analytics (from OpenAlex enrichment JSONB)
+These audit findings have been evaluated and are either by design, API limitations, or require infrastructure changes beyond code:
 
----
+- **In-memory rate limiting** (`dashboard/lib/rate-limit.ts`) — working as designed for single-server deployment. Would need Redis for multi-instance.
+- **DedupRelationship.PUBLISHED_VERSION** enum — forward declaration for planned preprint→publication linking. Not dead code.
+- **Stage naming mismatch** (stage1/2/3 vs pipeline stage numbers) — cosmetic; changing would require a migration and break existing data.
+- **Integration tests** — would require real database or complex multi-service mocking. Unit test coverage (248+ tests) is sufficient for current scale.
+- **Security scanning / SAST** — CI pipeline configuration, not a code change. Pre-commit hooks (ruff + mypy) provide basic static analysis.
+- **Coverage reporting** — CI configuration with pytest-cov. Not a code change.
+- **Monitoring dashboards** — requires external service (Grafana/Datadog). Cost monitoring exists in PipelineRun table.
 
-## Upcoming
+## Backlog
 
-### Batch 7 — Advanced analyst features
-
-- [ ] Methods section passage highlighting (flag specific sentences of concern)
-- [ ] Analyst feedback loop — use exported FP/confirmed data to refine LLM prompts
-
-### Backlog
-
-- [ ] Crossref enrichment client (funder info extraction)
-- [ ] Version tracking and re-screening on paper updates
+- [ ] Crossref enrichment client (funder info extraction) — funder data already available via OpenAlex enrichment
+- [ ] Analyst feedback loop — use exported FP/confirmed data to automatically refine LLM prompts
