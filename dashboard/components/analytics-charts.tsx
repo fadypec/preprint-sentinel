@@ -138,7 +138,7 @@ export const AnalyticsCharts = memo(function AnalyticsCharts({
       {/* Risk dimension trends — daily, DD/MM format */}
       <Card className="p-4">
         <h3 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
-          Risk Dimension Trends (Daily Avg Score)
+          Risk Dimension Trends (Weekly Avg Score)
         </h3>
         {dimensionTrends.length > 0 ? (
           <ResponsiveContainer width="100%" height={250}>

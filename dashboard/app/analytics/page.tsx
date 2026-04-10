@@ -17,10 +17,10 @@ type DimensionTrendRow = {
 };
 
 async function getDimensionTrends(since: Date): Promise<DimensionTrendRow[]> {
-  // Daily buckets, DD/MM format, 60 days
+  // Weekly buckets (smooths daily noise), DD/MM format showing week start date
   return prisma.$queryRaw<DimensionTrendRow[]>`
     SELECT
-      to_char(posted_date, 'DD/MM') as date,
+      to_char(date_trunc('week', posted_date), 'DD/MM') as date,
       ROUND(AVG(
         (stage2_result->'dimensions'->'pathogen_enhancement'->>'score')::numeric
       ), 1)::float as pathogen_enhancement,
@@ -44,8 +44,8 @@ async function getDimensionTrends(since: Date): Promise<DimensionTrendRow[]> {
       AND stage2_result IS NOT NULL
       AND stage2_result->'dimensions' IS NOT NULL
       AND is_duplicate_of IS NULL
-    GROUP BY posted_date
-    ORDER BY posted_date
+    GROUP BY date_trunc('week', posted_date)
+    ORDER BY date_trunc('week', posted_date)
   `;
 }
 
@@ -89,24 +89,40 @@ async function getStats() {
   });
   const fpRate = reviewedPapers > 0 ? Math.round((fpCount / reviewedPapers) * 100) : null;
 
-  // Top institutions — all flagged papers, using OpenAlex enrichment with fallback
+  // Top institutions — extract university/institute name from long department strings
+  // Uses regex to find the comma-segment containing University/Institut/College/etc,
+  // falling back to the first segment if no keyword matches.
   const topInstitutions = await prisma.$queryRaw<
     { name: string; count: number }[]
   >`
-    SELECT
-      COALESCE(
-        enrichment_data->'openalex'->>'primary_institution',
-        corresponding_institution
-      ) as name,
-      COUNT(*)::int as count
-    FROM papers
-    WHERE risk_tier IS NOT NULL
-      AND is_duplicate_of IS NULL
-      AND coarse_filter_passed = true
-      AND COALESCE(
-        enrichment_data->'openalex'->>'primary_institution',
-        corresponding_institution
-      ) IS NOT NULL
+    SELECT name, SUM(c)::int as count FROM (
+      SELECT
+        TRIM(COALESCE(
+          SUBSTRING(
+            COALESCE(
+              enrichment_data->'openalex'->>'primary_institution',
+              corresponding_institution
+            )
+            FROM '([^,]*(?:University|Institut|College|Hospital|Center|Centre|School|Academy)[^,]*)'
+          ),
+          SPLIT_PART(
+            COALESCE(
+              enrichment_data->'openalex'->>'primary_institution',
+              corresponding_institution
+            ), ',', 1
+          )
+        )) as name,
+        COUNT(*)::int as c
+      FROM papers
+      WHERE is_duplicate_of IS NULL
+        AND coarse_filter_passed = true
+        AND COALESCE(
+          enrichment_data->'openalex'->>'primary_institution',
+          corresponding_institution
+        ) IS NOT NULL
+      GROUP BY name
+    ) sub
+    WHERE name != ''
     GROUP BY name
     ORDER BY count DESC
     LIMIT 10
