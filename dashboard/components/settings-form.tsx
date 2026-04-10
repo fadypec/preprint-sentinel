@@ -269,7 +269,7 @@ export function SettingsForm({ initialSettings }: Props) {
             <Input
               type="password"
               value={settings.alert_slack_webhook}
-              placeholder="https://hooks.slack.com/..."
+              placeholder="Paste webhook URL"
               onChange={(e) => update("alert_slack_webhook", e.target.value)}
             />
           </div>
