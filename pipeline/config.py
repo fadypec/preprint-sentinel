@@ -82,6 +82,12 @@ class Settings(BaseSettings):
     semantic_scholar_request_delay: float = 1.0
     orcid_request_delay: float = 1.0
 
+    # Deduplication thresholds
+    dedup_title_threshold: float = 0.92  # title similarity for DOI papers
+    dedup_title_threshold_no_doi: float = 0.88  # title similarity for DOI-less papers
+    dedup_date_window_days: int = 14  # date window for DOI papers
+    dedup_date_window_days_no_doi: int = 7  # date window for DOI-less papers
+
     # Adjudication
     adjudication_min_tier: str = "high"  # "low", "medium", "high", "critical"
 

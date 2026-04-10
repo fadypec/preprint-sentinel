@@ -58,13 +58,20 @@ def extract_first_author_surname(authors: list[dict]) -> str | None:
 class DedupEngine:
     """Three-tier deduplication against existing papers in the database."""
 
-    TITLE_SIMILARITY_THRESHOLD = 0.92
-    TITLE_SIMILARITY_THRESHOLD_NO_DOI = 0.88
-    DATE_WINDOW_DAYS = 14
-    DATE_WINDOW_DAYS_NO_DOI = 7
-
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        *,
+        title_threshold: float = 0.92,
+        title_threshold_no_doi: float = 0.88,
+        date_window_days: int = 14,
+        date_window_days_no_doi: int = 7,
+    ) -> None:
         self._session = session
+        self.title_threshold = title_threshold
+        self.title_threshold_no_doi = title_threshold_no_doi
+        self.date_window_days = date_window_days
+        self.date_window_days_no_doi = date_window_days_no_doi
 
     async def check(self, paper: dict, paper_id: uuid.UUID | None = None) -> DedupResult:
         """Run the three-tier dedup cascade. Returns on first match.
@@ -91,12 +98,12 @@ class DedupEngine:
         # DOI-less papers: relaxed threshold (0.88), tighter window (7 days)
         if surname:
             if doi:
-                threshold = self.TITLE_SIMILARITY_THRESHOLD
-                window = self.DATE_WINDOW_DAYS
+                threshold = self.title_threshold
+                window = self.date_window_days
                 strategy = "title_author_similarity"
             else:
-                threshold = self.TITLE_SIMILARITY_THRESHOLD_NO_DOI
-                window = self.DATE_WINDOW_DAYS_NO_DOI
+                threshold = self.title_threshold_no_doi
+                window = self.date_window_days_no_doi
                 strategy = "title_author_date"
 
             match = await self._find_title_author_match(

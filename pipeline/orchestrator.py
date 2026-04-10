@@ -185,7 +185,7 @@ async def run_daily_pipeline(
         log.info("stage_starting", stage="dedup", papers_to_process=len(ingested_papers))
         non_dup_papers: list[Paper] = []
         try:
-            non_dup_papers, dup_count = await _run_dedup(session, ingested_papers)
+            non_dup_papers, dup_count = await _run_dedup(session, ingested_papers, settings)
             stats.papers_after_dedup = len(non_dup_papers)
             await session.commit()
             await _flush_progress()
@@ -659,9 +659,18 @@ async def _run_fulltext(
 async def _run_dedup(
     session: AsyncSession,
     papers: list[Paper],
+    settings=None,
 ) -> tuple[list[Paper], int]:
     """Run dedup on new papers. Returns (non_duplicates, duplicate_count)."""
-    engine = DedupEngine(session)
+    dedup_kwargs = {}
+    if settings is not None:
+        dedup_kwargs = {
+            "title_threshold": settings.dedup_title_threshold,
+            "title_threshold_no_doi": settings.dedup_title_threshold_no_doi,
+            "date_window_days": settings.dedup_date_window_days,
+            "date_window_days_no_doi": settings.dedup_date_window_days_no_doi,
+        }
+    engine = DedupEngine(session, **dedup_kwargs)
     non_dups: list[Paper] = []
     dup_count = 0
 
