@@ -20,7 +20,7 @@ class TestRunDailyPipeline:
             call_order.append("ingest")
             return []
 
-        async def mock_dedup(session, papers):
+        async def mock_dedup(session, papers, settings=None):
             call_order.append("dedup")
             return papers, 0
 
