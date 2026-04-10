@@ -46,6 +46,14 @@ Based on comprehensive codebase audit conducted 2026-04-09 (see `2026-04-09_AUDI
 - [x] React.memo on AnalyticsCharts — prevent unnecessary chart re-renders (audit medium-severity)
 - [x] Parallelize raw SQL queries with Promise.all — eliminate extra totalIngested table scan (audit medium-severity)
 
+### Batch 5 — Feeds, filters, and audit fixes (2026-04-10)
+
+- [x] Tier 2 sources added to dashboard source filter dropdown
+- [x] RSS/JSON feed endpoint (`/api/feed` with `?format=rss` option) for programmatic consumption
+- [x] Author/institution dedicated text filters in dashboard (ILIKE queries)
+- [x] Dedup thresholds moved from hardcoded class constants to config settings (audit medium-severity)
+- [x] Accessibility: aria-controls on audit trail expandable buttons (audit low-severity)
+
 ---
 
 ## Deferred
@@ -56,17 +64,15 @@ Based on comprehensive codebase audit conducted 2026-04-09 (see `2026-04-09_AUDI
 
 ## Upcoming
 
-### Batch 5 — Analyst workflow
+### Batch 6 — Analyst workflow
 
 - [ ] Dimension-level trend analytics (per-dimension over time, not just aggregate)
 - [ ] Methods section passage highlighting (flag specific sentences of concern)
 - [ ] Related papers view (by author, topic, citation via Semantic Scholar)
 - [ ] Analyst feedback loop (confirmed/false-positive labels feed back to prompt refinement)
-- [ ] RSS/JSON feed for programmatic consumption
 
 ### Backlog
 
 - [ ] Crossref enrichment client (funder info extraction)
-- [ ] Author/institution dedicated filter in dashboard
 - [ ] Country filter in analytics
 - [ ] Version tracking and re-screening on paper updates
