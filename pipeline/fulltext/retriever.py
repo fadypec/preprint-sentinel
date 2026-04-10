@@ -228,7 +228,12 @@ async def _try_europepmc(http: httpx.AsyncClient, doi: str, delay: float) -> tup
     """Source 2: Europe PMC full text XML."""
     # First, find the Europe PMC source/id for this DOI
     search_url = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
-    params: dict[str, str | int] = {"query": f"DOI:{doi}", "format": "json", "resultType": "core", "pageSize": 1}
+    params: dict[str, str | int] = {
+        "query": f"DOI:{doi}",
+        "format": "json",
+        "resultType": "core",
+        "pageSize": 1,
+    }
     try:
         await asyncio.sleep(delay)
         resp = await http.get(search_url, params=params, timeout=30.0)
@@ -353,7 +358,7 @@ def _find_methods_in_text(text: str) -> str:
 
     # Try unnumbered "Methods" section
     plain_methods_re = re.compile(
-        r'\n\s*(materials?\s*(?:and|&)\s*methods|methods|experimental\s*(?:procedures|methods))\s*\n',
+        r"\n\s*(materials?\s*(?:and|&)\s*methods|methods|experimental\s*(?:procedures|methods))\s*\n",
         re.IGNORECASE | re.MULTILINE,
     )
     match = plain_methods_re.search(text)
@@ -361,7 +366,7 @@ def _find_methods_in_text(text: str) -> str:
         start = match.start()
         # Look for next major section
         next_section_re = re.compile(
-            r'\n\s*(?:results|discussion|conclusion|acknowledgements?|references|data\s*availability|author\s*contributions?)\s*\n',
+            r"\n\s*(?:results|discussion|conclusion|acknowledgements?|references|data\s*availability|author\s*contributions?)\s*\n",
             re.IGNORECASE | re.MULTILINE,
         )
         end_match = next_section_re.search(text, match.end())

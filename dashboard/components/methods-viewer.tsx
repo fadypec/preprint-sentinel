@@ -1,3 +1,5 @@
+import React from "react";
+
 type Props = {
   methods: string | null;
   methodsOfConcern?: string[];
@@ -34,7 +36,7 @@ export function MethodsViewer({ methods, methodsOfConcern }: Props) {
 function highlightPassages(
   text: string,
   concerns: string[],
-): (string | JSX.Element)[] {
+): (string | React.ReactElement)[] {
   if (concerns.length === 0) return [text];
 
   // Normalise concern terms for case-insensitive matching
@@ -42,7 +44,7 @@ function highlightPassages(
 
   // Split into sentences (rough — split on period+space or newline)
   const sentences = text.split(/(?<=\.)\s+|\n/);
-  const result: (string | JSX.Element)[] = [];
+  const result: (string | React.ReactElement)[] = [];
 
   for (let i = 0; i < sentences.length; i++) {
     const sentence = sentences[i];

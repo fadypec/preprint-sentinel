@@ -77,7 +77,11 @@ class CrossrefClient:
     # -- Internal ------------------------------------------------------------
 
     async def _fetch_source(
-        self, source_name: str, prefix: str, from_date: date, to_date: date,
+        self,
+        source_name: str,
+        prefix: str,
+        from_date: date,
+        to_date: date,
     ) -> AsyncGenerator[dict, None]:
         """Paginate through all results for a single DOI prefix."""
         cursor = "*"
@@ -105,7 +109,11 @@ class CrossrefClient:
             )
 
     async def _fetch_page(
-        self, prefix: str, from_date: date, to_date: date, cursor: str,
+        self,
+        prefix: str,
+        from_date: date,
+        to_date: date,
+        cursor: str,
     ) -> dict:
         """Fetch a single page from the Crossref API with retry."""
         if self._client is None:

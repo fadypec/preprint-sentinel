@@ -257,10 +257,17 @@ async def run_daily_pipeline(
 
             if skipped:
                 log.info("coarse_filter_skipped_empty", skipped=skipped)
-            backlog = sum(1 for p in papers_list if p.posted_date < from_date or p.posted_date > to_date)
+            backlog = sum(
+                1 for p in papers_list if p.posted_date < from_date or p.posted_date > to_date
+            )
             if backlog:
                 stats.backlog["coarse_filter"] = backlog
-            log.info("stage_starting", stage="coarse_filter", papers_to_process=len(papers_list), backlog=backlog)
+            log.info(
+                "stage_starting",
+                stage="coarse_filter",
+                papers_to_process=len(papers_list),
+                backlog=backlog,
+            )
             passed = await run_coarse_filter(
                 session=session,
                 llm_client=llm_client,
@@ -296,7 +303,9 @@ async def run_daily_pipeline(
             result = await session.execute(stmt)
             coarse_passed = list(result.scalars().all())
 
-            backlog = sum(1 for p in coarse_passed if p.posted_date < from_date or p.posted_date > to_date)
+            backlog = sum(
+                1 for p in coarse_passed if p.posted_date < from_date or p.posted_date > to_date
+            )
             if backlog:
                 stats.backlog["fulltext"] = backlog
             log.info(
@@ -367,7 +376,9 @@ async def run_daily_pipeline(
             result = await session.execute(stmt)
             fulltext_papers = list(result.scalars().all())
 
-            backlog = sum(1 for p in fulltext_papers if p.posted_date < from_date or p.posted_date > to_date)
+            backlog = sum(
+                1 for p in fulltext_papers if p.posted_date < from_date or p.posted_date > to_date
+            )
             if backlog:
                 stats.backlog["methods_analysis"] = backlog
             log.info(
@@ -377,9 +388,7 @@ async def run_daily_pipeline(
                 backlog=backlog,
             )
             fallback_models = [
-                m.strip()
-                for m in settings.stage2_fallback_models.split(",")
-                if m.strip()
+                m.strip() for m in settings.stage2_fallback_models.split(",") if m.strip()
             ]
             await run_methods_analysis(
                 session=session,
@@ -412,10 +421,17 @@ async def run_daily_pipeline(
             result = await session.execute(stmt)
             methods_papers = list(result.scalars().all())
 
-            backlog = sum(1 for p in methods_papers if p.posted_date < from_date or p.posted_date > to_date)
+            backlog = sum(
+                1 for p in methods_papers if p.posted_date < from_date or p.posted_date > to_date
+            )
             if backlog:
                 stats.backlog["enrichment"] = backlog
-            log.info("stage_starting", stage="enrichment", papers_to_process=len(methods_papers), backlog=backlog)
+            log.info(
+                "stage_starting",
+                stage="enrichment",
+                papers_to_process=len(methods_papers),
+                backlog=backlog,
+            )
             enriched = await _run_enrichment(session, methods_papers, settings)
             stats.papers_enriched = len(enriched)
             await session.commit()
@@ -443,10 +459,17 @@ async def run_daily_pipeline(
             result = await session.execute(stmt)
             to_adjudicate = list(result.scalars().all())
 
-            backlog = sum(1 for p in to_adjudicate if p.posted_date < from_date or p.posted_date > to_date)
+            backlog = sum(
+                1 for p in to_adjudicate if p.posted_date < from_date or p.posted_date > to_date
+            )
             if backlog:
                 stats.backlog["adjudication"] = backlog
-            log.info("stage_starting", stage="adjudication", papers_to_process=len(to_adjudicate), backlog=backlog)
+            log.info(
+                "stage_starting",
+                stage="adjudication",
+                papers_to_process=len(to_adjudicate),
+                backlog=backlog,
+            )
             await run_adjudication(
                 session=session,
                 llm_client=llm_client,
@@ -517,8 +540,7 @@ async def _run_ingest(
     existing_titles: set[str] = {r.title.lower().strip() for r in existing_rows if r.title}
     # DOI → (paper_id, version) for version upgrade detection
     doi_versions: dict[str, tuple[str, int]] = {
-        r.doi.lower(): (str(r.id), r.version or 1)
-        for r in existing_rows if r.doi
+        r.doi.lower(): (str(r.id), r.version or 1) for r in existing_rows if r.doi
     }
     log.info(
         "ingest_existing_loaded",
@@ -710,11 +732,15 @@ async def _run_dedup(
             if canonical_id != paper.id:  # don't match self
                 paper.is_duplicate_of = canonical_id
                 result = DedupResult(
-                    is_duplicate=True, duplicate_of=canonical_id,
-                    strategy_used="doi_match", confidence=1.0,
+                    is_duplicate=True,
+                    duplicate_of=canonical_id,
+                    strategy_used="doi_match",
+                    confidence=1.0,
                 )
                 await engine.record_duplicate(
-                    canonical_id=canonical_id, member_id=paper.id, result=result,
+                    canonical_id=canonical_id,
+                    member_id=paper.id,
+                    result=result,
                 )
                 dup_count += 1
                 continue

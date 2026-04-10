@@ -259,7 +259,6 @@ class TestCallTool:
         assert "no tool_use block" in result.error.lower()
         assert result.tool_input == {}
 
-
     async def test_call_tool_refusal_returns_specific_error(self):
         from pipeline.triage.llm import LLMClient
 

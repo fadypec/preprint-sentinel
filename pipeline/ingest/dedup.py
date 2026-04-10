@@ -107,7 +107,11 @@ class DedupEngine:
                 strategy = "title_author_date"
 
             match = await self._find_title_author_match(
-                title, surname, posted_date, threshold, window,
+                title,
+                surname,
+                posted_date,
+                threshold,
+                window,
                 exclude_id=paper_id,
             )
             if match is not None:
@@ -132,7 +136,10 @@ class DedupEngine:
         return {row.doi: row.id for row in result.all() if row.doi}
 
     async def _check_doi(
-        self, doi: str, *, exclude_id: uuid.UUID | None = None,
+        self,
+        doi: str,
+        *,
+        exclude_id: uuid.UUID | None = None,
     ) -> DedupResult | None:
         """Tier 1: exact DOI match via indexed lookup."""
         clause = Paper.doi == doi

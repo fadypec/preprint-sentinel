@@ -16,24 +16,48 @@ SAMPLE_JATS = b"""\
 <?xml version="1.0"?>
 <article><body>
 <sec><title>Introduction</title>
-<p>This paper describes a novel method for analyzing biological samples using molecular techniques.
-The approach builds on previous work by Smith et al. and represents a significant advance in the field.</p>
-<p>Our hypothesis is that this new method will provide more accurate results than existing approaches.</p>
+<p>This paper describes a novel method for analyzing biological
+samples using advanced molecular techniques and bioinformatics.</p>
+<p>The approach builds on previous work by Smith et al. and
+extends the framework with improved sensitivity metrics.</p>
+<p>Our hypothesis is that this method provides more accurate
+results than existing gel-based approaches in the field.</p>
+<p>We evaluated performance across multiple sample types
+including tissue, blood, and environmental specimens.</p>
+<p>The motivation for this work stems from limitations in
+current protocols that require large sample volumes.</p>
 </sec>
 <sec sec-type="methods"><title>Methods</title>
-<p>We used PCR amplification followed by gel electrophoresis to analyze DNA samples from 50 subjects.</p>
-<p>Sample collection was performed according to standard protocols with appropriate consent procedures.</p>
+<p>We used PCR followed by gel electrophoresis to analyze
+DNA extracted from 50 subjects across three cohorts.</p>
+<p>Sample collection followed standard protocols with
+appropriate informed consent from all participants.</p>
 <p>Statistical analysis was performed using R software with significance set at p&lt;0.05.</p>
 <p>All experiments were conducted in triplicate and results averaged for analysis.</p>
 </sec>
 <sec><title>Results</title>
-<p>The method successfully amplified target sequences in 47 of 50 samples (94% success rate).</p>
-<p>No significant differences were observed between treatment groups (p=0.23).</p>
-<p>Quality control samples performed within expected ranges throughout the study.</p>
+<p>The method amplified target sequences in 47 of 50
+samples giving a 94 percent success rate overall.</p>
+<p>No significant differences were observed between
+the treatment groups with a p-value of 0.23.</p>
+<p>Quality control samples performed within expected
+ranges throughout the duration of the study period.</p>
+<p>Sensitivity analysis confirmed robust performance
+across varying input concentrations and conditions.</p>
+<p>Reproducibility was high with coefficient of
+variation below 5 percent for all measured outcomes.</p>
 </sec>
 <sec><title>Discussion</title>
-<p>These results demonstrate the effectiveness of the new approach for sample analysis.</p>
-<p>Further validation studies are needed to confirm these preliminary findings.</p>
+<p>These results demonstrate the effectiveness of
+the new approach for biological sample analysis.</p>
+<p>Further validation studies are needed to confirm
+these preliminary findings in larger cohorts.</p>
+<p>The method shows promise for clinical settings
+where rapid turnaround time is essential.</p>
+<p>Compared to existing approaches our technique
+requires less sample material and fewer reagents.</p>
+<p>Future work should explore automation potential
+and integration with existing laboratory workflows.</p>
 </sec>
 </body></article>"""
 
@@ -70,7 +94,7 @@ class TestRetrieveCascade:
         await retrieve_full_text(db_session, paper, settings)
 
         assert paper.full_text_retrieved is True
-        assert "PCR amplification" in paper.methods_section
+        assert "PCR followed by gel electrophoresis" in paper.methods_section
         assert paper.pipeline_stage == PipelineStage.FULLTEXT_RETRIEVED
 
     @respx.mock
@@ -109,7 +133,7 @@ class TestRetrieveCascade:
         await retrieve_full_text(db_session, paper, settings)
 
         assert paper.full_text_retrieved is True
-        assert "PCR amplification" in paper.methods_section
+        assert "PCR followed by gel electrophoresis" in paper.methods_section
 
     @respx.mock
     async def test_all_sources_fail_gracefully(self, db_session: AsyncSession):

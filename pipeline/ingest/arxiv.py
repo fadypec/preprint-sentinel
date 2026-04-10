@@ -65,7 +65,10 @@ class ArxivClient:
     # -- Internal ------------------------------------------------------------
 
     async def _fetch_category(
-        self, category: str, from_date: date, to_date: date,
+        self,
+        category: str,
+        from_date: date,
+        to_date: date,
     ) -> AsyncGenerator[dict, None]:
         """Paginate through all results for a single category."""
         start = 0
@@ -91,7 +94,11 @@ class ArxivClient:
             )
 
     async def _fetch_page(
-        self, category: str, from_date: date, to_date: date, start: int,
+        self,
+        category: str,
+        from_date: date,
+        to_date: date,
+        start: int,
     ) -> str:
         """Fetch a single page from the arXiv API with retry."""
         if self._client is None:
@@ -153,25 +160,25 @@ class ArxivClient:
             doi = entry_el.findtext("arxiv:doi", default=None, namespaces=_NS)
 
             primary_cat_el = entry_el.find("arxiv:primary_category", _NS)
-            primary_category = (
-                primary_cat_el.get("term") if primary_cat_el is not None else None
-            )
+            primary_category = primary_cat_el.get("term") if primary_cat_el is not None else None
 
             pdf_url = None
             for link_el in entry_el.findall("atom:link", _NS):
                 if link_el.get("title") == "pdf":
                     pdf_url = link_el.get("href")
 
-            entries.append({
-                "arxiv_id": arxiv_id,
-                "title": title,
-                "summary": summary,
-                "authors": authors,
-                "published": published,
-                "doi": doi,
-                "primary_category": primary_category,
-                "pdf_url": pdf_url,
-            })
+            entries.append(
+                {
+                    "arxiv_id": arxiv_id,
+                    "title": title,
+                    "summary": summary,
+                    "authors": authors,
+                    "published": published,
+                    "doi": doi,
+                    "primary_category": primary_category,
+                    "pdf_url": pdf_url,
+                }
+            )
 
         return entries
 

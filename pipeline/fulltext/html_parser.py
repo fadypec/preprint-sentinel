@@ -162,7 +162,7 @@ def _extract_by_content_structure(body) -> str | None:
         first_lines = elem_text[:500]
         if _METHODS_HEADINGS.search(first_lines):
             # Extract from start of methods pattern to end of element
-            import re
+
             match = _METHODS_HEADINGS.search(elem_text)
             if match:
                 methods_start = match.start()
@@ -179,13 +179,23 @@ def _extract_by_publisher_patterns(body) -> str | None:
     full_text = body.text_content()
 
     # Pattern 1: Nature/Springer - often uses "Methods" in plain text followed by content
-    nature_pattern = re.compile(r'\n\s*Methods\s*\n(.*?)(?=\n\s*(?:Results|Discussion|References|Data availability|Author information|Acknowledgements|Extended data)\s*\n|$)', re.DOTALL | re.IGNORECASE)
+    _next_sections = (
+        r"Results|Discussion|References|Data availability"
+        r"|Author information|Acknowledgements|Extended data"
+    )
+    nature_pattern = re.compile(
+        rf"\n\s*Methods\s*\n(.*?)(?=\n\s*(?:{_next_sections})\s*\n|$)",
+        re.DOTALL | re.IGNORECASE,
+    )
     match = nature_pattern.search(full_text)
     if match and len(match.group(1).strip()) > 100:
         return f"Methods\n{match.group(1).strip()}"
 
     # Pattern 2: Look for numbered sections
-    numbered_pattern = re.compile(r'\n\s*(\d+\.?\s*(?:Materials?\s*(?:and|&)\s*)?Methods?)\s*\n(.*?)(?=\n\s*\d+\.?\s*\w|$)', re.DOTALL | re.IGNORECASE)
+    numbered_pattern = re.compile(
+        r"\n\s*(\d+\.?\s*(?:Materials?\s*(?:and|&)\s*)?Methods?)\s*\n(.*?)(?=\n\s*\d+\.?\s*\w|$)",
+        re.DOTALL | re.IGNORECASE,
+    )
     match = numbered_pattern.search(full_text)
     if match and len(match.group(2).strip()) > 100:
         return f"{match.group(1)}\n{match.group(2).strip()}"
@@ -209,9 +219,11 @@ def _extract_by_paragraph_patterns(body) -> str | None:
                 next_text = next_elem.text_content().strip()
 
                 # Stop at next major section
-                if (len(next_text) < 50 and
-                    re.match(r'^\s*(results|discussion|conclusions?|acknowledgements?|references)\s*$',
-                            next_text, re.IGNORECASE)):
+                if len(next_text) < 50 and re.match(
+                    r"^\s*(results|discussion|conclusions?|acknowledgements?|references)\s*$",
+                    next_text,
+                    re.IGNORECASE,
+                ):
                     break
 
                 parts.append(next_text)
@@ -239,8 +251,10 @@ def _extract_section_by_siblings(heading) -> str:
 
     while sibling is not None:
         # Stop at same or higher level heading
-        if (sibling.tag in ["h1", "h2", "h3", "h4", "h5", "h6"] and
-            int(sibling.tag[1]) <= heading_level):
+        if (
+            sibling.tag in ["h1", "h2", "h3", "h4", "h5", "h6"]
+            and int(sibling.tag[1]) <= heading_level
+        ):
             break
         parts.append(_extract_text(sibling))
         sibling = sibling.getnext()

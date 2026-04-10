@@ -201,9 +201,7 @@ class TestRetry:
 
     @respx.mock
     async def test_all_retries_exhausted_raises(self):
-        respx.get("https://export.arxiv.org/api/query").mock(
-            return_value=httpx.Response(429)
-        )
+        respx.get("https://export.arxiv.org/api/query").mock(return_value=httpx.Response(429))
         from pipeline.ingest.arxiv import ArxivClient
 
         async with ArxivClient(request_delay=0, max_retries=2) as client:

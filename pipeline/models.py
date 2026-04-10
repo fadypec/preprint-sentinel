@@ -198,10 +198,12 @@ class PaperGroup(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     canonical_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("papers.id", ondelete="CASCADE"), index=True,
+        ForeignKey("papers.id", ondelete="CASCADE"),
+        index=True,
     )
     member_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("papers.id", ondelete="CASCADE"), index=True,
+        ForeignKey("papers.id", ondelete="CASCADE"),
+        index=True,
     )
     relationship: Mapped[DedupRelationship] = mapped_column(
         SQLEnum(DedupRelationship, name="dedup_relationship", create_constraint=True),
@@ -221,7 +223,8 @@ class AssessmentLog(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     paper_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("papers.id", ondelete="CASCADE"), index=True,
+        ForeignKey("papers.id", ondelete="CASCADE"),
+        index=True,
     )
     stage: Mapped[str] = mapped_column(String(50), index=True)
     model_used: Mapped[str] = mapped_column(String(100))

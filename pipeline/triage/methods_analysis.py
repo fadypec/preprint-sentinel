@@ -101,7 +101,7 @@ def _apply_result(paper: Paper, tool_input: dict) -> None:
             "dimensions_field_is_string",
             paper_id=str(paper.id),
             dimensions_preview=dimensions[:200],
-            all_keys=list(tool_input.keys())
+            all_keys=list(tool_input.keys()),
         )
         raise ValueError("Corrupted tool_input: dimensions field contains string instead of object")
 
@@ -112,8 +112,12 @@ def _apply_result(paper: Paper, tool_input: dict) -> None:
 
     # Check for required dimension keys
     required_dims = {
-        "pathogen_enhancement", "synthesis_barrier_lowering", "select_agent_relevance",
-        "novel_technique", "information_hazard", "defensive_framing"
+        "pathogen_enhancement",
+        "synthesis_barrier_lowering",
+        "select_agent_relevance",
+        "novel_technique",
+        "information_hazard",
+        "defensive_framing",
     }
     missing_dims = required_dims - set(dimensions.keys())
     if missing_dims:
@@ -122,12 +126,16 @@ def _apply_result(paper: Paper, tool_input: dict) -> None:
 
     # Validate dimension structure
     for dim_name, dim_value in dimensions.items():
-        if not isinstance(dim_value, dict) or "score" not in dim_value or "justification" not in dim_value:
+        if (
+            not isinstance(dim_value, dict)
+            or "score" not in dim_value
+            or "justification" not in dim_value
+        ):
             log.error(
                 "malformed_dimension",
                 paper_id=str(paper.id),
                 dimension=dim_name,
-                structure=dim_value
+                structure=dim_value,
             )
             raise ValueError(f"Dimension '{dim_name}' has invalid structure")
 
@@ -210,7 +218,12 @@ async def _run_sync(
             _create_assessment_log(session, paper, llm_result, used_model, user_msg)
 
         if llm_result.error:
-            log.warning("methods_analysis_error", paper_id=str(paper.id), error=llm_result.error, model=used_model)
+            log.warning(
+                "methods_analysis_error",
+                paper_id=str(paper.id),
+                error=llm_result.error,
+                model=used_model,
+            )
             paper.stage2_result = {"_error": llm_result.error, "_model": used_model}
             paper.pipeline_stage = PipelineStage.METHODS_ANALYSED
             paper.needs_manual_review = True
@@ -222,7 +235,11 @@ async def _run_sync(
                     paper_id=str(paper.id),
                     error=validation_err,
                 )
-                paper.stage2_result = {"_error": validation_err, "_model": used_model, **llm_result.tool_input}
+                paper.stage2_result = {
+                    "_error": validation_err,
+                    "_model": used_model,
+                    **llm_result.tool_input,
+                }
                 paper.pipeline_stage = PipelineStage.METHODS_ANALYSED
                 paper.needs_manual_review = True
             else:
@@ -246,8 +263,10 @@ async def _run_sync(
                         "methods_analysis_structural_error",
                         paper_id=str(paper.id),
                         error=error_msg,
-                        tool_input_preview=str(llm_result.tool_input)[:500] if llm_result.tool_input else None,
-                        model=used_model
+                        tool_input_preview=str(llm_result.tool_input)[:500]
+                        if llm_result.tool_input
+                        else None,
+                        model=used_model,
                     )
 
                     # Store error but preserve the raw tool_input for debugging
@@ -344,8 +363,10 @@ async def _run_batch(
                 "methods_analysis_structural_error_batch",
                 paper_id=custom_id,
                 error=error_msg,
-                tool_input_preview=str(llm_result.tool_input)[:500] if llm_result.tool_input else None,
-                model=model
+                tool_input_preview=str(llm_result.tool_input)[:500]
+                if llm_result.tool_input
+                else None,
+                model=model,
             )
 
             # Store error but preserve the raw tool_input for debugging
