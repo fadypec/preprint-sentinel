@@ -37,11 +37,11 @@ jobs:
         run: ruff format --check pipeline/ tests/
       - name: Type check (mypy)
         run: mypy pipeline/
-      - name: Run tests
+      - name: Run tests with coverage
         env:
           DATABASE_URL: postgresql+asyncpg://durc:test@localhost:5432/durc_triage
           ANTHROPIC_API_KEY: sk-ant-test-not-real
-        run: pytest tests/ -v --tb=short
+        run: pytest tests/ -v --tb=short --cov=pipeline --cov-report=term-missing
 
   dashboard:
     name: Dashboard lint & type-check
