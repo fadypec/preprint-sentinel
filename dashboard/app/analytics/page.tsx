@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { KpiCard } from "@/components/kpi-card";
 import { AnalyticsCharts } from "@/components/analytics-charts";
+import { PaperCoverageHeatmap } from "@/components/paper-coverage-heatmap";
+import { Card } from "@/components/ui/card";
 import { PipelineStage } from "@prisma/client";
 
 type DimensionTrendRow = {
@@ -182,6 +184,10 @@ export default async function AnalyticsPage() {
           }
         />
       </div>
+
+      <Card className="mb-6 p-4">
+        <PaperCoverageHeatmap />
+      </Card>
 
       <AnalyticsCharts
         papersOverTime={stats.papersOverTime}

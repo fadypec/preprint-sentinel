@@ -158,7 +158,7 @@ export default async function PipelinePage() {
 
           <Card className="p-4">
             <h2 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
-              Data Coverage
+              Pipeline Runs
             </h2>
             <CoverageHeatmap />
           </Card>
