@@ -77,7 +77,9 @@ def parse_malformed_result(stage2_result: dict[str, Any]) -> dict[str, Any] | No
     return None
 
 
-def _parse_strategy_complete_json(dimensions_str: str, stage2_result: dict) -> dict[str, Any] | None:
+def _parse_strategy_complete_json(
+    dimensions_str: str, stage2_result: dict
+) -> dict[str, Any] | None:
     """Try to parse as complete JSON first."""
     try:
         full_response = json.loads(dimensions_str)
@@ -88,14 +90,16 @@ def _parse_strategy_complete_json(dimensions_str: str, stage2_result: dict) -> d
     return None
 
 
-def _parse_strategy_dimension_boundary(dimensions_str: str, stage2_result: dict) -> dict[str, Any] | None:
+def _parse_strategy_dimension_boundary(
+    dimensions_str: str, stage2_result: dict
+) -> dict[str, Any] | None:
     """Handle malformed structure by finding dimension boundary."""
-    lines = dimensions_str.strip().split('\n')
+    lines = dimensions_str.strip().split("\n")
 
     # Find the line where the dimensions object ends (look for "},)
     dimension_end = -1
     for i, line in enumerate(lines):
-        if line.strip() == '},':
+        if line.strip() == "},":
             # Check if the next line starts a top-level field
             if i + 1 < len(lines) and lines[i + 1].strip().startswith('"aggregate_score"'):
                 dimension_end = i
@@ -105,29 +109,28 @@ def _parse_strategy_dimension_boundary(dimensions_str: str, stage2_result: dict)
         return None
 
     # Split into dimensions part and top-level fields part
-    dimensions_lines = lines[:dimension_end] + ['}']  # Replace }, with }
-    top_level_lines = lines[dimension_end + 1:]
+    dimensions_lines = lines[:dimension_end] + ["}"]  # Replace }, with }
+    top_level_lines = lines[dimension_end + 1 :]
 
     # Parse dimensions object
-    dimensions_json = '\n'.join(dimensions_lines)
+    dimensions_json = "\n".join(dimensions_lines)
     dimensions_obj = json.loads(dimensions_json)
 
     # Parse top-level fields - add opening brace
-    top_level_json = '{\n' + '\n'.join(top_level_lines)
+    top_level_json = "{\n" + "\n".join(top_level_lines)
     # Remove trailing comma if exists and add closing brace if missing
-    top_level_json = top_level_json.rstrip().rstrip(',') + '\n}'
+    top_level_json = top_level_json.rstrip().rstrip(",") + "\n}"
     top_level_obj = json.loads(top_level_json)
 
     # Combine into proper structure
-    full_response = {
-        "dimensions": dimensions_obj,
-        **top_level_obj
-    }
+    full_response = {"dimensions": dimensions_obj, **top_level_obj}
 
     return validate_and_build_result(stage2_result, full_response)
 
 
-def _parse_strategy_truncated_json(dimensions_str: str, stage2_result: dict) -> dict[str, Any] | None:
+def _parse_strategy_truncated_json(
+    dimensions_str: str, stage2_result: dict
+) -> dict[str, Any] | None:
     """Handle truncated JSON by finding the last complete field."""
     # Look for truncated JSON that ends abruptly
     # Try to find the last complete field and extract what we can
@@ -141,6 +144,7 @@ def _parse_strategy_truncated_json(dimensions_str: str, stage2_result: dict) -> 
 
     for pattern in truncation_patterns:
         import re
+
         match = re.search(pattern, dimensions_str, re.DOTALL)
         if match:
             # Try to reconstruct based on what we found
@@ -153,12 +157,14 @@ def _parse_strategy_truncated_json(dimensions_str: str, stage2_result: dict) -> 
     return None
 
 
-def _parse_strategy_control_chars(dimensions_str: str, stage2_result: dict) -> dict[str, Any] | None:
+def _parse_strategy_control_chars(
+    dimensions_str: str, stage2_result: dict
+) -> dict[str, Any] | None:
     """Handle JSON with control characters by cleaning them."""
     import re
 
     # Remove control characters except newlines and tabs
-    cleaned = re.sub(r'[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]', '', dimensions_str)
+    cleaned = re.sub(r"[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]", "", dimensions_str)
 
     if cleaned != dimensions_str:
         # Try parsing the cleaned version with other strategies
@@ -173,7 +179,9 @@ def _parse_strategy_control_chars(dimensions_str: str, stage2_result: dict) -> d
     return None
 
 
-def _parse_strategy_regex_extraction(dimensions_str: str, stage2_result: dict) -> dict[str, Any] | None:
+def _parse_strategy_regex_extraction(
+    dimensions_str: str, stage2_result: dict
+) -> dict[str, Any] | None:
     """Extract fields using regex patterns as last resort."""
     import re
 
@@ -183,45 +191,51 @@ def _parse_strategy_regex_extraction(dimensions_str: str, stage2_result: dict) -
     # Extract aggregate_score
     score_match = re.search(r'"aggregate_score":\s*(\d+)', dimensions_str)
     if score_match:
-        extracted['aggregate_score'] = int(score_match.group(1))
+        extracted["aggregate_score"] = int(score_match.group(1))
 
     # Extract risk_tier
     tier_match = re.search(r'"risk_tier":\s*"([^"]*)"', dimensions_str)
     if tier_match:
-        extracted['risk_tier'] = tier_match.group(1)
+        extracted["risk_tier"] = tier_match.group(1)
 
     # Extract summary
-    summary_match = re.search(r'"summary":\s*"([^"]*(?:\\.[^"]*)*)"', dimensions_str)
+    summary_match = re.search(r'"summary":\s*"((?:[^"\\]|\\.)*)"', dimensions_str)
     if summary_match:
-        extracted['summary'] = summary_match.group(1).replace('\\"', '"')
+        extracted["summary"] = summary_match.group(1).replace('\\"', '"')
 
     # Extract recommended_action
     action_match = re.search(r'"recommended_action":\s*"([^"]*)"', dimensions_str)
     if action_match:
-        extracted['recommended_action'] = action_match.group(1)
+        extracted["recommended_action"] = action_match.group(1)
 
     # Try to extract dimensions (simplified)
     dimensions = {}
-    dim_names = ['pathogen_enhancement', 'synthesis_barrier_lowering', 'select_agent_relevance',
-                 'novel_technique', 'information_hazard', 'defensive_framing']
+    dim_names = [
+        "pathogen_enhancement",
+        "synthesis_barrier_lowering",
+        "select_agent_relevance",
+        "novel_technique",
+        "information_hazard",
+        "defensive_framing",
+    ]
 
     for dim_name in dim_names:
         score_pattern = f'"{dim_name}":\\s*{{[^}}]*"score":\\s*(\\d+)'
         score_match = re.search(score_pattern, dimensions_str)
         if score_match:
             dimensions[dim_name] = {
-                'score': int(score_match.group(1)),
-                'justification': 'Recovered from corrupted data - justification unavailable'
+                "score": int(score_match.group(1)),
+                "justification": "Recovered from corrupted data - justification unavailable",
             }
 
     # Only proceed if we extracted enough core data
     if len(extracted) >= 3 and dimensions:  # Need at least score, tier, action and some dimensions
-        extracted['dimensions'] = dimensions
-        extracted['key_methods_of_concern'] = []  # Default empty
+        extracted["dimensions"] = dimensions
+        extracted["key_methods_of_concern"] = []  # Default empty
 
         # Fill in missing fields with defaults
-        if 'summary' not in extracted:
-            extracted['summary'] = 'Summary recovered from corrupted data'
+        if "summary" not in extracted:
+            extracted["summary"] = "Summary recovered from corrupted data"
 
         return validate_and_build_result(stage2_result, extracted)
 
@@ -234,12 +248,18 @@ def _reconstruct_from_partial_match(match, stage2_result: dict) -> dict[str, Any
     return None
 
 
-def validate_and_build_result(stage2_result: dict[str, Any], full_response: dict[str, Any]) -> dict[str, Any] | None:
+def validate_and_build_result(
+    stage2_result: dict[str, Any], full_response: dict[str, Any]
+) -> dict[str, Any] | None:
     """Validate parsed response and build corrected result."""
     # Validate that we have all required fields
     required_fields = {
-        "dimensions", "aggregate_score", "risk_tier",
-        "summary", "key_methods_of_concern", "recommended_action"
+        "dimensions",
+        "aggregate_score",
+        "risk_tier",
+        "summary",
+        "key_methods_of_concern",
+        "recommended_action",
     }
 
     if not all(field in full_response for field in required_fields):
@@ -328,7 +348,9 @@ async def fix_parsing_bug(dry_run: bool = True) -> None:
                 paper.stage2_result = corrected_result
                 paper.aggregate_score = corrected_result.get("aggregate_score")
                 paper.risk_tier = _RISK_TIER_MAP.get(corrected_result.get("risk_tier"))
-                paper.recommended_action = _ACTION_MAP.get(corrected_result.get("recommended_action"))
+                paper.recommended_action = _ACTION_MAP.get(
+                    corrected_result.get("recommended_action")
+                )
 
                 log.info(
                     "fixed_paper",
