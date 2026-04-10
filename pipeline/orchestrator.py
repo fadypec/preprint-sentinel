@@ -511,10 +511,15 @@ async def _run_ingest(
     # have, without a per-paper DB round-trip.  We check ALL existing papers,
     # not just those in the date range, because the same paper can appear
     # from different sources with different posted dates.
-    existing_stmt = select(Paper.doi, Paper.title)
+    existing_stmt = select(Paper.id, Paper.doi, Paper.title, Paper.version)
     existing_rows = (await session.execute(existing_stmt)).all()
     existing_dois: set[str] = {r.doi.lower() for r in existing_rows if r.doi}
     existing_titles: set[str] = {r.title.lower().strip() for r in existing_rows if r.title}
+    # DOI → (paper_id, version) for version upgrade detection
+    doi_versions: dict[str, tuple[str, int]] = {
+        r.doi.lower(): (str(r.id), r.version or 1)
+        for r in existing_rows if r.doi
+    }
     log.info(
         "ingest_existing_loaded",
         dois=len(existing_dois),
@@ -580,7 +585,27 @@ async def _run_ingest(
                 # Skip if we already have this paper (by DOI or exact title)
                 doi = record.get("doi")
                 title = record.get("title")
+                new_version = record.get("version", 1)
+
                 if doi and doi.lower() in existing_dois:
+                    # Check for version upgrade — if new version is higher,
+                    # flag the existing paper for re-screening
+                    doi_lower = doi.lower()
+                    if doi_lower in doi_versions:
+                        existing_id, existing_ver = doi_versions[doi_lower]
+                        if new_version > existing_ver:
+                            existing_paper = await session.get(Paper, existing_id)
+                            if existing_paper:
+                                existing_paper.version = new_version
+                                existing_paper.pipeline_stage = PipelineStage.INGESTED
+                                existing_paper.needs_manual_review = True
+                                doi_versions[doi_lower] = (existing_id, new_version)
+                                log.info(
+                                    "version_upgrade_detected",
+                                    doi=doi,
+                                    old_version=existing_ver,
+                                    new_version=new_version,
+                                )
                     skipped += 1
                     continue
                 if title and title.lower().strip() in existing_titles:
