@@ -89,7 +89,7 @@ async function getStats() {
   });
   const fpRate = reviewedPapers > 0 ? Math.round((fpCount / reviewedPapers) * 100) : null;
 
-  // Top institutions — use OpenAlex enrichment data for better coverage
+  // Top institutions — all flagged papers, using OpenAlex enrichment with fallback
   const topInstitutions = await prisma.$queryRaw<
     { name: string; count: number }[]
   >`
@@ -100,9 +100,9 @@ async function getStats() {
       ) as name,
       COUNT(*)::int as count
     FROM papers
-    WHERE posted_date >= ${thirtyDaysAgo}
-      AND risk_tier IN ('critical', 'high')
+    WHERE risk_tier IS NOT NULL
       AND is_duplicate_of IS NULL
+      AND coarse_filter_passed = true
       AND COALESCE(
         enrichment_data->'openalex'->>'primary_institution',
         corresponding_institution
@@ -117,8 +117,8 @@ async function getStats() {
   >`
     SELECT subject_category as name, COUNT(*)::int as count
     FROM papers
-    WHERE posted_date >= ${thirtyDaysAgo}
-      AND is_duplicate_of IS NULL
+    WHERE is_duplicate_of IS NULL
+      AND coarse_filter_passed = true
       AND subject_category IS NOT NULL
     GROUP BY subject_category
     ORDER BY count DESC
@@ -132,8 +132,8 @@ async function getStats() {
       enrichment_data->'openalex'->>'primary_institution_country' as name,
       COUNT(*)::int as count
     FROM papers
-    WHERE posted_date >= ${thirtyDaysAgo}
-      AND is_duplicate_of IS NULL
+    WHERE is_duplicate_of IS NULL
+      AND coarse_filter_passed = true
       AND enrichment_data->'openalex'->>'primary_institution_country' IS NOT NULL
     GROUP BY name
     ORDER BY count DESC

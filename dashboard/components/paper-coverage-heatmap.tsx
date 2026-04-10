@@ -148,12 +148,8 @@ export function PaperCoverageHeatmap() {
   // Find gaps
   const gaps = last30.filter((d) => isWeekday(d) && sourceCount(coverage[d]) === 0);
 
-  // Detect which sources have EVER appeared
-  const activeSources = new Set<string>();
-  for (const day of Object.values(coverage)) {
-    for (const src of Object.keys(day)) activeSources.add(src);
-  }
-  const orderedSources = ALL_SOURCES.filter((s) => activeSources.has(s));
+  // Show ALL configured sources so missing ones are visible as empty columns
+  const orderedSources = ALL_SOURCES;
 
   if (!loaded) {
     return <div className="h-48 animate-pulse rounded bg-slate-800/30" />;
