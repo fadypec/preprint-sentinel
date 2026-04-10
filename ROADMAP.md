@@ -62,17 +62,23 @@ Based on comprehensive codebase audit conducted 2026-04-09 (see `2026-04-09_AUDI
 
 ---
 
+### Batch 6 — Analyst workflow (2026-04-10)
+
+- [x] Dimension-level trend analytics — already implemented (weekly avg per-dimension line chart)
+- [x] Analyst feedback export endpoint (`/api/feedback`) for prompt refinement analysis
+- [x] Related papers section on paper detail page (by institution and first author)
+- [x] Country distribution chart in analytics (from OpenAlex enrichment JSONB)
+
+---
+
 ## Upcoming
 
-### Batch 6 — Analyst workflow
+### Batch 7 — Advanced analyst features
 
-- [ ] Dimension-level trend analytics (per-dimension over time, not just aggregate)
 - [ ] Methods section passage highlighting (flag specific sentences of concern)
-- [ ] Related papers view (by author, topic, citation via Semantic Scholar)
-- [ ] Analyst feedback loop (confirmed/false-positive labels feed back to prompt refinement)
+- [ ] Analyst feedback loop — use exported FP/confirmed data to refine LLM prompts
 
 ### Backlog
 
 - [ ] Crossref enrichment client (funder info extraction)
-- [ ] Country filter in analytics
 - [ ] Version tracking and re-screening on paper updates
