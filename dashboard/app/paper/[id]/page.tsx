@@ -253,7 +253,10 @@ export default async function PaperDetailPage({ params }: Props) {
             <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Methods Section
             </h2>
-            <MethodsViewer methods={paper.methodsSection} />
+            <MethodsViewer
+              methods={paper.methodsSection}
+              methodsOfConcern={stage2?.key_methods_of_concern}
+            />
           </section>
 
           {/* Analyst Notes */}
