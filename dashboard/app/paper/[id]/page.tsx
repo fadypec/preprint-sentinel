@@ -7,6 +7,7 @@ import { EnrichmentCard } from "@/components/enrichment-card";
 import { MethodsViewer } from "@/components/methods-viewer";
 import { AnalystNotes } from "@/components/analyst-notes";
 import { AuditTrail } from "@/components/audit-trail";
+import { RelatedPapers } from "@/components/related-papers";
 import { riskStyle } from "@/lib/risk-colors";
 import { cn, formatDate, sourceServerLabel, languageName } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
@@ -261,6 +262,22 @@ export default async function PaperDetailPage({ params }: Props) {
               Analyst Notes
             </h2>
             <AnalystNotes paperId={paper.id} initialNotes={paper.analystNotes} />
+          </section>
+
+          {/* Related Papers */}
+          <section>
+            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Related Papers
+            </h2>
+            <RelatedPapers
+              paperId={paper.id}
+              institution={paper.correspondingInstitution}
+              firstAuthorSurname={
+                authorList && authorList.length > 0
+                  ? (authorList[0].name ?? "").split(",")[0]?.trim() || null
+                  : null
+              }
+            />
           </section>
 
           {/* Audit Trail */}
