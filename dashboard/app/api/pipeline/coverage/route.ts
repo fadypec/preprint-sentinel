@@ -2,44 +2,43 @@ import { prisma } from "@/lib/prisma";
 import { apiRequireAuth } from "@/lib/auth-guard";
 
 /**
- * Returns per-date coverage data for the heatmap.
+ * Returns per-date pipeline run data for the coverage heatmap.
  *
- * Derives coverage from the papers table (ground truth) rather than
- * pipeline_runs, so clearing run history doesn't destroy the heatmap.
- *
- * Each date gets a status based on which sources have papers:
- *   "full" — has PubMed papers (broader coverage)
- *   "mesh" — has papers but no PubMed (preprint servers only)
+ * Each date gets a status based on pipeline_runs:
+ *   "success" — ran with no errors
+ *   "error"   — ran but had errors
+ *   (absent)  — no run on this date (gap in coverage)
  */
 export async function GET() {
   const denied = await apiRequireAuth();
   if (denied) return denied;
 
-  // Count papers per posted_date, split by whether PubMed is present
   const rows = await prisma.$queryRaw<
     {
-      posted_date: string;
-      total: bigint;
-      has_pubmed: boolean;
+      run_date: string;
+      runs: bigint;
+      has_error: boolean;
+      papers_ingested: bigint;
     }[]
   >`
     SELECT
-      posted_date::text as posted_date,
-      COUNT(*) as total,
-      BOOL_OR(source_server = 'pubmed') as has_pubmed
-    FROM papers
-    WHERE is_duplicate_of IS NULL
-      AND posted_date >= CURRENT_DATE - INTERVAL '200 days'
-    GROUP BY posted_date
-    ORDER BY posted_date
+      (started_at AT TIME ZONE 'UTC')::date::text as run_date,
+      COUNT(*) as runs,
+      BOOL_OR(
+        errors IS NOT NULL AND jsonb_array_length(errors) > 0
+      ) as has_error,
+      SUM(papers_ingested) as papers_ingested
+    FROM pipeline_runs
+    WHERE started_at >= CURRENT_DATE - INTERVAL '200 days'
+    GROUP BY (started_at AT TIME ZONE 'UTC')::date
+    ORDER BY run_date
   `;
 
   const coverage: Record<string, string> = {};
 
   for (const row of rows) {
-    if (!row.posted_date) continue;
-    const key = row.posted_date;
-    coverage[key] = row.has_pubmed ? "full" : "mesh";
+    if (!row.run_date) continue;
+    coverage[row.run_date] = row.has_error ? "error" : "success";
   }
 
   return Response.json(coverage);

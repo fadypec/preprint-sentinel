@@ -3,20 +3,24 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
-type Coverage = Record<string, string>; // date string → "full" | "mesh" | "error"
+type Coverage = Record<string, string>; // date string → "success" | "error"
 
-const DAY_LABELS = ["", "Mon", "", "Wed", "", "Fri", ""];
+// Monday-first: Mon=0, Tue=1, ..., Sun=6
+const DAY_LABELS = ["Mon", "", "Wed", "", "Fri", "", ""];
 const MONTH_LABELS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
 
+/** Convert JS getDay() (Sun=0) to Monday-first index (Mon=0). */
+function mondayIndex(jsDay: number): number {
+  return (jsDay + 6) % 7; // Mon=0, Tue=1, ..., Sun=6
+}
+
 function getCellColor(status: string | undefined): string {
   switch (status) {
-    case "full":
+    case "success":
       return "bg-green-500";
-    case "mesh":
-      return "bg-amber-500";
     case "error":
       return "bg-red-500";
     default:
@@ -26,26 +30,30 @@ function getCellColor(status: string | undefined): string {
 
 function getCellTitle(dateStr: string, status: string | undefined): string {
   switch (status) {
-    case "full":
-      return `${dateStr}: Preprints + PubMed`;
-    case "mesh":
-      return `${dateStr}: Preprints only`;
+    case "success":
+      return `${dateStr}: Pipeline ran successfully`;
+    case "error":
+      return `${dateStr}: Pipeline ran with errors`;
     default:
-      return `${dateStr}: No data`;
+      return `${dateStr}: No pipeline run (gap)`;
   }
 }
 
-/** Build the weeks grid for the last N weeks. */
+/** Build the weeks grid starting on Monday. */
 function buildGrid(weeks: number) {
   const today = new Date();
-  // Find the most recent Saturday (end of week in GitHub style, Sun=0)
-  const endDay = new Date(today);
-  endDay.setDate(endDay.getDate() + (6 - endDay.getDay()));
 
+  // Find the end of the current week (Sunday)
+  const endDay = new Date(today);
+  const daysUntilSunday = (7 - mondayIndex(endDay.getDay()) - 1 + 7) % 7;
+  endDay.setDate(endDay.getDate() + daysUntilSunday);
+
+  // Go back N weeks from end
   const startDay = new Date(endDay);
   startDay.setDate(startDay.getDate() - (weeks * 7 - 1));
-  // Align to Sunday
-  startDay.setDate(startDay.getDate() - startDay.getDay());
+  // Align to Monday
+  const startOffset = mondayIndex(startDay.getDay());
+  startDay.setDate(startDay.getDate() - startOffset);
 
   const grid: string[][] = []; // grid[week][dayOfWeek] = "YYYY-MM-DD"
   const d = new Date(startDay);
@@ -120,7 +128,7 @@ export function CoverageHeatmap() {
       </div>
 
       <div className="flex gap-[2px]">
-        {/* Day of week labels */}
+        {/* Day of week labels (Mon-first) */}
         <div className="flex flex-col gap-[2px] pr-1">
           {DAY_LABELS.map((label, i) => (
             <div key={i} className="flex h-[11px] w-5 items-center justify-end">
@@ -149,7 +157,6 @@ export function CoverageHeatmap() {
                         : "bg-slate-800/50 dark:bg-slate-700/50",
                   )}
                   title={isFuture ? "" : getCellTitle(dateStr, status)}
-                  // only fill slots up to row length of 7
                   style={di >= 7 ? { display: "none" } : undefined}
                 />
               );
@@ -162,15 +169,15 @@ export function CoverageHeatmap() {
       <div className="flex items-center gap-3 pt-1">
         <div className="flex items-center gap-1">
           <div className="h-[11px] w-[11px] rounded-[2px] bg-slate-800 dark:bg-slate-700" />
-          <span className="text-[10px] text-slate-500 dark:text-slate-400">No data</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="h-[11px] w-[11px] rounded-[2px] bg-amber-500" />
-          <span className="text-[10px] text-slate-500 dark:text-slate-400">Preprints</span>
+          <span className="text-[10px] text-slate-500 dark:text-slate-400">No run</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="h-[11px] w-[11px] rounded-[2px] bg-green-500" />
-          <span className="text-[10px] text-slate-500 dark:text-slate-400">+ PubMed</span>
+          <span className="text-[10px] text-slate-500 dark:text-slate-400">Success</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="h-[11px] w-[11px] rounded-[2px] bg-red-500" />
+          <span className="text-[10px] text-slate-500 dark:text-slate-400">Errors</span>
         </div>
       </div>
     </div>
