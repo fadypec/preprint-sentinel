@@ -29,6 +29,7 @@ export function AuditTrail({ logs }: Props) {
               className="flex w-full items-center gap-2 p-3 text-left text-xs"
               onClick={() => setExpandedId(isExpanded ? null : log.id)}
               aria-expanded={isExpanded}
+              aria-controls={`audit-detail-${log.id}`}
             >
               {isExpanded ? (
                 <ChevronDown className="h-3 w-3 shrink-0" />
@@ -48,7 +49,7 @@ export function AuditTrail({ logs }: Props) {
               </span>
             </button>
             {isExpanded && (
-              <div className="border-t border-slate-200 p-3 dark:border-slate-700">
+              <div id={`audit-detail-${log.id}`} className="border-t border-slate-200 p-3 dark:border-slate-700">
                 <details className="mb-2">
                   <summary className="cursor-pointer text-xs font-medium text-slate-600 dark:text-slate-400">
                     Prompt
