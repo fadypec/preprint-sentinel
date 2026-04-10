@@ -602,56 +602,71 @@ async def _run_ingest(
         source_count = 0
         skipped = 0
         log.info("ingest_source_starting", source=source_name)
-        async with client_factory() as client:
-            async for record in client.fetch_papers(from_date, to_date):
-                # Skip if we already have this paper (by DOI or exact title)
-                doi = record.get("doi")
-                title = record.get("title")
-                new_version = record.get("version", 1)
+        try:
+            async with client_factory() as client:
+                async for record in client.fetch_papers(from_date, to_date):
+                    # Skip if we already have this paper (by DOI or exact title)
+                    doi = record.get("doi")
+                    title = record.get("title")
+                    new_version = record.get("version", 1)
 
-                if doi and doi.lower() in existing_dois:
-                    # Check for version upgrade — if new version is higher,
-                    # flag the existing paper for re-screening
-                    doi_lower = doi.lower()
-                    if doi_lower in doi_versions:
-                        existing_id, existing_ver = doi_versions[doi_lower]
-                        if new_version > existing_ver:
-                            existing_paper = await session.get(Paper, existing_id)
-                            if existing_paper:
-                                existing_paper.version = new_version
-                                existing_paper.pipeline_stage = PipelineStage.INGESTED
-                                existing_paper.needs_manual_review = True
-                                doi_versions[doi_lower] = (existing_id, new_version)
-                                log.info(
-                                    "version_upgrade_detected",
-                                    doi=doi,
-                                    old_version=existing_ver,
-                                    new_version=new_version,
-                                )
-                    skipped += 1
-                    continue
-                if title and title.lower().strip() in existing_titles:
-                    skipped += 1
-                    continue
+                    if doi and doi.lower() in existing_dois:
+                        # Check for version upgrade — if new version is higher,
+                        # flag the existing paper for re-screening
+                        doi_lower = doi.lower()
+                        if doi_lower in doi_versions:
+                            existing_id, existing_ver = doi_versions[doi_lower]
+                            if new_version > existing_ver:
+                                existing_paper = await session.get(Paper, existing_id)
+                                if existing_paper:
+                                    existing_paper.version = new_version
+                                    existing_paper.pipeline_stage = PipelineStage.INGESTED
+                                    existing_paper.needs_manual_review = True
+                                    doi_versions[doi_lower] = (existing_id, new_version)
+                                    log.info(
+                                        "version_upgrade_detected",
+                                        doi=doi,
+                                        old_version=existing_ver,
+                                        new_version=new_version,
+                                    )
+                        skipped += 1
+                        continue
+                    if title and title.lower().strip() in existing_titles:
+                        skipped += 1
+                        continue
 
-                paper = Paper(**{k: v for k, v in record.items() if k not in _extra_keys})
-                if record.get("full_text_url"):
-                    paper.full_text_url = record["full_text_url"]
-                if record.get("_language"):
-                    paper.language = record["_language"]
-                if record.get("_vernacular_title"):
-                    paper.original_title = record["_vernacular_title"]
-                session.add(paper)
-                papers.append(paper)
-                source_count += 1
+                    paper = Paper(
+                        **{k: v for k, v in record.items() if k not in _extra_keys}
+                    )
+                    if record.get("full_text_url"):
+                        paper.full_text_url = record["full_text_url"]
+                    if record.get("_language"):
+                        paper.language = record["_language"]
+                    if record.get("_vernacular_title"):
+                        paper.original_title = record["_vernacular_title"]
+                    session.add(paper)
+                    papers.append(paper)
+                    source_count += 1
 
-                # Track the new paper so later sources don't duplicate it
-                if doi:
-                    existing_dois.add(doi.lower())
-                if title:
-                    existing_titles.add(title.lower().strip())
+                    # Track the new paper so later sources don't duplicate it
+                    if doi:
+                        existing_dois.add(doi.lower())
+                    if title:
+                        existing_titles.add(title.lower().strip())
 
-        log.info("ingest_source_complete", source=source_name, new=source_count, skipped=skipped)
+            log.info(
+                "ingest_source_complete",
+                source=source_name,
+                new=source_count,
+                skipped=skipped,
+            )
+        except Exception as exc:
+            log.error(
+                "ingest_source_error",
+                source=source_name,
+                error=_exc_str(exc),
+                papers_before_error=source_count,
+            )
 
     await session.flush()
     log.info("ingest_complete", new=len(papers))
