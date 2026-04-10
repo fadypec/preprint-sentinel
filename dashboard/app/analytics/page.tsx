@@ -116,6 +116,21 @@ async function getStats() {
     LIMIT 10
   `;
 
+  const topCountries = await prisma.$queryRaw<
+    { name: string; count: number }[]
+  >`
+    SELECT
+      enrichment_data->'openalex'->>'primary_institution_country' as name,
+      COUNT(*)::int as count
+    FROM papers
+    WHERE created_at >= ${thirtyDaysAgo}
+      AND pipeline_stage != 'ingested'
+      AND enrichment_data->'openalex'->>'primary_institution_country' IS NOT NULL
+    GROUP BY enrichment_data->'openalex'->>'primary_institution_country'
+    ORDER BY count DESC
+    LIMIT 10
+  `;
+
   return {
     papersToday,
     criticalHighToday,
@@ -130,6 +145,7 @@ async function getStats() {
     papersOverTime,
     topInstitutions,
     topCategories,
+    topCountries,
     dimensionTrends: await getDimensionTrends(thirtyDaysAgo),
   };
 }
@@ -171,6 +187,7 @@ export default async function AnalyticsPage() {
         papersOverTime={stats.papersOverTime}
         topInstitutions={stats.topInstitutions}
         topCategories={stats.topCategories}
+        topCountries={stats.topCountries}
         dimensionTrends={stats.dimensionTrends}
       />
     </div>

@@ -49,6 +49,7 @@ type Props = {
   papersOverTime: PapersOverTimeData;
   topInstitutions: InstitutionData;
   topCategories: InstitutionData;
+  topCountries: InstitutionData;
   dimensionTrends: DimensionTrendData;
 };
 
@@ -56,6 +57,7 @@ export const AnalyticsCharts = memo(function AnalyticsCharts({
   papersOverTime,
   topInstitutions,
   topCategories,
+  topCountries,
   dimensionTrends,
 }: Props) {
   const { resolvedTheme } = useTheme();
@@ -152,6 +154,30 @@ export const AnalyticsCharts = memo(function AnalyticsCharts({
             />
             <Tooltip />
             <Bar dataKey="count" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </Card>
+
+      {/* Top countries — horizontal bar */}
+      <Card className="p-4">
+        <h3 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
+          Top Countries
+        </h3>
+        <ResponsiveContainer width="100%" height={250}>
+          <BarChart data={topCountries} layout="vertical">
+            <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+            <XAxis
+              type="number"
+              tick={{ fill: textColor, fontSize: 10 }}
+            />
+            <YAxis
+              type="category"
+              dataKey="name"
+              tick={{ fill: textColor, fontSize: 10 }}
+              width={40}
+            />
+            <Tooltip />
+            <Bar dataKey="count" fill="#06b6d4" radius={[0, 4, 4, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </Card>
