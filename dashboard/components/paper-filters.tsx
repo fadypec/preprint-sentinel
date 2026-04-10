@@ -204,6 +204,11 @@ export function PaperFilters({ tier, source, status, q, needsReview, sort, dim, 
           <option value="medrxiv">medRxiv</option>
           <option value="pubmed">PubMed</option>
           <option value="europepmc">Europe PMC</option>
+          <option value="arxiv">arXiv</option>
+          <option value="research_square">Research Square</option>
+          <option value="chemrxiv">ChemRxiv</option>
+          <option value="zenodo">Zenodo</option>
+          <option value="ssrn">SSRN</option>
         </select>
 
         <label htmlFor="filter-status" className="sr-only">Filter by review status</label>
