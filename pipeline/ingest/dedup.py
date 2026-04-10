@@ -123,6 +123,14 @@ class DedupEngine:
             is_duplicate=False, duplicate_of=None, strategy_used="none", confidence=0.0
         )
 
+    async def batch_check_dois(self, dois: list[str]) -> dict[str, uuid.UUID]:
+        """Batch Tier 1: look up all DOIs in one query. Returns {doi: paper_id}."""
+        if not dois:
+            return {}
+        stmt = select(Paper.doi, Paper.id).where(Paper.doi.in_(dois))
+        result = await self._session.execute(stmt)
+        return {row.doi: row.id for row in result.all() if row.doi}
+
     async def _check_doi(
         self, doi: str, *, exclude_id: uuid.UUID | None = None,
     ) -> DedupResult | None:

@@ -22,7 +22,7 @@ from pipeline.fulltext.retriever import fetch_full_text_content
 from pipeline.ingest.arxiv import ArxivClient
 from pipeline.ingest.biorxiv import BiorxivClient
 from pipeline.ingest.crossref import CrossrefClient
-from pipeline.ingest.dedup import DedupEngine
+from pipeline.ingest.dedup import DedupEngine, DedupResult
 from pipeline.ingest.europepmc import EuropepmcClient
 from pipeline.ingest.pubmed import PubmedClient
 from pipeline.ingest.zenodo import ZenodoClient
@@ -674,13 +674,36 @@ async def _run_dedup(
     non_dups: list[Paper] = []
     dup_count = 0
 
+    # Phase 1: Batch DOI check — single query for all DOIs (eliminates N round-trips)
+    dois = [p.doi for p in papers if p.doi]
+    doi_matches = await engine.batch_check_dois(dois) if dois else {}
+
+    needs_fuzzy: list[Paper] = []
     for paper in papers:
+        if paper.doi and paper.doi in doi_matches:
+            canonical_id = doi_matches[paper.doi]
+            if canonical_id != paper.id:  # don't match self
+                paper.is_duplicate_of = canonical_id
+                result = DedupResult(
+                    is_duplicate=True, duplicate_of=canonical_id,
+                    strategy_used="doi_match", confidence=1.0,
+                )
+                await engine.record_duplicate(
+                    canonical_id=canonical_id, member_id=paper.id, result=result,
+                )
+                dup_count += 1
+                continue
+        needs_fuzzy.append(paper)
+
+    # Phase 2: Fuzzy title/author check — sequential (requires streaming DB rows)
+    for paper in needs_fuzzy:
         record = {
             "doi": paper.doi,
             "title": paper.title,
             "authors": paper.authors,
             "posted_date": paper.posted_date,
         }
+        # Skip DOI tier since we already checked; go straight to fuzzy
         result = await engine.check(record, paper_id=paper.id)
         if result.is_duplicate:
             paper.is_duplicate_of = result.duplicate_of
