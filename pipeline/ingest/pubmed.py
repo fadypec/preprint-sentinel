@@ -66,7 +66,10 @@ class PubmedClient:
         self._client: httpx.AsyncClient | None = None
 
     async def __aenter__(self) -> PubmedClient:
-        self._client = httpx.AsyncClient()
+        # Set api_key as a default param on the client so it's included
+        # automatically but not visible in per-request params (which are logged).
+        default_params = {"api_key": self.api_key} if self.api_key else {}
+        self._client = httpx.AsyncClient(params=default_params)
         return self
 
     async def __aexit__(self, *exc: object) -> None:
@@ -112,8 +115,6 @@ class PubmedClient:
         }
         if self.query_mode == "mesh_filtered":
             params["term"] = self.mesh_query
-        if self.api_key:
-            params["api_key"] = self.api_key
 
         resp = await self._request(self.ESEARCH_URL, params)
         data = resp.json()
@@ -135,8 +136,6 @@ class PubmedClient:
             "webenv": webenv,
             "query_key": query_key,
         }
-        if self.api_key:
-            params["api_key"] = self.api_key
 
         resp = await self._request(self.EFETCH_URL, params)
         return self._parse_articles(resp.content)
