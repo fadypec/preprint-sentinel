@@ -16,6 +16,8 @@ export async function GET(request: NextRequest) {
     const sort = params.get("sort");
     const dim = params.get("dim");
     const dimMin = params.get("dim_min");
+    const author = params.get("author")?.trim();
+    const institution = params.get("institution")?.trim();
 
     // Validate enum filter values -- return 400 for invalid input
     const errors = invalidFilters({ tier, source, status, sort, dim, dimMin });
@@ -23,7 +25,7 @@ export async function GET(request: NextRequest) {
       return Response.json({ error: errors.join("; ") }, { status: 400 });
     }
 
-    const result = await queryPapers({ page, tier, source, status, search, needsReview, sort, dim, dimMin });
+    const result = await queryPapers({ page, tier, source, status, search, needsReview, sort, dim, dimMin, author, institution });
 
     return Response.json(result);
   } catch (err) {

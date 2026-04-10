@@ -39,6 +39,8 @@ export type PaperQueryParams = {
   sort?: string | null;
   dim?: string | null;
   dimMin?: string | null;
+  author?: string | null;
+  institution?: string | null;
 };
 
 export type PaperQueryResult = {
@@ -205,11 +207,13 @@ export async function queryPapers(
   const sort = validSort(params.sort);
   const dim = validDimension(params.dim);
   const dimMin = dim ? validDimMin(params.dimMin) ?? 1 : undefined;
+  const author = params.author?.trim() || undefined;
+  const institution = params.institution?.trim() || undefined;
 
-  // Dimension filtering requires raw SQL (JSONB path query), so route
-  // through the raw SQL path even when there's no full-text search.
-  if (search || dim) {
-    return queryPapersRawSQL({ page, tiers, source, status, search, needsReview, sort: sort!, dim, dimMin });
+  // Dimension filtering, author/institution ILIKE, and full-text search
+  // all require raw SQL — route through the raw SQL path.
+  if (search || dim || author || institution) {
+    return queryPapersRawSQL({ page, tiers, source, status, search, needsReview, sort: sort!, dim, dimMin, author, institution });
   }
 
   return queryPapersPrisma({ page, tiers, source, status, needsReview, sort: sort! });
@@ -287,7 +291,7 @@ async function queryPapersPrisma(filters: {
   };
 }
 
-/** Raw SQL path — used for full-text search (tsvector) and/or dimension filtering (JSONB). */
+/** Raw SQL path — used for full-text search, dimension filtering, and author/institution ILIKE. */
 async function queryPapersRawSQL(filters: {
   page: number;
   tiers?: RiskTier[];
@@ -298,6 +302,8 @@ async function queryPapersRawSQL(filters: {
   sort: string;
   dim?: string;
   dimMin?: number;
+  author?: string;
+  institution?: string;
 }): Promise<PaperQueryResult> {
   // Full-text search clause (optional)
   let searchClause = Prisma.empty;
@@ -337,6 +343,18 @@ async function queryPapersRawSQL(filters: {
   const dimClause =
     filters.dim && filters.dimMin != null
       ? Prisma.sql`AND (stage2_result->'dimensions'->${filters.dim}->>'score')::int >= ${filters.dimMin}`
+      : Prisma.empty;
+
+  // Author ILIKE clause (searches within JSONB authors array serialized as text)
+  const authorClause =
+    filters.author
+      ? Prisma.sql`AND authors::text ILIKE ${"%" + filters.author + "%"}`
+      : Prisma.empty;
+
+  // Institution ILIKE clause
+  const institutionClause =
+    filters.institution
+      ? Prisma.sql`AND corresponding_institution ILIKE ${"%" + filters.institution + "%"}`
       : Prisma.empty;
 
   // Build ORDER BY clause based on sort parameter
@@ -412,6 +430,8 @@ async function queryPapersRawSQL(filters: {
         ${statusClause}
         ${needsReviewClause}
         ${dimClause}
+        ${authorClause}
+        ${institutionClause}
     `,
     prisma.$queryRaw<[{ count: bigint }]>`
       SELECT COUNT(*) as count FROM papers WHERE is_duplicate_of IS NULL
@@ -427,6 +447,8 @@ async function queryPapersRawSQL(filters: {
         ${statusClause}
         ${needsReviewClause}
         ${dimClause}
+        ${authorClause}
+        ${institutionClause}
       ${orderByClause}
       LIMIT ${PAGE_SIZE} OFFSET ${(filters.page - 1) * PAGE_SIZE}
     `,

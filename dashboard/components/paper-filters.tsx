@@ -47,6 +47,8 @@ type PaperFiltersProps = {
   sort: string;
   dim: string;
   dimMin: string;
+  author: string;
+  institution: string;
 };
 
 /** Build a clean URL with only non-default filter params. */
@@ -58,6 +60,8 @@ function buildUrl(filters: {
   needsReview: string;
   sort: string;
   dim: string;
+  author: string;
+  institution: string;
   dimMin: string;
 }): string {
   const p = new URLSearchParams();
@@ -71,6 +75,8 @@ function buildUrl(filters: {
   if (filters.sort && filters.sort !== "date_desc") p.set("sort", filters.sort);
   if (filters.dim && filters.dim !== "all") p.set("dim", filters.dim);
   if (filters.dim && filters.dim !== "all" && filters.dimMin && filters.dimMin !== "1") p.set("dim_min", filters.dimMin);
+  if (filters.author) p.set("author", filters.author);
+  if (filters.institution) p.set("institution", filters.institution);
   const qs = p.toString();
   return qs ? `/?${qs}` : "/";
 }
@@ -86,7 +92,7 @@ function buildUrl(filters: {
  * parse, independent of React hydration). Falls back to the Go button
  * if JS never loads.
  */
-export function PaperFilters({ tier, source, status, q, needsReview, sort, dim, dimMin }: PaperFiltersProps) {
+export function PaperFilters({ tier, source, status, q, needsReview, sort, dim, dimMin, author, institution }: PaperFiltersProps) {
   const selectedTiers = new Set(
     !tier || tier === "all" ? [] : tier.split(","),
   );
@@ -105,6 +111,8 @@ export function PaperFilters({ tier, source, status, q, needsReview, sort, dim, 
       sort,
       dim,
       dimMin,
+      author,
+      institution,
     });
   }
 
@@ -115,7 +123,9 @@ export function PaperFilters({ tier, source, status, q, needsReview, sort, dim, 
     q !== "" ||
     needsReview === "true" ||
     (sort !== "date_desc" && sort !== "") ||
-    (dim !== "all" && dim !== "");
+    (dim !== "all" && dim !== "") ||
+    author !== "" ||
+    institution !== "";
 
   const tierValue =
     selectedTiers.size > 0 ? [...selectedTiers].join(",") : "";
@@ -162,6 +172,8 @@ export function PaperFilters({ tier, source, status, q, needsReview, sort, dim, 
           sort,
           dim,
           dimMin,
+          author,
+          institution,
         })}
         role="button"
         aria-pressed={needsReview === "true"}
@@ -182,13 +194,35 @@ export function PaperFilters({ tier, source, status, q, needsReview, sort, dim, 
         className="contents"
         data-filter-form=""
       >
-        {/* Preserve tier and needs_review selection when form submits */}
+        {/* Preserve chip-based selections when form submits */}
         {tierValue && (
           <input type="hidden" name="tier" value={tierValue} />
         )}
         {needsReview === "true" && (
           <input type="hidden" name="needs_review" value="true" />
         )}
+
+        <label htmlFor="filter-author" className="sr-only">Filter by author</label>
+        <input
+          id="filter-author"
+          type="text"
+          name="author"
+          defaultValue={author}
+          placeholder="Author..."
+          aria-label="Filter by author name"
+          className="h-8 w-28 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30 dark:hover:bg-input/50"
+        />
+
+        <label htmlFor="filter-institution" className="sr-only">Filter by institution</label>
+        <input
+          id="filter-institution"
+          type="text"
+          name="institution"
+          defaultValue={institution}
+          placeholder="Institution..."
+          aria-label="Filter by institution"
+          className="h-8 w-32 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30 dark:hover:bg-input/50"
+        />
 
         <label htmlFor="filter-source" className="sr-only">Filter by source</label>
         <select
