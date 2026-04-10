@@ -3,7 +3,8 @@ import { KpiCard } from "@/components/kpi-card";
 import { AnalyticsCharts } from "@/components/analytics-charts";
 import { PaperCoverageHeatmap } from "@/components/paper-coverage-heatmap";
 import { Card } from "@/components/ui/card";
-import { PipelineStage } from "@prisma/client";
+
+export const dynamic = "force-dynamic";
 
 type DimensionTrendRow = {
   date: string;
@@ -15,92 +16,98 @@ type DimensionTrendRow = {
   defensive_framing: number;
 };
 
-async function getDimensionTrends(
-  since: Date,
-): Promise<DimensionTrendRow[]> {
+async function getDimensionTrends(since: Date): Promise<DimensionTrendRow[]> {
+  // Daily buckets, DD/MM format, 60 days
   return prisma.$queryRaw<DimensionTrendRow[]>`
     SELECT
-      to_char(date_trunc('week', created_at), 'MM/DD') as date,
-      ROUND(AVG((stage2_result->'dimensions'->'pathogen_enhancement'->>'score')::numeric), 1)::float as pathogen_enhancement,
-      ROUND(AVG((stage2_result->'dimensions'->'synthesis_barrier_lowering'->>'score')::numeric), 1)::float as synthesis_barrier_lowering,
-      ROUND(AVG((stage2_result->'dimensions'->'select_agent_relevance'->>'score')::numeric), 1)::float as select_agent_relevance,
-      ROUND(AVG((stage2_result->'dimensions'->'novel_technique'->>'score')::numeric), 1)::float as novel_technique,
-      ROUND(AVG((stage2_result->'dimensions'->'information_hazard'->>'score')::numeric), 1)::float as information_hazard,
-      ROUND(AVG((stage2_result->'dimensions'->'defensive_framing'->>'score')::numeric), 1)::float as defensive_framing
+      to_char(posted_date, 'DD/MM') as date,
+      ROUND(AVG(
+        (stage2_result->'dimensions'->'pathogen_enhancement'->>'score')::numeric
+      ), 1)::float as pathogen_enhancement,
+      ROUND(AVG(
+        (stage2_result->'dimensions'->'synthesis_barrier_lowering'->>'score')::numeric
+      ), 1)::float as synthesis_barrier_lowering,
+      ROUND(AVG(
+        (stage2_result->'dimensions'->'select_agent_relevance'->>'score')::numeric
+      ), 1)::float as select_agent_relevance,
+      ROUND(AVG(
+        (stage2_result->'dimensions'->'novel_technique'->>'score')::numeric
+      ), 1)::float as novel_technique,
+      ROUND(AVG(
+        (stage2_result->'dimensions'->'information_hazard'->>'score')::numeric
+      ), 1)::float as information_hazard,
+      ROUND(AVG(
+        (stage2_result->'dimensions'->'defensive_framing'->>'score')::numeric
+      ), 1)::float as defensive_framing
     FROM papers
-    WHERE created_at >= ${since}
+    WHERE posted_date >= ${since}
       AND stage2_result IS NOT NULL
       AND stage2_result->'dimensions' IS NOT NULL
-    GROUP BY date_trunc('week', created_at)
-    ORDER BY date_trunc('week', created_at)
+      AND is_duplicate_of IS NULL
+    GROUP BY posted_date
+    ORDER BY posted_date
   `;
 }
 
 async function getStats() {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const sevenDaysAgo = new Date(today);
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-  const thirtyDaysAgo = new Date(today);
+  const sixtyDaysAgo = new Date();
+  sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+  const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  const papersToday = await prisma.paper.count({
+  // KPI 1: Unreviewed critical/high papers needing attention
+  const unreviewedCritHigh = await prisma.paper.count({
     where: {
-      createdAt: { gte: today },
-      pipelineStage: { not: PipelineStage.ingested },
-    },
-  });
-
-  const criticalHighToday = await prisma.paper.count({
-    where: {
-      createdAt: { gte: today },
       riskTier: { in: ["critical", "high"] },
+      reviewStatus: "unreviewed",
+      isDuplicateOf: null,
     },
   });
 
-  const papersLastWeek = await prisma.paper.count({
-    where: {
-      createdAt: { gte: sevenDaysAgo },
-      pipelineStage: { not: PipelineStage.ingested },
-    },
-  });
-  const dailyAvg = Math.round(papersLastWeek / 7);
-
-  const lastRun = await prisma.pipelineRun.findFirst({
-    orderBy: { startedAt: "desc" },
-  });
-
-  const papersOverTime = await prisma.$queryRaw<
-    {
-      date: string;
-      critical: number;
-      high: number;
-      medium: number;
-      low: number;
-    }[]
-  >`
-    SELECT
-      to_char(created_at::date, 'MM/DD') as date,
-      COUNT(*) FILTER (WHERE risk_tier = 'critical')::int as critical,
-      COUNT(*) FILTER (WHERE risk_tier = 'high')::int as high,
-      COUNT(*) FILTER (WHERE risk_tier = 'medium')::int as medium,
-      COUNT(*) FILTER (WHERE risk_tier = 'low')::int as low
+  // KPI 2: Coverage gaps (weekdays with no papers in last 30d)
+  // Computed client-side from coverage data, but we can get a server count too
+  const coverageDays = await prisma.$queryRaw<{ day_count: bigint }[]>`
+    SELECT COUNT(DISTINCT posted_date) as day_count
     FROM papers
-    WHERE created_at >= ${thirtyDaysAgo}
-      AND pipeline_stage != 'ingested'
-    GROUP BY created_at::date
-    ORDER BY created_at::date
+    WHERE is_duplicate_of IS NULL
+      AND posted_date >= CURRENT_DATE - INTERVAL '30 days'
+      AND EXTRACT(DOW FROM posted_date) BETWEEN 1 AND 5
   `;
+  // 30 days × 5/7 ≈ 21-22 weekdays
+  const weekdaysInRange = Math.round(30 * 5 / 7);
+  const daysWithData = Number(coverageDays[0]?.day_count ?? 0);
+  const coverageGaps = Math.max(0, weekdaysInRange - daysWithData);
 
+  // KPI 3: False positive rate
+  const reviewedPapers = await prisma.paper.count({
+    where: {
+      reviewStatus: { in: ["confirmed_concern", "false_positive"] },
+    },
+  });
+  const fpCount = await prisma.paper.count({
+    where: { reviewStatus: "false_positive" },
+  });
+  const fpRate = reviewedPapers > 0 ? Math.round((fpCount / reviewedPapers) * 100) : null;
+
+  // Top institutions — use OpenAlex enrichment data for better coverage
   const topInstitutions = await prisma.$queryRaw<
     { name: string; count: number }[]
   >`
-    SELECT corresponding_institution as name, COUNT(*)::int as count
+    SELECT
+      COALESCE(
+        enrichment_data->'openalex'->>'primary_institution',
+        corresponding_institution
+      ) as name,
+      COUNT(*)::int as count
     FROM papers
-    WHERE created_at >= ${thirtyDaysAgo}
+    WHERE posted_date >= ${thirtyDaysAgo}
       AND risk_tier IN ('critical', 'high')
-      AND corresponding_institution IS NOT NULL
-    GROUP BY corresponding_institution
+      AND is_duplicate_of IS NULL
+      AND COALESCE(
+        enrichment_data->'openalex'->>'primary_institution',
+        corresponding_institution
+      ) IS NOT NULL
+    GROUP BY name
     ORDER BY count DESC
     LIMIT 10
   `;
@@ -110,8 +117,8 @@ async function getStats() {
   >`
     SELECT subject_category as name, COUNT(*)::int as count
     FROM papers
-    WHERE created_at >= ${thirtyDaysAgo}
-      AND pipeline_stage != 'ingested'
+    WHERE posted_date >= ${thirtyDaysAgo}
+      AND is_duplicate_of IS NULL
       AND subject_category IS NOT NULL
     GROUP BY subject_category
     ORDER BY count DESC
@@ -125,30 +132,23 @@ async function getStats() {
       enrichment_data->'openalex'->>'primary_institution_country' as name,
       COUNT(*)::int as count
     FROM papers
-    WHERE created_at >= ${thirtyDaysAgo}
-      AND pipeline_stage != 'ingested'
+    WHERE posted_date >= ${thirtyDaysAgo}
+      AND is_duplicate_of IS NULL
       AND enrichment_data->'openalex'->>'primary_institution_country' IS NOT NULL
-    GROUP BY enrichment_data->'openalex'->>'primary_institution_country'
+    GROUP BY name
     ORDER BY count DESC
     LIMIT 10
   `;
 
   return {
-    papersToday,
-    criticalHighToday,
-    dailyAvg,
-    trendPct:
-      dailyAvg > 0
-        ? Math.round(((papersToday - dailyAvg) / dailyAvg) * 100)
-        : 0,
-    lastRunOk: lastRun
-      ? !(Array.isArray(lastRun.errors) && lastRun.errors.length > 0)
-      : null,
-    papersOverTime,
+    unreviewedCritHigh,
+    coverageGaps,
+    fpRate,
+    reviewedPapers,
     topInstitutions,
     topCategories,
     topCountries,
-    dimensionTrends: await getDimensionTrends(thirtyDaysAgo),
+    dimensionTrends: await getDimensionTrends(sixtyDaysAgo),
   };
 }
 
@@ -161,36 +161,39 @@ export default async function AnalyticsPage() {
         Analytics
       </h1>
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* KPIs */}
+      <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <KpiCard
-          title="Papers Today"
-          value={stats.papersToday}
-          trend={stats.trendPct}
-          subtitle={`7-day avg: ${stats.dailyAvg}`}
+          title="Unreviewed Critical/High"
+          value={stats.unreviewedCritHigh}
+          subtitle={stats.unreviewedCritHigh > 0 ? "Needs analyst attention" : "All clear"}
         />
         <KpiCard
-          title="Critical/High Today"
-          value={stats.criticalHighToday}
+          title="Coverage Gaps (30d)"
+          value={stats.coverageGaps}
+          subtitle={stats.coverageGaps === 0 ? "No missing weekdays" : "Weekdays with no data"}
         />
-        <KpiCard title="Daily Average (7d)" value={stats.dailyAvg} />
         <KpiCard
-          title="Pipeline Health"
-          value={
-            stats.lastRunOk === null
-              ? "No runs"
-              : stats.lastRunOk
-                ? "Healthy"
-                : "Error"
+          title="False Positive Rate"
+          value={stats.fpRate !== null ? `${stats.fpRate}%` : "—"}
+          subtitle={
+            stats.reviewedPapers > 0
+              ? `${stats.reviewedPapers} papers reviewed`
+              : "No papers reviewed yet"
           }
         />
       </div>
 
+      {/* Intelligence coverage */}
       <Card className="mb-6 p-4">
+        <h2 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
+          Intelligence Coverage
+        </h2>
         <PaperCoverageHeatmap />
       </Card>
 
+      {/* Charts */}
       <AnalyticsCharts
-        papersOverTime={stats.papersOverTime}
         topInstitutions={stats.topInstitutions}
         topCategories={stats.topCategories}
         topCountries={stats.topCountries}

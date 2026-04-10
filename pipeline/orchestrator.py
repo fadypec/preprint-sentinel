@@ -635,9 +635,7 @@ async def _run_ingest(
                         skipped += 1
                         continue
 
-                    paper = Paper(
-                        **{k: v for k, v in record.items() if k not in _extra_keys}
-                    )
+                    paper = Paper(**{k: v for k, v in record.items() if k not in _extra_keys})
                     if record.get("full_text_url"):
                         paper.full_text_url = record["full_text_url"]
                     if record.get("_language"):

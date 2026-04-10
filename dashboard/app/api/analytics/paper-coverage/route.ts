@@ -2,11 +2,10 @@ import { prisma } from "@/lib/prisma";
 import { apiRequireAuth } from "@/lib/auth-guard";
 
 /**
- * Returns per-date paper counts by posted_date for the intelligence
- * coverage heatmap. Shows how many non-duplicate papers we ingested
- * for each day that papers were posted on preprint servers.
+ * Returns per-date, per-source paper counts for the intelligence
+ * coverage heatmap and detail table.
  *
- * Response: { "2026-04-08": { count: 342, hasPubmed: true }, ... }
+ * Response: { "2026-04-08": { "biorxiv": 120, "pubmed": 45, ... }, ... }
  */
 export async function GET() {
   const denied = await apiRequireAuth();
@@ -15,29 +14,27 @@ export async function GET() {
   const rows = await prisma.$queryRaw<
     {
       posted_date: string;
-      total: bigint;
-      has_pubmed: boolean;
+      source_server: string;
+      count: bigint;
     }[]
   >`
     SELECT
       posted_date::text as posted_date,
-      COUNT(*) as total,
-      BOOL_OR(source_server = 'pubmed') as has_pubmed
+      source_server::text as source_server,
+      COUNT(*) as count
     FROM papers
     WHERE is_duplicate_of IS NULL
       AND posted_date >= CURRENT_DATE - INTERVAL '200 days'
-    GROUP BY posted_date
-    ORDER BY posted_date
+    GROUP BY posted_date, source_server
+    ORDER BY posted_date, source_server
   `;
 
-  const coverage: Record<string, { count: number; hasPubmed: boolean }> = {};
+  const coverage: Record<string, Record<string, number>> = {};
 
   for (const row of rows) {
     if (!row.posted_date) continue;
-    coverage[row.posted_date] = {
-      count: Number(row.total),
-      hasPubmed: row.has_pubmed,
-    };
+    if (!coverage[row.posted_date]) coverage[row.posted_date] = {};
+    coverage[row.posted_date][row.source_server] = Number(row.count);
   }
 
   return Response.json(coverage);

@@ -2,8 +2,6 @@
 
 import { memo } from "react";
 import {
-  AreaChart,
-  Area,
   BarChart,
   Bar,
   LineChart,
@@ -25,14 +23,6 @@ const COLORS = {
   low: "#22c55e",
 };
 
-type PapersOverTimeData = {
-  date: string;
-  critical: number;
-  high: number;
-  medium: number;
-  low: number;
-}[];
-
 type InstitutionData = { name: string; count: number }[];
 
 type DimensionTrendData = {
@@ -46,7 +36,6 @@ type DimensionTrendData = {
 }[];
 
 type Props = {
-  papersOverTime: PapersOverTimeData;
   topInstitutions: InstitutionData;
   topCategories: InstitutionData;
   topCountries: InstitutionData;
@@ -54,7 +43,6 @@ type Props = {
 };
 
 export const AnalyticsCharts = memo(function AnalyticsCharts({
-  papersOverTime,
   topInstitutions,
   topCategories,
   topCountries,
@@ -66,72 +54,31 @@ export const AnalyticsCharts = memo(function AnalyticsCharts({
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
-      {/* Papers over time — stacked area */}
-      <Card className="p-4">
-        <h3 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
-          Papers Over Time
-        </h3>
-        <ResponsiveContainer width="100%" height={250}>
-          <AreaChart data={papersOverTime}>
-            <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-            <XAxis dataKey="date" tick={{ fill: textColor, fontSize: 10 }} />
-            <YAxis tick={{ fill: textColor, fontSize: 10 }} />
-            <Tooltip />
-            <Area
-              type="monotone"
-              dataKey="critical"
-              stackId="1"
-              fill={COLORS.critical}
-              stroke={COLORS.critical}
-            />
-            <Area
-              type="monotone"
-              dataKey="high"
-              stackId="1"
-              fill={COLORS.high}
-              stroke={COLORS.high}
-            />
-            <Area
-              type="monotone"
-              dataKey="medium"
-              stackId="1"
-              fill={COLORS.medium}
-              stroke={COLORS.medium}
-            />
-            <Area
-              type="monotone"
-              dataKey="low"
-              stackId="1"
-              fill={COLORS.low}
-              stroke={COLORS.low}
-            />
-            <Legend />
-          </AreaChart>
-        </ResponsiveContainer>
-      </Card>
-
       {/* Top flagged institutions — horizontal bar */}
       <Card className="p-4">
         <h3 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
           Top Flagged Institutions
         </h3>
-        <ResponsiveContainer width="100%" height={250}>
-          <BarChart data={topInstitutions} layout="vertical">
-            <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-            <XAxis
-              type="number"
-              tick={{ fill: textColor, fontSize: 10 }}
-            />
-            <YAxis
-              type="category"
-              dataKey="name"
-              tick={{ fill: textColor, fontSize: 10 }}
-              width={120}
-            />
-            <Tooltip />
-            <Bar dataKey="count" fill="#3b82f6" radius={[0, 4, 4, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
+        {topInstitutions.length > 0 ? (
+          <ResponsiveContainer width="100%" height={250}>
+            <BarChart data={topInstitutions} layout="vertical">
+              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+              <XAxis type="number" tick={{ fill: textColor, fontSize: 10 }} />
+              <YAxis
+                type="category"
+                dataKey="name"
+                tick={{ fill: textColor, fontSize: 10 }}
+                width={150}
+              />
+              <Tooltip />
+              <Bar dataKey="count" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <p className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+            No institution data available yet.
+          </p>
+        )}
       </Card>
 
       {/* Top flagged categories — horizontal bar */}
@@ -139,23 +86,26 @@ export const AnalyticsCharts = memo(function AnalyticsCharts({
         <h3 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
           Top Flagged Categories
         </h3>
-        <ResponsiveContainer width="100%" height={250}>
-          <BarChart data={topCategories} layout="vertical">
-            <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-            <XAxis
-              type="number"
-              tick={{ fill: textColor, fontSize: 10 }}
-            />
-            <YAxis
-              type="category"
-              dataKey="name"
-              tick={{ fill: textColor, fontSize: 10 }}
-              width={120}
-            />
-            <Tooltip />
-            <Bar dataKey="count" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
+        {topCategories.length > 0 ? (
+          <ResponsiveContainer width="100%" height={250}>
+            <BarChart data={topCategories} layout="vertical">
+              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+              <XAxis type="number" tick={{ fill: textColor, fontSize: 10 }} />
+              <YAxis
+                type="category"
+                dataKey="name"
+                tick={{ fill: textColor, fontSize: 10 }}
+                width={120}
+              />
+              <Tooltip />
+              <Bar dataKey="count" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <p className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+            No category data available yet.
+          </p>
+        )}
       </Card>
 
       {/* Top countries — horizontal bar */}
@@ -163,78 +113,54 @@ export const AnalyticsCharts = memo(function AnalyticsCharts({
         <h3 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
           Top Countries
         </h3>
-        <ResponsiveContainer width="100%" height={250}>
-          <BarChart data={topCountries} layout="vertical">
-            <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-            <XAxis
-              type="number"
-              tick={{ fill: textColor, fontSize: 10 }}
-            />
-            <YAxis
-              type="category"
-              dataKey="name"
-              tick={{ fill: textColor, fontSize: 10 }}
-              width={40}
-            />
-            <Tooltip />
-            <Bar dataKey="count" fill="#06b6d4" radius={[0, 4, 4, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
+        {topCountries.length > 0 ? (
+          <ResponsiveContainer width="100%" height={250}>
+            <BarChart data={topCountries} layout="vertical">
+              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+              <XAxis type="number" tick={{ fill: textColor, fontSize: 10 }} />
+              <YAxis
+                type="category"
+                dataKey="name"
+                tick={{ fill: textColor, fontSize: 10 }}
+                width={40}
+              />
+              <Tooltip />
+              <Bar dataKey="count" fill="#06b6d4" radius={[0, 4, 4, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <p className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+            No country data available yet.
+          </p>
+        )}
       </Card>
 
-      {/* Risk dimension trends — line chart */}
+      {/* Risk dimension trends — daily, DD/MM format */}
       <Card className="p-4">
         <h3 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
-          Risk Dimension Trends (Avg Score)
+          Risk Dimension Trends (Daily Avg Score)
         </h3>
-        <ResponsiveContainer width="100%" height={250}>
-          <LineChart data={dimensionTrends}>
-            <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-            <XAxis dataKey="date" tick={{ fill: textColor, fontSize: 10 }} />
-            <YAxis
-              domain={[0, 3]}
-              tick={{ fill: textColor, fontSize: 10 }}
-            />
-            <Tooltip />
-            <Line
-              type="monotone"
-              dataKey="pathogen_enhancement"
-              stroke={COLORS.critical}
-              dot={false}
-            />
-            <Line
-              type="monotone"
-              dataKey="information_hazard"
-              stroke={COLORS.high}
-              dot={false}
-            />
-            <Line
-              type="monotone"
-              dataKey="synthesis_barrier_lowering"
-              stroke={COLORS.medium}
-              dot={false}
-            />
-            <Line
-              type="monotone"
-              dataKey="novel_technique"
-              stroke="#3b82f6"
-              dot={false}
-            />
-            <Line
-              type="monotone"
-              dataKey="select_agent_relevance"
-              stroke="#8b5cf6"
-              dot={false}
-            />
-            <Line
-              type="monotone"
-              dataKey="defensive_framing"
-              stroke="#64748b"
-              dot={false}
-            />
-            <Legend />
-          </LineChart>
-        </ResponsiveContainer>
+        {dimensionTrends.length > 0 ? (
+          <ResponsiveContainer width="100%" height={250}>
+            <LineChart data={dimensionTrends}>
+              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+              <XAxis dataKey="date" tick={{ fill: textColor, fontSize: 10 }} />
+              <YAxis domain={[0, 3]} tick={{ fill: textColor, fontSize: 10 }} />
+              <Tooltip />
+              <Line type="monotone" dataKey="pathogen_enhancement" stroke={COLORS.critical} dot={false} name="Pathogen enhancement" />
+              <Line type="monotone" dataKey="information_hazard" stroke={COLORS.high} dot={false} name="Information hazard" />
+              <Line type="monotone" dataKey="synthesis_barrier_lowering" stroke={COLORS.medium} dot={false} name="Synthesis barriers" />
+              <Line type="monotone" dataKey="novel_technique" stroke="#3b82f6" dot={false} name="Novel technique" />
+              <Line type="monotone" dataKey="select_agent_relevance" stroke="#8b5cf6" dot={false} name="Select agent" />
+              <Line type="monotone" dataKey="defensive_framing" stroke="#64748b" dot={false} name="Defensive framing" />
+              <Legend />
+            </LineChart>
+          </ResponsiveContainer>
+        ) : (
+          <p className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+            Not enough data for dimension trends yet.
+          </p>
+        )}
       </Card>
     </div>
   );
