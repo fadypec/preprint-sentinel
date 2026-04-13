@@ -4,7 +4,7 @@ import { PipelineControls } from "@/components/pipeline-controls";
 import { CoverageHeatmap } from "@/components/coverage-heatmap";
 import { PipelineBacklog, type BacklogData } from "@/components/pipeline-backlog";
 import { Card } from "@/components/ui/card";
-import { triggerPipeline, cancelPipeline, clearRunHistory, togglePubmedQueryMode } from "./actions";
+import { triggerPipeline, cancelPipeline, clearRunHistory, togglePubmedQueryMode, reprocessErrors } from "./actions";
 
 type StageCount = { pipeline_stage: string; coarse_filter_passed: boolean | null; risk_tier: string | null; count: bigint };
 
@@ -144,6 +144,7 @@ export default async function PipelinePage() {
               initialStatus={pipelineStatus}
               triggerAction={triggerPipeline}
               cancelAction={cancelPipeline}
+              reprocessAction={reprocessErrors}
               pubmedMode={pubmedMode}
               togglePubmedMode={togglePubmedQueryMode}
             />

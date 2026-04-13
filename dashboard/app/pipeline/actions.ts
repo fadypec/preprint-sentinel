@@ -138,6 +138,50 @@ export async function clearRunHistory(): Promise<
   return { ok: true, message: `Cleared ${count} run${count !== 1 ? "s" : ""}` };
 }
 
+export async function reprocessErrors(): Promise<
+  { ok: true; message: string } | { ok: false; error: string }
+> {
+  try {
+    // Reset papers with errors back to their previous stage so the
+    // next pipeline run (with backlog) will reprocess them.
+    // Papers at methods_analysed with errors → reset to fulltext_retrieved
+    const methodsReset = await prisma.$executeRaw`
+      UPDATE papers
+      SET pipeline_stage = 'fulltext_retrieved',
+          needs_manual_review = false,
+          stage2_result = NULL,
+          risk_tier = NULL,
+          aggregate_score = NULL,
+          recommended_action = NULL
+      WHERE pipeline_stage = 'methods_analysed'
+        AND (stage2_result::text LIKE '%_error%' OR needs_manual_review = true)
+        AND is_duplicate_of IS NULL
+    `;
+
+    // Papers at adjudicated with errors → reset to methods_analysed
+    const adjReset = await prisma.$executeRaw`
+      UPDATE papers
+      SET pipeline_stage = 'methods_analysed',
+          needs_manual_review = false,
+          stage3_result = NULL
+      WHERE pipeline_stage = 'adjudicated'
+        AND (stage3_result::text LIKE '%_error%' OR needs_manual_review = true)
+        AND is_duplicate_of IS NULL
+    `;
+
+    const total = Number(methodsReset) + Number(adjReset);
+    return {
+      ok: true,
+      message: `Reset ${total} papers for reprocessing (${methodsReset} methods, ${adjReset} adjudication). Run pipeline with backlog to reprocess.`,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Failed to reset papers",
+    };
+  }
+}
+
 export async function togglePubmedQueryMode(): Promise<string> {
   const row = await prisma.pipelineSettings.findUnique({ where: { id: 1 } });
   const current = (row?.settings as Record<string, unknown>) ?? {};

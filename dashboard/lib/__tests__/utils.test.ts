@@ -72,8 +72,32 @@ describe("parseDimensions", () => {
     expect(result.key.score).toBe(1);
   });
 
-  it("returns empty object for invalid JSON", () => {
+  it("returns empty object for non-dimension invalid JSON", () => {
     expect(parseDimensions("not json at all")).toEqual({});
+  });
+
+  it("extracts dimensions via regex from malformed JSON", () => {
+    // Simulates LLM output with missing commas between dimension objects
+    const malformed = `{
+      "pathogen_enhancement": {
+        "score": 2,
+        "justification": "some reason"
+      }
+      "novel_technique": {
+        "score": 3,
+        "justification": "another reason"
+      }
+    }`;
+    const result = parseDimensions(malformed);
+    expect(result.pathogen_enhancement?.score).toBe(2);
+    expect(result.novel_technique?.score).toBe(3);
+  });
+
+  it("extracts scores from double-encoded JSON with extra data", () => {
+    const doubleEncoded =
+      '{\n  "information_hazard": {\n    "score": 1,\n    "justification": "low risk"\n  }\n}\nextra junk after';
+    const result = parseDimensions(doubleEncoded);
+    expect(result.information_hazard?.score).toBe(1);
   });
 
   it("returns empty object for arrays", () => {

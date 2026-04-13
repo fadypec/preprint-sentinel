@@ -33,7 +33,8 @@ export type Dimensions = Record<string, DimensionEntry>;
 /**
  * Safely parse the dimensions field from stage2Result.
  * It may be a JSON string or already a parsed object.
- * Handles common LLM artifacts: trailing commas, stray quotes, truncation.
+ * Handles common LLM artifacts: trailing commas, stray quotes, truncation,
+ * and completely malformed JSON by falling back to regex extraction.
  */
 export function parseDimensions(raw: unknown): Dimensions {
   if (!raw) return {};
@@ -52,8 +53,45 @@ export function parseDimensions(raw: unknown): Dimensions {
   try {
     return JSON.parse(cleaned) as Dimensions;
   } catch {
-    return {};
+    // JSON parse failed — fall back to regex extraction of dimension scores
+    return extractDimensionsRegex(raw);
   }
+}
+
+const DIMENSION_NAMES = [
+  "pathogen_enhancement",
+  "synthesis_barrier_lowering",
+  "select_agent_relevance",
+  "novel_technique",
+  "information_hazard",
+  "defensive_framing",
+];
+
+/**
+ * Regex fallback for extracting dimension scores from malformed JSON.
+ * Looks for patterns like "dimension_name": { ... "score": N ... }
+ */
+function extractDimensionsRegex(raw: string): Dimensions {
+  const result: Dimensions = {};
+  for (const name of DIMENSION_NAMES) {
+    // Match "dimension_name": { ... "score": N
+    const pattern = new RegExp(
+      `"${name}"\\s*:\\s*\\{[^}]*"score"\\s*:\\s*(\\d+)`,
+    );
+    const match = raw.match(pattern);
+    if (match) {
+      // Try to extract justification too
+      const justPattern = new RegExp(
+        `"${name}"\\s*:\\s*\\{[^}]*"justification"\\s*:\\s*"([^"]*(?:\\\\.[^"]*)*)"`,
+      );
+      const justMatch = raw.match(justPattern);
+      result[name] = {
+        score: parseInt(match[1], 10),
+        justification: justMatch ? justMatch[1].replace(/\\"/g, '"') : "",
+      };
+    }
+  }
+  return result;
 }
 
 /**

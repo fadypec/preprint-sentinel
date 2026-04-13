@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Play, Square, Loader2, Calendar } from "lucide-react";
+import { Play, Square, Loader2, Calendar, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PipelineProgress } from "@/components/pipeline-progress";
 
@@ -21,6 +21,7 @@ type Props = {
   initialStatus: PipelineStatus | null;
   triggerAction: (from: string, to: string, includeBacklog: boolean) => Promise<ActionResult>;
   cancelAction: () => Promise<ActionResult>;
+  reprocessAction: () => Promise<ActionResult>;
   pubmedMode: string;
   togglePubmedMode: () => Promise<string>;
 };
@@ -34,6 +35,7 @@ export function PipelineControls({
   initialStatus,
   triggerAction,
   cancelAction,
+  reprocessAction,
   pubmedMode: initialPubmedMode,
   togglePubmedMode,
 }: Props) {
@@ -45,6 +47,7 @@ export function PipelineControls({
   const [currentPubmedMode, setCurrentPubmedMode] = useState(initialPubmedMode);
   const [toggling, setToggling] = useState(false);
   const [includeBacklog, setIncludeBacklog] = useState(true);
+  const [reprocessing, setReprocessing] = useState(false);
 
   // Default range: last 2 days → today
   const today = fmtDate(new Date());
@@ -194,7 +197,7 @@ export function PipelineControls({
         </span>
       </div>
 
-      {/* Run / Stop buttons */}
+      {/* Run / Stop / Reprocess buttons */}
       <div className="flex gap-2">
         {isRunning ? (
           <Button
@@ -216,23 +219,56 @@ export function PipelineControls({
             )}
           </Button>
         ) : (
-          <Button
-            size="sm"
-            onClick={runPipeline}
-            disabled={pending}
-          >
-            {pending ? (
-              <>
-                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                Starting...
-              </>
-            ) : (
-              <>
-                <Play className="mr-1 h-3 w-3" />
-                Run Pipeline
-              </>
-            )}
-          </Button>
+          <>
+            <Button
+              size="sm"
+              onClick={runPipeline}
+              disabled={pending || reprocessing}
+            >
+              {pending ? (
+                <>
+                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                  Starting...
+                </>
+              ) : (
+                <>
+                  <Play className="mr-1 h-3 w-3" />
+                  Run Pipeline
+                </>
+              )}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={pending || reprocessing}
+              onClick={async () => {
+                setReprocessing(true);
+                setError(null);
+                setSuccess(null);
+                try {
+                  const result = await reprocessAction();
+                  if (result.ok) setSuccess(result.message);
+                  else setError(result.error);
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : "Failed");
+                } finally {
+                  setReprocessing(false);
+                }
+              }}
+            >
+              {reprocessing ? (
+                <>
+                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                  Resetting...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-1 h-3 w-3" />
+                  Fix Errors
+                </>
+              )}
+            </Button>
+          </>
         )}
       </div>
 
