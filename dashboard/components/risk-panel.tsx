@@ -2,7 +2,7 @@ import { DimensionBar } from "@/components/dimension-bar";
 import { ReviewStatusSelect } from "@/components/review-status-select";
 import { Badge } from "@/components/ui/badge";
 import { riskStyle } from "@/lib/risk-colors";
-import { cn, parseDimensions } from "@/lib/utils";
+import { cn, parseDimensions, computeAggregateScore } from "@/lib/utils";
 import { ExternalLink } from "lucide-react";
 import type { Paper } from "@prisma/client";
 
@@ -27,8 +27,12 @@ export function RiskPanel({ paper }: RiskPanelProps) {
   } | null;
   const dimensions = parseDimensions(stage2?.dimensions);
 
-  // Fall back to stage2 aggregate_score if paper-level is missing/zero
-  const score = paper.aggregateScore || stage2?.aggregate_score || 0;
+  // Fall back to stage2 aggregate_score, then compute from dimensions
+  const score =
+    paper.aggregateScore ||
+    stage2?.aggregate_score ||
+    computeAggregateScore(dimensions) ||
+    0;
 
   const doiUrl = paper.doi ? `https://doi.org/${paper.doi}` : null;
 

@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Paper } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { cn, parseDimensions, languageName } from "@/lib/utils";
+import { cn, parseDimensions, computeAggregateScore, languageName } from "@/lib/utils";
 import { riskStyle } from "@/lib/risk-colors";
 import { formatDate, sourceServerLabel } from "@/lib/utils";
 
@@ -28,8 +28,12 @@ export function PaperCard({ paper }: PaperCardProps) {
     .sort(([, a], [, b]) => b.score - a.score)
     .slice(0, 3);
 
-  // Fall back to stage2 aggregate_score if paper-level is missing/zero
-  const score = paper.aggregateScore || stage2?.aggregate_score || null;
+  // Fall back to stage2 aggregate_score, then compute from dimensions
+  const score =
+    paper.aggregateScore ||
+    stage2?.aggregate_score ||
+    computeAggregateScore(dimensions) ||
+    null;
 
   // Format author list
   type AuthorEntry = { name?: string };

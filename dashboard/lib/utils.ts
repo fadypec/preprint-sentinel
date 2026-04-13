@@ -56,6 +56,16 @@ export function parseDimensions(raw: unknown): Dimensions {
   }
 }
 
+/**
+ * Compute aggregate score from dimension entries (sum of all scores).
+ * Used as fallback when the aggregate_score field is missing.
+ */
+export function computeAggregateScore(dims: Dimensions): number | null {
+  const entries = Object.values(dims);
+  if (entries.length === 0) return null;
+  return entries.reduce((sum, d) => sum + (d.score ?? 0), 0);
+}
+
 const LANGUAGE_NAMES: Record<string, string> = {
   chi: "Chinese", zho: "Chinese", jpn: "Japanese", kor: "Korean",
   ger: "German", deu: "German", fre: "French", fra: "French",

@@ -4,6 +4,7 @@ import {
   formatDuration,
   formatCost,
   parseDimensions,
+  computeAggregateScore,
   languageName,
   sourceServerLabel,
 } from "../utils";
@@ -99,6 +100,21 @@ describe("languageName", () => {
 
   it("is case-insensitive", () => {
     expect(languageName("CHI")).toBe("Chinese");
+  });
+});
+
+describe("computeAggregateScore", () => {
+  it("sums dimension scores", () => {
+    const dims = {
+      a: { score: 2, justification: "" },
+      b: { score: 3, justification: "" },
+      c: { score: 1, justification: "" },
+    };
+    expect(computeAggregateScore(dims)).toBe(6);
+  });
+
+  it("returns null for empty dimensions", () => {
+    expect(computeAggregateScore({})).toBeNull();
   });
 });
 

@@ -9,7 +9,7 @@ import { AnalystNotes } from "@/components/analyst-notes";
 import { AuditTrail } from "@/components/audit-trail";
 import { RelatedPapers } from "@/components/related-papers";
 import { riskStyle } from "@/lib/risk-colors";
-import { cn, formatDate, sourceServerLabel, languageName } from "@/lib/utils";
+import { cn, formatDate, sourceServerLabel, languageName, parseDimensions, computeAggregateScore } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
 import { Markdown } from "@/components/markdown";
 
@@ -106,7 +106,7 @@ export default async function PaperDetailPage({ params }: Props) {
           <div className="mt-1 flex items-center gap-2">
             <Badge className={cn(style.badge)}>{style.label}</Badge>
             <span className="text-xs text-slate-500 dark:text-slate-400">
-              Score: {paper.aggregateScore || stage2?.aggregate_score || 0}/18
+              Score: {paper.aggregateScore || stage2?.aggregate_score || computeAggregateScore(parseDimensions((paper.stage2Result as Record<string, unknown> | null)?.dimensions)) || 0}/18
             </span>
           </div>
         </div>
