@@ -11,6 +11,7 @@ import { RelatedPapers } from "@/components/related-papers";
 import { riskStyle } from "@/lib/risk-colors";
 import { cn, formatDate, sourceServerLabel, languageName } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
+import { Markdown } from "@/components/markdown";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -32,6 +33,7 @@ export default async function PaperDetailPage({ params }: Props) {
   const stage2 = paper.stage2Result as {
     summary?: string;
     key_methods_of_concern?: string[];
+    aggregate_score?: number;
   } | null;
   const stage3 = paper.stage3Result as {
     summary?: string;
@@ -104,7 +106,7 @@ export default async function PaperDetailPage({ params }: Props) {
           <div className="mt-1 flex items-center gap-2">
             <Badge className={cn(style.badge)}>{style.label}</Badge>
             <span className="text-xs text-slate-500 dark:text-slate-400">
-              Score: {paper.aggregateScore ?? 0}/18
+              Score: {paper.aggregateScore || stage2?.aggregate_score || 0}/18
             </span>
           </div>
         </div>
@@ -186,7 +188,7 @@ export default async function PaperDetailPage({ params }: Props) {
                 AI Assessment Summary
               </h2>
               <div className="rounded-md bg-slate-100 p-4 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                {stage3?.summary ?? stage2?.summary}
+                <Markdown>{stage3?.summary ?? stage2?.summary ?? ""}</Markdown>
               </div>
             </section>
           )}
@@ -217,8 +219,8 @@ export default async function PaperDetailPage({ params }: Props) {
               <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Adjudication Context
               </h2>
-              <div className="space-y-2 text-sm text-slate-700 dark:text-slate-300">
-                <p>{stage3.institutional_context}</p>
+              <div className="space-y-3 text-sm text-slate-700 dark:text-slate-300">
+                <Markdown>{stage3.institutional_context ?? ""}</Markdown>
                 {stage3.durc_oversight_indicators &&
                   stage3.durc_oversight_indicators.length > 0 && (
                     <div>
@@ -230,10 +232,10 @@ export default async function PaperDetailPage({ params }: Props) {
                   )}
                 {stage3.adjustment_reasoning && (
                   <div>
-                    <span className="text-xs text-slate-500 dark:text-slate-400">
-                      Reasoning:{" "}
+                    <span className="mb-1 block text-xs text-slate-500 dark:text-slate-400">
+                      Reasoning:
                     </span>
-                    {stage3.adjustment_reasoning}
+                    <Markdown>{stage3.adjustment_reasoning}</Markdown>
                   </div>
                 )}
               </div>

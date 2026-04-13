@@ -21,8 +21,14 @@ type RiskPanelProps = {
 
 export function RiskPanel({ paper }: RiskPanelProps) {
   const style = riskStyle(paper.riskTier);
-  const stage2 = paper.stage2Result as { dimensions?: unknown } | null;
+  const stage2 = paper.stage2Result as {
+    dimensions?: unknown;
+    aggregate_score?: number;
+  } | null;
   const dimensions = parseDimensions(stage2?.dimensions);
+
+  // Fall back to stage2 aggregate_score if paper-level is missing/zero
+  const score = paper.aggregateScore || stage2?.aggregate_score || 0;
 
   const doiUrl = paper.doi ? `https://doi.org/${paper.doi}` : null;
 
@@ -31,7 +37,7 @@ export function RiskPanel({ paper }: RiskPanelProps) {
       {/* Aggregate badge */}
       <div className="text-center">
         <Badge className={cn("text-lg px-3 py-1", style.badge)}>
-          {style.label} &middot; {paper.aggregateScore ?? 0}/18
+          {style.label} &middot; {score}/18
         </Badge>
       </div>
 

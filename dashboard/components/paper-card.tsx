@@ -13,7 +13,11 @@ type PaperCardProps = {
 export function PaperCard({ paper }: PaperCardProps) {
   const style = riskStyle(paper.riskTier);
   const isTranslated = paper.language != null && paper.language !== "eng" && paper.originalTitle != null;
-  const stage2 = paper.stage2Result as { summary?: string; dimensions?: unknown } | null;
+  const stage2 = paper.stage2Result as {
+    summary?: string;
+    dimensions?: unknown;
+    aggregate_score?: number;
+  } | null;
   const stage3 = paper.stage3Result as { summary?: string } | null;
   const summary = stage3?.summary ?? stage2?.summary ?? null;
 
@@ -23,6 +27,9 @@ export function PaperCard({ paper }: PaperCardProps) {
     .filter(([, d]) => d.score >= 1)
     .sort(([, a], [, b]) => b.score - a.score)
     .slice(0, 3);
+
+  // Fall back to stage2 aggregate_score if paper-level is missing/zero
+  const score = paper.aggregateScore || stage2?.aggregate_score || null;
 
   // Format author list
   type AuthorEntry = { name?: string };
@@ -72,7 +79,7 @@ export function PaperCard({ paper }: PaperCardProps) {
           </p>
         )}
 
-        {paper.aggregateScore != null && (
+        {(topDimensions.length > 0 || score != null) && (
           <div className="mt-2 flex flex-wrap gap-1">
             {topDimensions.map(([name, dim]) => (
               <span
@@ -89,9 +96,11 @@ export function PaperCard({ paper }: PaperCardProps) {
                 {name.replace(/_/g, " ")}: {dim.score}
               </span>
             ))}
-            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-700 dark:bg-slate-700 dark:text-slate-200">
-              Score: {paper.aggregateScore}/18
-            </span>
+            {score != null && (
+              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-700 dark:bg-slate-700 dark:text-slate-200">
+                Score: {score}/18
+              </span>
+            )}
           </div>
         )}
       </Card>
