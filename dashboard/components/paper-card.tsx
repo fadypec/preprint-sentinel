@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { cn, parseDimensions, computeAggregateScore, languageName } from "@/lib/utils";
 import { riskStyle } from "@/lib/risk-colors";
 import { formatDate, sourceServerLabel } from "@/lib/utils";
+import { AlertTriangle } from "lucide-react";
 
 type PaperCardProps = {
   paper: Paper;
@@ -17,9 +18,13 @@ export function PaperCard({ paper }: PaperCardProps) {
     summary?: string;
     dimensions?: unknown;
     aggregate_score?: number;
+    _error?: string;
   } | null;
-  const stage3 = paper.stage3Result as { summary?: string } | null;
+  const stage3 = paper.stage3Result as { summary?: string; _error?: string } | null;
   const summary = stage3?.summary ?? stage2?.summary ?? null;
+
+  // Detect processing errors
+  const hasError = !!(stage2?._error || stage3?._error || paper.needsManualReview);
 
   // Parse dimensions (may be a JSON string or object)
   const dimensions = parseDimensions(stage2?.dimensions);
@@ -72,9 +77,19 @@ export function PaperCard({ paper }: PaperCardProps) {
               {sourceServerLabel(paper.sourceServer)} &middot; {formatDate(paper.postedDate)}
             </p>
           </div>
-          <Badge className={cn("shrink-0", style.badge)} aria-label={`Risk tier: ${style.label}`}>
-            {style.label}
-          </Badge>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {hasError && (
+              <span
+                title="Processing errors — assessment may be incomplete"
+                className="text-amber-500 dark:text-amber-400"
+              >
+                <AlertTriangle className="h-4 w-4" />
+              </span>
+            )}
+            <Badge className={cn(style.badge)} aria-label={`Risk tier: ${style.label}`}>
+              {style.label}
+            </Badge>
+          </div>
         </div>
 
         {summary && (

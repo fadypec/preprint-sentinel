@@ -36,6 +36,7 @@ export type PaperQueryParams = {
   status?: string | null;
   search?: string | null;
   needsReview?: string | null;
+  hasErrors?: string | null;
   sort?: string | null;
   dim?: string | null;
   dimMin?: string | null;
@@ -209,11 +210,12 @@ export async function queryPapers(
   const dimMin = dim ? validDimMin(params.dimMin) ?? 1 : undefined;
   const author = params.author?.trim() || undefined;
   const institution = params.institution?.trim() || undefined;
+  const hasErrors = params.hasErrors === "true" ? true : undefined;
 
-  // Dimension filtering, author/institution ILIKE, and full-text search
-  // all require raw SQL — route through the raw SQL path.
-  if (search || dim || author || institution) {
-    return queryPapersRawSQL({ page, tiers, source, status, search, needsReview, sort: sort!, dim, dimMin, author, institution });
+  // Dimension filtering, author/institution ILIKE, full-text search,
+  // and error filtering all require raw SQL.
+  if (search || dim || author || institution || hasErrors) {
+    return queryPapersRawSQL({ page, tiers, source, status, search, needsReview, hasErrors, sort: sort!, dim, dimMin, author, institution });
   }
 
   return queryPapersPrisma({ page, tiers, source, status, needsReview, sort: sort! });
@@ -291,7 +293,7 @@ async function queryPapersPrisma(filters: {
   };
 }
 
-/** Raw SQL path — used for full-text search, dimension filtering, and author/institution ILIKE. */
+/** Raw SQL path — used for full-text search, dimension filtering, author/institution ILIKE, and error filtering. */
 async function queryPapersRawSQL(filters: {
   page: number;
   tiers?: RiskTier[];
@@ -299,6 +301,7 @@ async function queryPapersRawSQL(filters: {
   status?: ReviewStatus;
   search?: string;
   needsReview?: boolean;
+  hasErrors?: boolean;
   sort: string;
   dim?: string;
   dimMin?: number;
@@ -355,6 +358,12 @@ async function queryPapersRawSQL(filters: {
   const institutionClause =
     filters.institution
       ? Prisma.sql`AND corresponding_institution ILIKE ${"%" + filters.institution + "%"}`
+      : Prisma.empty;
+
+  // Error filter clause — papers with _error in stage results or needs_manual_review
+  const errorsClause =
+    filters.hasErrors
+      ? Prisma.sql`AND (needs_manual_review = true OR stage2_result::text LIKE '%_error%' OR stage3_result::text LIKE '%_error%')`
       : Prisma.empty;
 
   // Build ORDER BY clause based on sort parameter
@@ -432,6 +441,7 @@ async function queryPapersRawSQL(filters: {
         ${dimClause}
         ${authorClause}
         ${institutionClause}
+        ${errorsClause}
     `,
     prisma.$queryRaw<[{ count: bigint }]>`
       SELECT COUNT(*) as count FROM papers WHERE is_duplicate_of IS NULL
@@ -449,6 +459,7 @@ async function queryPapersRawSQL(filters: {
         ${dimClause}
         ${authorClause}
         ${institutionClause}
+        ${errorsClause}
       ${orderByClause}
       LIMIT ${PAGE_SIZE} OFFSET ${(filters.page - 1) * PAGE_SIZE}
     `,

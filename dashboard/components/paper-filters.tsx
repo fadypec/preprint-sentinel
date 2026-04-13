@@ -49,6 +49,7 @@ type PaperFiltersProps = {
   dimMin: string;
   author: string;
   institution: string;
+  hasErrors: string;
 };
 
 /** Build a clean URL with only non-default filter params. */
@@ -58,6 +59,7 @@ function buildUrl(filters: {
   status: string;
   q: string;
   needsReview: string;
+  hasErrors: string;
   sort: string;
   dim: string;
   author: string;
@@ -77,6 +79,7 @@ function buildUrl(filters: {
   if (filters.dim && filters.dim !== "all" && filters.dimMin && filters.dimMin !== "1") p.set("dim_min", filters.dimMin);
   if (filters.author) p.set("author", filters.author);
   if (filters.institution) p.set("institution", filters.institution);
+  if (filters.hasErrors === "true") p.set("has_errors", "true");
   const qs = p.toString();
   return qs ? `/?${qs}` : "/";
 }
@@ -92,7 +95,7 @@ function buildUrl(filters: {
  * parse, independent of React hydration). Falls back to the Go button
  * if JS never loads.
  */
-export function PaperFilters({ tier, source, status, q, needsReview, sort, dim, dimMin, author, institution }: PaperFiltersProps) {
+export function PaperFilters({ tier, source, status, q, needsReview, hasErrors, sort, dim, dimMin, author, institution }: PaperFiltersProps) {
   const selectedTiers = new Set(
     !tier || tier === "all" ? [] : tier.split(","),
   );
@@ -108,6 +111,7 @@ export function PaperFilters({ tier, source, status, q, needsReview, sort, dim, 
       status,
       q,
       needsReview,
+      hasErrors,
       sort,
       dim,
       dimMin,
@@ -122,6 +126,7 @@ export function PaperFilters({ tier, source, status, q, needsReview, sort, dim, 
     (status !== "all" && status !== "") ||
     q !== "" ||
     needsReview === "true" ||
+    hasErrors === "true" ||
     (sort !== "date_desc" && sort !== "") ||
     (dim !== "all" && dim !== "") ||
     author !== "" ||
@@ -169,6 +174,7 @@ export function PaperFilters({ tier, source, status, q, needsReview, sort, dim, 
           status,
           q,
           needsReview: needsReview === "true" ? "" : "true",
+          hasErrors,
           sort,
           dim,
           dimMin,
@@ -187,6 +193,33 @@ export function PaperFilters({ tier, source, status, q, needsReview, sort, dim, 
         Needs Review
       </a>
 
+      {/* Has Errors toggle — plain <a> link */}
+      <a
+        href={buildUrl({
+          tier,
+          source,
+          status,
+          q,
+          needsReview,
+          hasErrors: hasErrors === "true" ? "" : "true",
+          sort,
+          dim,
+          dimMin,
+          author,
+          institution,
+        })}
+        role="button"
+        aria-pressed={hasErrors === "true"}
+        className={cn(
+          "rounded-md border px-2.5 py-1 text-xs font-medium no-underline transition-colors",
+          hasErrors === "true"
+            ? "bg-red-500 text-white border-red-500 dark:bg-red-600 dark:border-red-600"
+            : "border-red-300 text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/30",
+        )}
+      >
+        Has Errors
+      </a>
+
       {/* Source / Status / Search — HTML form, no React hydration needed */}
       <form
         method="GET"
@@ -200,6 +233,9 @@ export function PaperFilters({ tier, source, status, q, needsReview, sort, dim, 
         )}
         {needsReview === "true" && (
           <input type="hidden" name="needs_review" value="true" />
+        )}
+        {hasErrors === "true" && (
+          <input type="hidden" name="has_errors" value="true" />
         )}
 
         <label htmlFor="filter-author" className="sr-only">Filter by author</label>

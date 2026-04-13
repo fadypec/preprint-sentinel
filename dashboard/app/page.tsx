@@ -25,12 +25,13 @@ type Props = {
     dim_min?: string;
     author?: string;
     institution?: string;
+    has_errors?: string;
   }>;
 };
 
 function buildPaginationHref(
   targetPage: number,
-  filters: { tier?: string; source?: string; status?: string; q?: string; sort?: string; dim?: string; dimMin?: string; author?: string; institution?: string },
+  filters: { tier?: string; source?: string; status?: string; q?: string; sort?: string; dim?: string; dimMin?: string; author?: string; institution?: string; hasErrors?: string },
 ): string {
   const p = new URLSearchParams();
   p.set("page", String(targetPage));
@@ -43,6 +44,7 @@ function buildPaginationHref(
   if (filters.dim && filters.dim !== "all" && filters.dimMin && filters.dimMin !== "1") p.set("dim_min", filters.dimMin);
   if (filters.author) p.set("author", filters.author);
   if (filters.institution) p.set("institution", filters.institution);
+  if (filters.hasErrors === "true") p.set("has_errors", "true");
   return `/?${p.toString()}`;
 }
 
@@ -59,6 +61,7 @@ export default async function DailyFeedPage({ searchParams }: Props) {
   const dimMin = params.dim_min;
   const author = params.author?.trim();
   const institution = params.institution?.trim();
+  const hasErrors = params.has_errors;
 
   const { papers, total, totalIngested, totalPages } = await queryPapers({
     page,
@@ -67,6 +70,7 @@ export default async function DailyFeedPage({ searchParams }: Props) {
     status,
     search,
     needsReview,
+    hasErrors,
     sort,
     dim,
     dimMin,
@@ -74,7 +78,7 @@ export default async function DailyFeedPage({ searchParams }: Props) {
     institution,
   });
 
-  const filterState = { tier, source, status, q: search, needsReview, sort, dim, dimMin, author, institution };
+  const filterState = { tier, source, status, q: search, needsReview, hasErrors, sort, dim, dimMin, author, institution };
   const flaggedPct = totalIngested > 0 ? ((total / totalIngested) * 100).toFixed(1) : "0";
 
   return (
@@ -107,6 +111,7 @@ export default async function DailyFeedPage({ searchParams }: Props) {
           dimMin={dimMin ?? "1"}
           author={author ?? ""}
           institution={institution ?? ""}
+          hasErrors={hasErrors ?? ""}
         />
       </div>
 
