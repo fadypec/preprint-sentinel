@@ -252,7 +252,8 @@ class TestRetry:
         assert route.call_count == 2
 
     @respx.mock
-    async def test_all_retries_exhausted_raises(self):
+    async def test_all_retries_exhausted_skips_source(self):
+        """After retries are exhausted, the failing prefix is skipped (not raised)."""
         respx.get("https://api.crossref.org/works").mock(return_value=httpx.Response(429))
 
         from pipeline.ingest.crossref import CrossrefClient
@@ -260,5 +261,6 @@ class TestRetry:
         async with CrossrefClient(
             request_delay=0, max_retries=2, sources={"research_square": "10.21203"}
         ) as client:
-            with pytest.raises(RuntimeError, match="failed after 2 retries"):
-                _ = [p async for p in client.fetch_papers(date(2026, 3, 1), date(2026, 3, 30))]
+            # Error is caught per-prefix — returns empty list, not an exception
+            papers = [p async for p in client.fetch_papers(date(2026, 3, 1), date(2026, 3, 30))]
+        assert len(papers) == 0

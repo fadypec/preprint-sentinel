@@ -80,10 +80,12 @@ class ZenodoClient:
         if self._client is None:
             raise RuntimeError("Use ZenodoClient as async context manager")
 
+        # Build URL with q= directly to avoid httpx encoding [ ] which Zenodo rejects
+        q_value = f"created:[{from_date} TO {to_date}]"
+        url = f"{self.BASE_URL}?q={q_value}"
         params = {
             "type": "publication",
             "subtype": "preprint",
-            "q": f"created:[{from_date} TO {to_date}]",
             "size": self.PAGE_SIZE,
             "page": page,
             "sort": "-created",
@@ -91,7 +93,7 @@ class ZenodoClient:
 
         resp = await request_with_retry(
             self._client,
-            self.BASE_URL,
+            url,
             params=params,
             timeout=30.0,
             request_delay=self.request_delay,

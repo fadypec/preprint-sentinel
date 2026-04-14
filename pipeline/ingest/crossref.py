@@ -22,10 +22,11 @@ from pipeline.models import SourceServer
 
 log = structlog.get_logger()
 
+# SSRN excluded: registers as journal-article in Crossref (not posted-content),
+# requires different query parameters, and is primarily economics/social science.
 _DEFAULT_SOURCES: dict[str, str] = {
     "research_square": "10.21203",
     "chemrxiv": "10.26434",
-    "ssrn": "10.2139",
 }
 
 _SOURCE_SERVER_MAP: dict[str, SourceServer] = {
@@ -71,8 +72,18 @@ class CrossrefClient:
     async def fetch_papers(self, from_date: date, to_date: date) -> AsyncGenerator[dict, None]:
         """Yield normalised paper dicts from all configured Crossref sources."""
         for source_name, prefix in self.sources.items():
-            async for paper in self._fetch_source(source_name, prefix, from_date, to_date):
-                yield paper
+            try:
+                async for paper in self._fetch_source(source_name, prefix, from_date, to_date):
+                    yield paper
+            except Exception as exc:
+                # Log and skip this prefix — don't let one failing source
+                # (e.g., Research Square 400) kill ChemRxiv and SSRN
+                log.warning(
+                    "crossref_prefix_error",
+                    source=source_name,
+                    prefix=prefix,
+                    error=f"{type(exc).__name__}: {exc}",
+                )
 
     # -- Internal ------------------------------------------------------------
 
@@ -119,6 +130,8 @@ class CrossrefClient:
         if self._client is None:
             raise RuntimeError("Use CrossrefClient as async context manager")
 
+        # Note: sort/order params removed — Crossref returns 400 when
+        # combining cursor pagination with sort=posted on some prefixes.
         params: dict = {
             "filter": (
                 f"prefix:{prefix},"
@@ -128,8 +141,6 @@ class CrossrefClient:
             ),
             "rows": self.PAGE_SIZE,
             "cursor": cursor,
-            "sort": "posted",
-            "order": "desc",
         }
         if self.email:
             params["mailto"] = self.email
