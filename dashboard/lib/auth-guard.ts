@@ -4,18 +4,36 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { checkRateLimit } from "@/lib/rate-limit";
 
-/** Auth is optional in dev when no OAuth providers are configured */
+/**
+ * Auth is optional in dev when no OAuth providers are configured.
+ * In production (NODE_ENV=production), auth is ALWAYS required —
+ * the app will reject requests rather than silently running open.
+ */
 function authConfigured(): boolean {
   const configured = !!(process.env.AUTH_GITHUB_ID || process.env.AUTH_GOOGLE_ID);
-  if (!configured && !authWarned) {
+  if (configured) return true;
+
+  // In production, never allow unauthenticated access
+  if (process.env.NODE_ENV === "production") {
+    if (!authWarned) {
+      authWarned = true;
+      console.error(
+        "[SECURITY] CRITICAL: No OAuth providers configured in production. " +
+        "Set AUTH_GITHUB_ID/AUTH_GOOGLE_ID. Auth is ENFORCED — requests will be rejected.",
+      );
+    }
+    return true; // Force auth checks even though no provider exists (will 401 everything)
+  }
+
+  // Dev mode — allow open access with warning
+  if (!authWarned) {
     authWarned = true;
     console.warn(
-      "[SECURITY] No OAuth providers configured (AUTH_GITHUB_ID / AUTH_GOOGLE_ID). " +
-      "Authentication is DISABLED. All routes are publicly accessible. " +
-      "This is expected in development but must not reach production.",
+      "[SECURITY] No OAuth providers configured. " +
+      "Authentication is DISABLED (dev mode only).",
     );
   }
-  return configured;
+  return false;
 }
 
 let authWarned = false;
