@@ -56,7 +56,11 @@ def _orcid_data() -> dict:
 def _crossref_data() -> dict:
     return {
         "funders": [
-            {"name": "National Institutes of Health", "doi": "10.13039/100000002", "award": ["R01AI123456"]},
+            {
+                "name": "National Institutes of Health",
+                "doi": "10.13039/100000002",
+                "award": ["R01AI123456"],
+            },
         ],
     }
 
@@ -142,7 +146,9 @@ class TestEnrichPaper:
              patch(_ENRICHMENT_PATCHES[2]) as orcid_cls, \
              patch(_ENRICHMENT_PATCHES[3]) as cr_cls:
             oa_cls.return_value = _make_async_client_mock(_openalex_data())
-            s2_cls.return_value = _make_async_client_mock(lookup_side_effect=RuntimeError("API down"))
+            s2_cls.return_value = _make_async_client_mock(
+                lookup_side_effect=RuntimeError("API down"),
+            )
             orcid_cls.return_value = _make_async_client_mock(_orcid_data())
             cr_cls.return_value = _make_async_client_mock(_crossref_data())
 
