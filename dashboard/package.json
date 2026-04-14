@@ -26,7 +26,7 @@
     "nodemailer": "^8.0.5",
     "nuqs": "^2.8.9",
     "pg": "^8.20.0",
-    "prisma": "^7.6.0",
+    "prisma": "^7.7.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-markdown": "^10.1.0",
