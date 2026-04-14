@@ -1,7 +1,7 @@
 # DURC Preprint Triage System — Roadmap
 
 Living document tracking audit remediation and feature work.
-Based on comprehensive codebase audit conducted 2026-04-09 (see `2026-04-09_AUDIT.md`).
+Based on comprehensive codebase audits conducted 2026-04-09 and 2026-04-10.
 
 ---
 
@@ -69,6 +69,24 @@ Based on comprehensive codebase audit conducted 2026-04-09 (see `2026-04-09_AUDI
 - [x] Version tracking — detect paper version upgrades and flag for re-screening (backlog)
 - [x] Slack webhook placeholder replaced with generic text (audit medium-severity security)
 
+### Batch 8 — CI, analytics redesign, and data quality (2026-04-10 to 2026-04-14)
+
+- [x] CodeQL security scanning workflow added
+- [x] pytest-cov coverage reporting in CI (78% coverage)
+- [x] CI fixes: ruff formatting, ESLint setState-in-effect, npm peer deps, ReDoS regex
+- [x] Per-source error handling in ingest — one failing source no longer kills entire pipeline
+- [x] Analytics page redesign: actionable KPIs, intelligence coverage heatmap + source detail table
+- [x] Institution name normalisation (regex extraction of university names from department strings)
+- [x] Dashboard Vitest run added to CI
+- [x] Markdown rendering for LLM assessment summaries and reasoning
+- [x] Score fallback chain: paper.aggregateScore → stage2 score → computed from dimensions
+- [x] Regex fallback in parseDimensions for malformed LLM JSON output
+- [x] Processing error indicator (warning triangle) on paper cards
+- [x] "Has Errors" filter toggle in feed
+- [x] "Fix Errors" button on Pipeline page (resets error papers for reprocessing)
+- [x] Sort by computed score when aggregate_score is NULL (COALESCE with JSONB dimension sum)
+- [x] Coverage heatmap rewritten: pipeline runs (Pipeline page) + source-aware paper coverage (Analytics page)
+
 ---
 
 ## Deferred
@@ -79,17 +97,30 @@ Based on comprehensive codebase audit conducted 2026-04-09 (see `2026-04-09_AUDI
 
 ## Documented Limitations
 
-These audit findings have been evaluated and are either by design, API limitations, or require infrastructure changes beyond code:
-
-- **In-memory rate limiting** (`dashboard/lib/rate-limit.ts`) — working as designed for single-server deployment. Would need Redis for multi-instance.
+- **In-memory rate limiting** — working as designed for single-server deployment. Would need Redis for multi-instance.
 - **DedupRelationship.PUBLISHED_VERSION** enum — forward declaration for planned preprint→publication linking. Not dead code.
 - **Stage naming mismatch** (stage1/2/3 vs pipeline stage numbers) — cosmetic; changing would require a migration and break existing data.
-- **Integration tests** — would require real database or complex multi-service mocking. Unit test coverage (248+ tests) is sufficient for current scale.
-- **Security scanning / SAST** — CI pipeline configuration, not a code change. Pre-commit hooks (ruff + mypy) provide basic static analysis.
-- **Coverage reporting** — CI configuration with pytest-cov. Not a code change.
-- **Monitoring dashboards** — requires external service (Grafana/Datadog). Cost monitoring exists in PipelineRun table.
 
-## Backlog
+---
 
-- [ ] Crossref enrichment client (funder info extraction) — funder data already available via OpenAlex enrichment
-- [ ] Analyst feedback loop — use exported FP/confirmed data to automatically refine LLM prompts
+## Next Steps
+
+### Immediate (security — before production)
+
+1. **Add auth guards to server actions** — `requireAdmin()` on `triggerPipeline`, `cancelPipeline`, `clearRunHistory`, `togglePubmedQueryMode`, `reprocessErrors`
+2. **Wire pipeline failure alerting** to existing Slack/email system — failures currently only logged
+
+### Short-term (operational hardening)
+
+3. **Add unauthenticated `/api/health` endpoint** — liveness probe for infrastructure monitoring
+4. **Write operations runbook** — backup restore, API key rotation, stuck pipeline procedures
+5. **Add CSRF protection** on state-changing API routes (PUT/PATCH)
+6. **Add coverage threshold** — `--cov-fail-under=70` in CI
+
+### Backlog (nice-to-have)
+
+7. Crossref enrichment client (funder info) — already available via OpenAlex
+8. Analyst feedback loop — use exported FP/confirmed data to refine LLM prompts
+9. Dependency vulnerability scanning (Dependabot)
+10. OpenAPI documentation for dashboard API
+11. Developer onboarding guide
