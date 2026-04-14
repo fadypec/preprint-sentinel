@@ -366,6 +366,20 @@ async function queryPapersRawSQL(filters: {
       ? Prisma.sql`AND (needs_manual_review = true OR stage2_result::text LIKE '%_error%' OR stage3_result::text LIKE '%_error%')`
       : Prisma.empty;
 
+  // Computed score expression: falls back to sum of dimension scores
+  // when aggregate_score is NULL (matches client-side computeAggregateScore)
+  const scoreExpr = Prisma.sql`COALESCE(
+    aggregate_score,
+    (
+      COALESCE((stage2_result->'dimensions'->'pathogen_enhancement'->>'score')::int, 0) +
+      COALESCE((stage2_result->'dimensions'->'synthesis_barrier_lowering'->>'score')::int, 0) +
+      COALESCE((stage2_result->'dimensions'->'select_agent_relevance'->>'score')::int, 0) +
+      COALESCE((stage2_result->'dimensions'->'novel_technique'->>'score')::int, 0) +
+      COALESCE((stage2_result->'dimensions'->'information_hazard'->>'score')::int, 0) +
+      COALESCE((stage2_result->'dimensions'->'defensive_framing'->>'score')::int, 0)
+    )
+  )`;
+
   // Build ORDER BY clause based on sort parameter
   let orderByClause: Prisma.Sql;
   switch (filters.sort) {
@@ -379,7 +393,7 @@ async function queryPapersRawSQL(filters: {
             WHEN 'low' THEN 1
             ELSE 0
           END DESC,
-          aggregate_score DESC NULLS LAST,
+          ${scoreExpr} DESC NULLS LAST,
           posted_date DESC
       `;
       break;
@@ -393,7 +407,7 @@ async function queryPapersRawSQL(filters: {
             WHEN 'low' THEN 1
             ELSE 0
           END DESC,
-          aggregate_score ASC NULLS FIRST,
+          ${scoreExpr} ASC NULLS FIRST,
           posted_date DESC
       `;
       break;
