@@ -1,4 +1,4 @@
-"""Enrichment orchestrator -- merges data from OpenAlex, Semantic Scholar, and ORCID.
+"""Enrichment orchestrator -- merges data from OpenAlex, Semantic Scholar, ORCID, and Crossref.
 
 Usage:
     result = await enrich_paper(paper, settings)
@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 
 import structlog
 
+from pipeline.enrichment.crossref import CrossrefEnrichmentClient
 from pipeline.enrichment.openalex import OpenAlexClient
 from pipeline.enrichment.orcid import OrcidClient
 from pipeline.enrichment.semantic_scholar import SemanticScholarClient
@@ -99,6 +100,21 @@ async def enrich_paper(paper: Paper, settings) -> EnrichmentResult:
     except Exception:
         log.warning("enrichment_orcid_failed", paper_id=str(paper.id), exc_info=True)
         sources_failed.append("orcid")
+
+    # 4. Crossref funder info (supplements OpenAlex funder data)
+    try:
+        crossref_email = getattr(settings, "crossref_email", "") or settings.openalex_email
+        async with CrossrefEnrichmentClient(
+            email=crossref_email,
+            request_delay=getattr(settings, "crossref_request_delay", 1.0),
+        ) as cr_client:
+            cr_data = await cr_client.lookup(doi)
+        if cr_data is not None:
+            merged_data["crossref"] = cr_data
+        sources_succeeded.append("crossref")
+    except Exception:
+        log.warning("enrichment_crossref_failed", paper_id=str(paper.id), exc_info=True)
+        sources_failed.append("crossref")
 
     partial = len(sources_failed) > 0
 

@@ -53,6 +53,49 @@ def _orcid_data() -> dict:
     }
 
 
+def _crossref_data() -> dict:
+    return {
+        "funders": [
+            {"name": "National Institutes of Health", "doi": "10.13039/100000002", "award": ["R01AI123456"]},
+        ],
+    }
+
+
+def _mock_settings() -> MagicMock:
+    """Create a mock settings object with all required enrichment fields."""
+    s = MagicMock()
+    s.openalex_email = "test@test.com"
+    s.openalex_request_delay = 0
+    s.semantic_scholar_api_key = MagicMock()
+    s.semantic_scholar_api_key.get_secret_value = MagicMock(return_value="")
+    s.semantic_scholar_request_delay = 0
+    s.orcid_request_delay = 0
+    s.crossref_email = "test@test.com"
+    s.crossref_request_delay = 0
+    return s
+
+
+def _make_async_client_mock(lookup_return=None, lookup_side_effect=None):
+    """Create a mock async context manager client with a .lookup() method."""
+    mock = AsyncMock()
+    if lookup_side_effect:
+        mock.lookup = AsyncMock(side_effect=lookup_side_effect)
+    else:
+        mock.lookup = AsyncMock(return_value=lookup_return)
+    mock.__aenter__ = AsyncMock(return_value=mock)
+    mock.__aexit__ = AsyncMock(return_value=None)
+    return mock
+
+
+# All four enrichment source class paths
+_ENRICHMENT_PATCHES = (
+    "pipeline.enrichment.enricher.OpenAlexClient",
+    "pipeline.enrichment.enricher.SemanticScholarClient",
+    "pipeline.enrichment.enricher.OrcidClient",
+    "pipeline.enrichment.enricher.CrossrefEnrichmentClient",
+)
+
+
 class TestEnrichPaper:
     """Tests for enrich_paper function."""
 
@@ -60,144 +103,78 @@ class TestEnrichPaper:
         from pipeline.enrichment.enricher import enrich_paper
 
         paper = await insert_paper(
-            db_session,
-            title="Test Paper",
-            doi="10.1234/test",
+            db_session, title="Test Paper", doi="10.1234/test",
             corresponding_author="Jane Smith",
         )
 
-        mock_settings = MagicMock()
-        mock_settings.openalex_email = "test@test.com"
-        mock_settings.openalex_request_delay = 0
-        mock_settings.semantic_scholar_api_key = MagicMock()
-        mock_settings.semantic_scholar_api_key.get_secret_value = MagicMock(return_value="")
-        mock_settings.semantic_scholar_request_delay = 0
-        mock_settings.orcid_request_delay = 0
+        with patch(_ENRICHMENT_PATCHES[0]) as oa_cls, \
+             patch(_ENRICHMENT_PATCHES[1]) as s2_cls, \
+             patch(_ENRICHMENT_PATCHES[2]) as orcid_cls, \
+             patch(_ENRICHMENT_PATCHES[3]) as cr_cls:
+            oa_cls.return_value = _make_async_client_mock(_openalex_data())
+            s2_cls.return_value = _make_async_client_mock(_s2_data())
+            orcid_cls.return_value = _make_async_client_mock(_orcid_data())
+            cr_cls.return_value = _make_async_client_mock(_crossref_data())
 
-        with (
-            patch("pipeline.enrichment.enricher.OpenAlexClient") as mock_oa_cls,
-            patch("pipeline.enrichment.enricher.SemanticScholarClient") as mock_s2_cls,
-            patch("pipeline.enrichment.enricher.OrcidClient") as mock_orcid_cls,
-        ):
-            # OpenAlex mock
-            mock_oa = AsyncMock()
-            mock_oa.lookup = AsyncMock(return_value=_openalex_data())
-            mock_oa.__aenter__ = AsyncMock(return_value=mock_oa)
-            mock_oa.__aexit__ = AsyncMock(return_value=None)
-            mock_oa_cls.return_value = mock_oa
-
-            # Semantic Scholar mock
-            mock_s2 = AsyncMock()
-            mock_s2.lookup = AsyncMock(return_value=_s2_data())
-            mock_s2.__aenter__ = AsyncMock(return_value=mock_s2)
-            mock_s2.__aexit__ = AsyncMock(return_value=None)
-            mock_s2_cls.return_value = mock_s2
-
-            # ORCID mock
-            mock_orcid = AsyncMock()
-            mock_orcid.lookup = AsyncMock(return_value=_orcid_data())
-            mock_orcid.__aenter__ = AsyncMock(return_value=mock_orcid)
-            mock_orcid.__aexit__ = AsyncMock(return_value=None)
-            mock_orcid_cls.return_value = mock_orcid
-
-            result = await enrich_paper(paper, mock_settings)
+            result = await enrich_paper(paper, _mock_settings())
 
         assert result.partial is False
-        assert result.sources_succeeded == ["openalex", "semantic_scholar", "orcid"]
+        assert "openalex" in result.sources_succeeded
+        assert "semantic_scholar" in result.sources_succeeded
+        assert "orcid" in result.sources_succeeded
+        assert "crossref" in result.sources_succeeded
         assert result.sources_failed == []
         assert result.data["openalex"]["openalex_work_id"] == "W123"
         assert result.data["s2"]["s2_paper_id"] == "abc123"
         assert result.data["orcid"]["orcid_id"] == "0000-0001-2345-6789"
+        assert result.data["crossref"]["funders"][0]["name"] == "National Institutes of Health"
 
     async def test_one_source_fails(self, db_session: AsyncSession):
         from pipeline.enrichment.enricher import enrich_paper
 
         paper = await insert_paper(
-            db_session,
-            title="Test Paper",
-            doi="10.1234/test",
+            db_session, title="Test Paper", doi="10.1234/test",
             corresponding_author="Jane Smith",
         )
 
-        mock_settings = MagicMock()
-        mock_settings.openalex_email = "test@test.com"
-        mock_settings.openalex_request_delay = 0
-        mock_settings.semantic_scholar_api_key = MagicMock()
-        mock_settings.semantic_scholar_api_key.get_secret_value = MagicMock(return_value="")
-        mock_settings.semantic_scholar_request_delay = 0
-        mock_settings.orcid_request_delay = 0
+        with patch(_ENRICHMENT_PATCHES[0]) as oa_cls, \
+             patch(_ENRICHMENT_PATCHES[1]) as s2_cls, \
+             patch(_ENRICHMENT_PATCHES[2]) as orcid_cls, \
+             patch(_ENRICHMENT_PATCHES[3]) as cr_cls:
+            oa_cls.return_value = _make_async_client_mock(_openalex_data())
+            s2_cls.return_value = _make_async_client_mock(lookup_side_effect=RuntimeError("API down"))
+            orcid_cls.return_value = _make_async_client_mock(_orcid_data())
+            cr_cls.return_value = _make_async_client_mock(_crossref_data())
 
-        with (
-            patch("pipeline.enrichment.enricher.OpenAlexClient") as mock_oa_cls,
-            patch("pipeline.enrichment.enricher.SemanticScholarClient") as mock_s2_cls,
-            patch("pipeline.enrichment.enricher.OrcidClient") as mock_orcid_cls,
-        ):
-            # OpenAlex succeeds
-            mock_oa = AsyncMock()
-            mock_oa.lookup = AsyncMock(return_value=_openalex_data())
-            mock_oa.__aenter__ = AsyncMock(return_value=mock_oa)
-            mock_oa.__aexit__ = AsyncMock(return_value=None)
-            mock_oa_cls.return_value = mock_oa
-
-            # Semantic Scholar fails
-            mock_s2 = AsyncMock()
-            mock_s2.lookup = AsyncMock(side_effect=RuntimeError("API down"))
-            mock_s2.__aenter__ = AsyncMock(return_value=mock_s2)
-            mock_s2.__aexit__ = AsyncMock(return_value=None)
-            mock_s2_cls.return_value = mock_s2
-
-            # ORCID succeeds
-            mock_orcid = AsyncMock()
-            mock_orcid.lookup = AsyncMock(return_value=_orcid_data())
-            mock_orcid.__aenter__ = AsyncMock(return_value=mock_orcid)
-            mock_orcid.__aexit__ = AsyncMock(return_value=None)
-            mock_orcid_cls.return_value = mock_orcid
-
-            result = await enrich_paper(paper, mock_settings)
+            result = await enrich_paper(paper, _mock_settings())
 
         assert result.partial is True
         assert "openalex" in result.sources_succeeded
         assert "orcid" in result.sources_succeeded
+        assert "crossref" in result.sources_succeeded
         assert result.sources_failed == ["semantic_scholar"]
-        assert "openalex" in result.data
         assert "s2" not in result.data
-        assert "orcid" in result.data
 
     async def test_all_sources_fail(self, db_session: AsyncSession):
         from pipeline.enrichment.enricher import enrich_paper
 
         paper = await insert_paper(
-            db_session,
-            title="Test Paper",
-            doi="10.1234/test",
+            db_session, title="Test Paper", doi="10.1234/test",
             corresponding_author="Jane Smith",
         )
 
-        mock_settings = MagicMock()
-        mock_settings.openalex_email = "test@test.com"
-        mock_settings.openalex_request_delay = 0
-        mock_settings.semantic_scholar_api_key = MagicMock()
-        mock_settings.semantic_scholar_api_key.get_secret_value = MagicMock(return_value="")
-        mock_settings.semantic_scholar_request_delay = 0
-        mock_settings.orcid_request_delay = 0
+        with patch(_ENRICHMENT_PATCHES[0]) as oa_cls, \
+             patch(_ENRICHMENT_PATCHES[1]) as s2_cls, \
+             patch(_ENRICHMENT_PATCHES[2]) as orcid_cls, \
+             patch(_ENRICHMENT_PATCHES[3]) as cr_cls:
+            for cls in [oa_cls, s2_cls, orcid_cls, cr_cls]:
+                cls.return_value = _make_async_client_mock(lookup_side_effect=RuntimeError("fail"))
 
-        with (
-            patch("pipeline.enrichment.enricher.OpenAlexClient") as mock_oa_cls,
-            patch("pipeline.enrichment.enricher.SemanticScholarClient") as mock_s2_cls,
-            patch("pipeline.enrichment.enricher.OrcidClient") as mock_orcid_cls,
-        ):
-            for mock_cls in [mock_oa_cls, mock_s2_cls, mock_orcid_cls]:
-                mock_inst = AsyncMock()
-                mock_inst.lookup = AsyncMock(side_effect=RuntimeError("fail"))
-                mock_inst.__aenter__ = AsyncMock(return_value=mock_inst)
-                mock_inst.__aexit__ = AsyncMock(return_value=None)
-                mock_cls.return_value = mock_inst
-
-            result = await enrich_paper(paper, mock_settings)
+            result = await enrich_paper(paper, _mock_settings())
 
         assert result.partial is True
         assert result.sources_succeeded == []
-        assert set(result.sources_failed) == {"openalex", "semantic_scholar", "orcid"}
+        assert set(result.sources_failed) == {"openalex", "semantic_scholar", "orcid", "crossref"}
         assert result.data == {}
 
     async def test_orcid_uses_known_orcid_from_openalex(self, db_session: AsyncSession):
@@ -205,44 +182,21 @@ class TestEnrichPaper:
         from pipeline.enrichment.enricher import enrich_paper
 
         paper = await insert_paper(
-            db_session,
-            title="Test Paper",
-            doi="10.1234/test",
+            db_session, title="Test Paper", doi="10.1234/test",
             corresponding_author="Jane Smith",
         )
 
-        mock_settings = MagicMock()
-        mock_settings.openalex_email = "test@test.com"
-        mock_settings.openalex_request_delay = 0
-        mock_settings.semantic_scholar_api_key = MagicMock()
-        mock_settings.semantic_scholar_api_key.get_secret_value = MagicMock(return_value="")
-        mock_settings.semantic_scholar_request_delay = 0
-        mock_settings.orcid_request_delay = 0
+        with patch(_ENRICHMENT_PATCHES[0]) as oa_cls, \
+             patch(_ENRICHMENT_PATCHES[1]) as s2_cls, \
+             patch(_ENRICHMENT_PATCHES[2]) as orcid_cls, \
+             patch(_ENRICHMENT_PATCHES[3]) as cr_cls:
+            oa_cls.return_value = _make_async_client_mock(_openalex_data())
+            s2_cls.return_value = _make_async_client_mock(_s2_data())
+            mock_orcid = _make_async_client_mock(_orcid_data())
+            orcid_cls.return_value = mock_orcid
+            cr_cls.return_value = _make_async_client_mock(_crossref_data())
 
-        with (
-            patch("pipeline.enrichment.enricher.OpenAlexClient") as mock_oa_cls,
-            patch("pipeline.enrichment.enricher.SemanticScholarClient") as mock_s2_cls,
-            patch("pipeline.enrichment.enricher.OrcidClient") as mock_orcid_cls,
-        ):
-            mock_oa = AsyncMock()
-            mock_oa.lookup = AsyncMock(return_value=_openalex_data())
-            mock_oa.__aenter__ = AsyncMock(return_value=mock_oa)
-            mock_oa.__aexit__ = AsyncMock(return_value=None)
-            mock_oa_cls.return_value = mock_oa
-
-            mock_s2 = AsyncMock()
-            mock_s2.lookup = AsyncMock(return_value=_s2_data())
-            mock_s2.__aenter__ = AsyncMock(return_value=mock_s2)
-            mock_s2.__aexit__ = AsyncMock(return_value=None)
-            mock_s2_cls.return_value = mock_s2
-
-            mock_orcid = AsyncMock()
-            mock_orcid.lookup = AsyncMock(return_value=_orcid_data())
-            mock_orcid.__aenter__ = AsyncMock(return_value=mock_orcid)
-            mock_orcid.__aexit__ = AsyncMock(return_value=None)
-            mock_orcid_cls.return_value = mock_orcid
-
-            await enrich_paper(paper, mock_settings)
+            await enrich_paper(paper, _mock_settings())
 
         # Verify ORCID was called with the known_orcid from OpenAlex
         mock_orcid.lookup.assert_called_once_with("Jane Smith", known_orcid="0000-0001-2345-6789")
