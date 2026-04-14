@@ -52,6 +52,46 @@ async function getClientIp(): Promise<string> {
   return h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
 }
 
+/**
+ * CSRF protection via Origin header verification.
+ *
+ * For state-changing requests (PUT, PATCH, POST, DELETE), verifies that
+ * the Origin header matches the expected host. This prevents cross-site
+ * request forgery since browsers always send the Origin header on
+ * cross-origin requests and it cannot be spoofed by JavaScript.
+ *
+ * Returns a 403 Response if the origin doesn't match, or null if OK.
+ */
+export async function csrfCheck(request: Request): Promise<Response | null> {
+  const method = request.method.toUpperCase();
+  // Only check state-changing methods
+  if (method === "GET" || method === "HEAD" || method === "OPTIONS") {
+    return null;
+  }
+
+  const origin = request.headers.get("origin");
+  const host = request.headers.get("host");
+
+  // If no origin header, this is likely a same-origin request (fetch API
+  // from same page). Browsers always send Origin on cross-origin requests.
+  if (!origin) return null;
+
+  // Verify origin matches host
+  try {
+    const originUrl = new URL(origin);
+    if (host && originUrl.host === host) {
+      return null; // Same origin — safe
+    }
+  } catch {
+    // Malformed origin — reject
+  }
+
+  return Response.json(
+    { error: "CSRF validation failed: origin mismatch" },
+    { status: 403 },
+  );
+}
+
 /** Returns null if the request is authorised, or a 401/429 Response if not. */
 export async function apiRequireAuth(): Promise<Response | null> {
   const rateLimited = checkRateLimit(await getClientIp());

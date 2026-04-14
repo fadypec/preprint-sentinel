@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { apiRequireAuth, apiRequireAdmin } from "@/lib/auth-guard";
+import { apiRequireAuth, apiRequireAdmin, csrfCheck } from "@/lib/auth-guard";
 
 /** Keys that contain secrets — redacted on read, preserved on write. */
 const SECRET_KEYS = ["alert_slack_webhook"];
@@ -30,6 +30,8 @@ export async function GET() {
 }
 
 export async function PUT(request: NextRequest) {
+  const csrf = await csrfCheck(request);
+  if (csrf) return csrf;
   const adminDenied = await apiRequireAdmin();
   if (adminDenied) return adminDenied;
   try {

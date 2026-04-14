@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ReviewStatus, Prisma } from "@prisma/client";
-import { apiRequireAuth } from "@/lib/auth-guard";
+import { apiRequireAuth, csrfCheck } from "@/lib/auth-guard";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -29,6 +29,8 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 }
 
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
+  const csrf = await csrfCheck(request);
+  if (csrf) return csrf;
   const authDenied = await apiRequireAuth();
   if (authDenied) return authDenied;
   try {
