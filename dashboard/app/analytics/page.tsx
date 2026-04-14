@@ -1,14 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { KpiCard } from "@/components/kpi-card";
-import nextDynamic from "next/dynamic";
+import { AnalyticsCharts } from "@/components/analytics-charts";
 import { PaperCoverageHeatmap } from "@/components/paper-coverage-heatmap";
 import { Card } from "@/components/ui/card";
-
-// Lazy-load recharts bundle (~400KB) — only fetched when analytics page is visited
-const AnalyticsCharts = nextDynamic(
-  () => import("@/components/analytics-charts").then((m) => m.AnalyticsCharts),
-  { ssr: false, loading: () => <div className="h-80 animate-pulse rounded bg-slate-800/30" /> },
-);
 
 export const dynamic = "force-dynamic";
 
