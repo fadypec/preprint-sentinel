@@ -115,7 +115,7 @@ export function PipelineProgress({ initialRunning }: Props) {
             Pipeline running
           </span>
         </div>
-        <span className="text-xs text-slate-400">{elapsedStr}</span>
+        <span className="text-xs text-slate-500">{elapsedStr}</span>
       </div>
 
       <div className="space-y-1">
@@ -139,13 +139,13 @@ export function PipelineProgress({ initialRunning }: Props) {
                   "text-xs",
                   isComplete && "text-slate-500 dark:text-slate-400",
                   isCurrent && "font-medium text-slate-700 dark:text-slate-200",
-                  !isComplete && !isCurrent && "text-slate-400 dark:text-slate-600",
+                  !isComplete && !isCurrent && "text-slate-500 dark:text-slate-600",
                 )}
               >
                 {stage.label}
               </span>
               {statVal != null && statVal > 0 && (
-                <span className="text-[10px] text-slate-400">
+                <span className="text-[10px] text-slate-500">
                   ({statVal})
                 </span>
               )}
@@ -155,7 +155,7 @@ export function PipelineProgress({ initialRunning }: Props) {
       </div>
 
       {data.totalCostUsd != null && data.totalCostUsd > 0 && (
-        <p className="text-[10px] text-slate-400">
+        <p className="text-[10px] text-slate-500">
           Cost so far: {formatCost(data.totalCostUsd)}
         </p>
       )}
@@ -166,7 +166,7 @@ export function PipelineProgress({ initialRunning }: Props) {
             {data.errors.length} error(s)
           </p>
           {data.errors.map((e, i) => (
-            <p key={i} className="text-[10px] text-red-500 dark:text-red-400">
+            <p key={`err-${i}-${String(e).slice(0, 20)}`} className="text-[10px] text-red-500 dark:text-red-400">
               {String(e)}
             </p>
           ))}

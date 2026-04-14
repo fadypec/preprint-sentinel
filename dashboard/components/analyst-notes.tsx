@@ -35,7 +35,9 @@ export function AnalystNotes({ paperId, initialNotes }: Props) {
 
   return (
     <div>
+      <label htmlFor="analyst-notes-textarea" className="sr-only">Analyst notes</label>
       <Textarea
+        id="analyst-notes-textarea"
         value={notes}
         onChange={(e) => { setNotes(e.target.value); setSaved(false); setError(null); }}
         placeholder="Add analyst notes..."

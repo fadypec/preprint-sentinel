@@ -44,7 +44,7 @@ export function PipelineBacklog({ data }: { data: BacklogData }) {
                   ) : allDone ? (
                     <CircleCheck className="h-3.5 w-3.5 text-green-500" />
                   ) : (
-                    <CircleMinus className="h-3.5 w-3.5 text-slate-400" />
+                    <CircleMinus className="h-3.5 w-3.5 text-slate-500" />
                   )}
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
                     {stage.label}
@@ -55,7 +55,7 @@ export function PipelineBacklog({ data }: { data: BacklogData }) {
                     "font-mono text-sm font-semibold",
                     stage.count > 0
                       ? "text-slate-900 dark:text-slate-100"
-                      : "text-slate-400 dark:text-slate-500"
+                      : "text-slate-500 dark:text-slate-500"
                   )}
                 >
                   {stage.count.toLocaleString()}
@@ -101,7 +101,7 @@ export function PipelineBacklog({ data }: { data: BacklogData }) {
         );
       })}
 
-      <div className="pt-1 text-center text-[11px] text-slate-400 dark:text-slate-500">
+      <div className="pt-1 text-center text-[11px] text-slate-500 dark:text-slate-500">
         {data.total.toLocaleString()} total non-duplicate papers
       </div>
     </div>

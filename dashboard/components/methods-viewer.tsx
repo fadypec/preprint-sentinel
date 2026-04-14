@@ -56,7 +56,7 @@ function highlightPassages(
       const originalTerm = concerns[lowerConcerns.indexOf(matchedTerm)];
       result.push(
         <mark
-          key={i}
+          key={`s-${i}-${sentence.slice(0, 20)}`}
           className="bg-red-100 px-0.5 text-red-900 dark:bg-red-900/30 dark:text-red-200"
           title={`Flagged: ${originalTerm}`}
         >

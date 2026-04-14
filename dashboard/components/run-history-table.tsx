@@ -61,9 +61,9 @@ export function RunHistoryTable({ runs, clearAction }: Props) {
       >
         <TableCell className="w-6 px-2">
           {isExpanded ? (
-            <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+            <ChevronDown className="h-3.5 w-3.5 text-slate-500" />
           ) : (
-            <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
+            <ChevronRight className="h-3.5 w-3.5 text-slate-500" />
           )}
         </TableCell>
         <TableCell className="text-xs">
@@ -199,7 +199,7 @@ function RunDetail({ run, errors }: { run: PipelineRun; errors: unknown[] }) {
           </p>
           {errors.map((e, i) => (
             <p
-              key={i}
+              key={`error-${i}-${String(e).slice(0, 20)}`}
               className="rounded bg-red-50 px-3 py-1.5 font-mono text-[11px] text-red-700 dark:bg-red-900/30 dark:text-red-400"
             >
               {String(e)}
