@@ -114,10 +114,15 @@ Based on comprehensive codebase audits conducted 2026-04-09 and 2026-04-10.
 
 ---
 
-## Backlog (nice-to-have)
+### Backlog Completion (2026-04-14)
 
-- [ ] Crossref enrichment client (funder info) — already available via OpenAlex
-- [ ] Analyst feedback loop — use exported FP/confirmed data to refine LLM prompts
-- [ ] Dependency vulnerability scanning (Dependabot)
-- [ ] OpenAPI documentation for dashboard API
-- [ ] Developer onboarding guide
+- [x] Dependabot configuration — weekly scans for Python, Node, and GitHub Actions
+- [x] Crossref funder enrichment — 4th enrichment source extracting funder names and grant IDs
+- [x] OpenAPI documentation — `docs/API.md` covering all 27 dashboard endpoints
+- [x] Developer onboarding guide — `docs/DEVELOPMENT.md` with setup, debugging, contribution instructions
+
+---
+
+## Backlog (deferred)
+
+- [ ] Analyst feedback loop — use exported FP/confirmed data to refine LLM prompts (deferred until analyst hired)
