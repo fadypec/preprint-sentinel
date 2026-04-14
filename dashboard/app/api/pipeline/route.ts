@@ -3,7 +3,7 @@ import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 import { prisma } from "@/lib/prisma";
-import { apiRequireAuth, apiRequireAdmin } from "@/lib/auth-guard";
+import { apiRequireAuth, apiRequireAdmin, csrfCheck } from "@/lib/auth-guard";
 
 /**
  * Derive pipeline status from the pipeline_runs table.
@@ -36,6 +36,8 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const csrf = await csrfCheck(request);
+  if (csrf) return csrf;
   const denied = await apiRequireAdmin();
   if (denied) return denied;
   // Check if already running

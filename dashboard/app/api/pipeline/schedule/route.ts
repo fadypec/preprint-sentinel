@@ -1,8 +1,10 @@
 import { NextRequest } from "next/server";
 import { updatePipelineSchedule } from "@/lib/pipeline-api";
-import { apiRequireAdmin } from "@/lib/auth-guard";
+import { apiRequireAdmin, csrfCheck } from "@/lib/auth-guard";
 
 export async function PUT(request: NextRequest) {
+  const csrf = await csrfCheck(request);
+  if (csrf) return csrf;
   const denied = await apiRequireAdmin();
   if (denied) return denied;
   // Parse JSON body

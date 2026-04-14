@@ -1,4 +1,4 @@
-import { apiRequireAdmin } from "@/lib/auth-guard";
+import { apiRequireAdmin, csrfCheck } from "@/lib/auth-guard";
 import {
   getAlertSettings,
   getDigestPapers,
@@ -7,6 +7,8 @@ import {
 } from "@/lib/alerts";
 
 export async function POST(request: Request) {
+  const csrf = await csrfCheck(request);
+  if (csrf) return csrf;
   const denied = await apiRequireAdmin();
   if (denied) return denied;
 

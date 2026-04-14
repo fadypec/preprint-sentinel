@@ -1,7 +1,9 @@
 import { pausePipeline } from "@/lib/pipeline-api";
-import { apiRequireAdmin } from "@/lib/auth-guard";
+import { apiRequireAdmin, csrfCheck } from "@/lib/auth-guard";
 
-export async function POST() {
+export async function POST(request: Request) {
+  const csrf = await csrfCheck(request);
+  if (csrf) return csrf;
   const denied = await apiRequireAdmin();
   if (denied) return denied;
   try {
