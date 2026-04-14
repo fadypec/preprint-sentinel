@@ -41,7 +41,7 @@ jobs:
         env:
           DATABASE_URL: postgresql+asyncpg://durc:test@localhost:5432/durc_triage
           ANTHROPIC_API_KEY: sk-ant-test-not-real
-        run: pytest tests/ -v --tb=short --cov=pipeline --cov-report=term-missing
+        run: pytest tests/ -v --tb=short --cov=pipeline --cov-report=term-missing --cov-fail-under=70
 
   dashboard:
     name: Dashboard lint & type-check
@@ -62,3 +62,5 @@ jobs:
         run: npm run lint
       - name: Type check (tsc)
         run: npx tsc --noEmit
+      - name: Run tests (Vitest)
+        run: npm test
