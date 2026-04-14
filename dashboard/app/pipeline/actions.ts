@@ -4,12 +4,20 @@ import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 import { prisma } from "@/lib/prisma";
+import { requireAdmin } from "@/lib/auth-guard";
+
+/**
+ * All server actions in this file require admin privileges.
+ * They control pipeline execution and modify paper state.
+ */
 
 export async function triggerPipeline(
   fromDate: string,
   toDate: string,
   includeBacklog: boolean = true,
 ): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
+  await requireAdmin();
+
   // Check if already running
   const running = await prisma.pipelineRun.findFirst({
     where: { finishedAt: null },
@@ -97,6 +105,8 @@ export async function triggerPipeline(
 export async function cancelPipeline(): Promise<
   { ok: true; message: string } | { ok: false; error: string }
 > {
+  await requireAdmin();
+
   // Use raw SQL to read pid (column may not be in Prisma client yet)
   const rows = await prisma.$queryRaw<
     { id: string; pid: number | null }[]
@@ -126,6 +136,8 @@ export async function cancelPipeline(): Promise<
 export async function clearRunHistory(): Promise<
   { ok: true; message: string } | { ok: false; error: string }
 > {
+  await requireAdmin();
+
   // Don't allow clearing while a run is in progress
   const running = await prisma.pipelineRun.findFirst({
     where: { finishedAt: null },
@@ -141,6 +153,8 @@ export async function clearRunHistory(): Promise<
 export async function reprocessErrors(): Promise<
   { ok: true; message: string } | { ok: false; error: string }
 > {
+  await requireAdmin();
+
   try {
     // Reset papers with errors back to their previous stage so the
     // next pipeline run (with backlog) will reprocess them.
@@ -183,6 +197,8 @@ export async function reprocessErrors(): Promise<
 }
 
 export async function togglePubmedQueryMode(): Promise<string> {
+  await requireAdmin();
+
   const row = await prisma.pipelineSettings.findUnique({ where: { id: 1 } });
   const current = (row?.settings as Record<string, unknown>) ?? {};
   const oldMode =
