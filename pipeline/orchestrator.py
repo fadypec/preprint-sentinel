@@ -17,6 +17,7 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from pipeline.alerts import send_pipeline_failure_alert
 from pipeline.enrichment.enricher import enrich_paper
 from pipeline.fulltext.retriever import fetch_full_text_content
 from pipeline.ingest.arxiv import ArxivClient
@@ -515,6 +516,26 @@ async def run_daily_pipeline(
         errors=len(stats.errors),
         duration_s=(stats.finished_at - stats.started_at).total_seconds(),
     )
+
+    # Send failure alert if there were errors
+    if stats.errors:
+        try:
+            from pipeline.models import PipelineSettings
+
+            async with session_factory() as alert_session:
+                ps_result = await alert_session.execute(
+                    select(PipelineSettings).where(PipelineSettings.id == 1)
+                )
+                ps = ps_result.scalar_one_or_none()
+                alert_config = ps.settings if ps else {}
+            await send_pipeline_failure_alert(
+                errors=stats.errors,
+                settings_json=alert_config,
+                run_duration_s=(stats.finished_at - stats.started_at).total_seconds(),
+                papers_ingested=stats.papers_ingested,
+            )
+        except Exception as exc:
+            log.warning("pipeline_alert_failed", error=str(exc))
 
     return stats
 
