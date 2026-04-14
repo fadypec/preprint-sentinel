@@ -163,7 +163,10 @@ async def _run_sync(
         if processed % 50 == 0 or processed == total:
             log.info("coarse_filter_progress", processed=processed, total=total)
 
-    await asyncio.gather(*[_classify(p) for p in papers])
+    await asyncio.wait_for(
+        asyncio.gather(*[_classify(p) for p in papers]),
+        timeout=600,  # 10 min aggregate timeout
+    )
     await session.flush()
 
     log.info("coarse_filter_complete", total=total, passed=len(passed))

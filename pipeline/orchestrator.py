@@ -552,17 +552,25 @@ async def _run_ingest(
     wasteful re-ingestion on overlapping date ranges.
     """
     # Pre-load existing DOIs and titles so we can skip papers we already
-    # have, without a per-paper DB round-trip.  We check ALL existing papers,
-    # not just those in the date range, because the same paper can appear
-    # from different sources with different posted dates.
-    existing_stmt = select(Paper.id, Paper.doi, Paper.title, Paper.version)
-    existing_rows = (await session.execute(existing_stmt)).all()
-    existing_dois: set[str] = {r.doi.lower() for r in existing_rows if r.doi}
-    existing_titles: set[str] = {r.title.lower().strip() for r in existing_rows if r.title}
-    # DOI → (paper_id, version) for version upgrade detection
+    # have, without a per-paper DB round-trip.
+    #
+    # DOI set is unbounded (DOIs are small, ~15MB at 500K papers).
+    # Title set is limited to last 90 days to bound memory — DOI-less
+    # duplicates beyond 90 days are extremely unlikely.
+    doi_stmt = select(Paper.id, Paper.doi, Paper.version).where(Paper.doi.isnot(None))
+    doi_rows = (await session.execute(doi_stmt)).all()
+    existing_dois: set[str] = {r.doi.lower() for r in doi_rows}
     doi_versions: dict[str, tuple[str, int]] = {
-        r.doi.lower(): (str(r.id), r.version or 1) for r in existing_rows if r.doi
+        r.doi.lower(): (str(r.id), r.version or 1) for r in doi_rows
     }
+
+    title_cutoff = from_date - timedelta(days=90)
+    title_stmt = select(Paper.title).where(
+        Paper.posted_date >= title_cutoff,
+        Paper.title.isnot(None),
+    )
+    title_rows = (await session.execute(title_stmt)).all()
+    existing_titles: set[str] = {r.title.lower().strip() for r in title_rows}
     log.info(
         "ingest_existing_loaded",
         dois=len(existing_dois),
@@ -714,7 +722,10 @@ async def _run_fulltext(
 
     # Fetch all full texts concurrently (HTTP only, no DB)
     log.info("fulltext_fetching", total=total, concurrency=concurrency)
-    fetch_results = await asyncio.gather(*[_fetch(p) for p in papers])
+    fetch_results = await asyncio.wait_for(
+        asyncio.gather(*[_fetch(p) for p in papers]),
+        timeout=600,  # 10 min aggregate timeout per stage
+    )
 
     # Apply results sequentially (session-safe)
     retrieved = 0
@@ -837,7 +848,10 @@ async def _run_enrichment(
 
     # Fetch all enrichment data concurrently (HTTP only, no DB writes)
     log.info("enrichment_fetching", total=total, concurrency=concurrency)
-    fetch_results = await asyncio.gather(*[_enrich(p) for p in papers])
+    fetch_results = await asyncio.wait_for(
+        asyncio.gather(*[_enrich(p) for p in papers]),
+        timeout=600,
+    )
 
     # Apply results sequentially (session-safe)
     for paper, result in fetch_results:
@@ -907,7 +921,10 @@ async def _run_fulltext_translation(
             translated += 1
             log.info("fulltext_translated", paper_id=str(paper.id), language=paper.language)
 
-    await asyncio.gather(*[_translate(p) for p in papers])
+    await asyncio.wait_for(
+        asyncio.gather(*[_translate(p) for p in papers]),
+        timeout=600,
+    )
     await session.flush()
     log.info("fulltext_translation_complete", total=total, translated=translated)
 
@@ -978,6 +995,9 @@ async def _run_translation(
         except (json.JSONDecodeError, KeyError) as exc:
             log.warning("translation_parse_error", paper_id=str(paper.id), error=str(exc))
 
-    await asyncio.gather(*[_translate(p) for p in papers])
+    await asyncio.wait_for(
+        asyncio.gather(*[_translate(p) for p in papers]),
+        timeout=600,
+    )
     await session.flush()
     log.info("translation_complete", total=total, translated=translated)
