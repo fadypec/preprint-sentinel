@@ -103,24 +103,21 @@ Based on comprehensive codebase audits conducted 2026-04-09 and 2026-04-10.
 
 ---
 
-## Next Steps
+### Critical & High Priority Hardening (2026-04-14)
 
-### Immediate (security — before production)
+- [x] Auth guards (`requireAdmin()`) on all 5 pipeline server actions
+- [x] Pipeline failure alerting via Slack webhook and SMTP email
+- [x] Unauthenticated `/api/health` endpoint for infrastructure monitoring
+- [x] Operations runbook (`docs/OPERATIONS.md`)
+- [x] CSRF protection via Origin header verification on all PUT/PATCH routes
+- [x] Coverage threshold enforcement (`--cov-fail-under=70`) + dashboard tests in CI
 
-1. **Add auth guards to server actions** — `requireAdmin()` on `triggerPipeline`, `cancelPipeline`, `clearRunHistory`, `togglePubmedQueryMode`, `reprocessErrors`
-2. **Wire pipeline failure alerting** to existing Slack/email system — failures currently only logged
+---
 
-### Short-term (operational hardening)
+## Backlog (nice-to-have)
 
-3. **Add unauthenticated `/api/health` endpoint** — liveness probe for infrastructure monitoring
-4. **Write operations runbook** — backup restore, API key rotation, stuck pipeline procedures
-5. **Add CSRF protection** on state-changing API routes (PUT/PATCH)
-6. **Add coverage threshold** — `--cov-fail-under=70` in CI
-
-### Backlog (nice-to-have)
-
-7. Crossref enrichment client (funder info) — already available via OpenAlex
-8. Analyst feedback loop — use exported FP/confirmed data to refine LLM prompts
-9. Dependency vulnerability scanning (Dependabot)
-10. OpenAPI documentation for dashboard API
-11. Developer onboarding guide
+- [ ] Crossref enrichment client (funder info) — already available via OpenAlex
+- [ ] Analyst feedback loop — use exported FP/confirmed data to refine LLM prompts
+- [ ] Dependency vulnerability scanning (Dependabot)
+- [ ] OpenAPI documentation for dashboard API
+- [ ] Developer onboarding guide
