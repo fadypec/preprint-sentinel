@@ -8,6 +8,7 @@ Create Date: 2026-04-09 12:00:00.000000
 
 from collections.abc import Sequence
 
+import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -18,6 +19,18 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    # Add language and translation columns (may already exist on some DBs)
+    for col_name, col_type in [
+        ("language", sa.String(10)),
+        ("original_title", sa.Text()),
+        ("original_abstract", sa.Text()),
+        ("original_methods_section", sa.Text()),
+    ]:
+        try:
+            op.add_column("papers", sa.Column(col_name, col_type, nullable=True))
+        except Exception:
+            pass  # Column already exists (local dev DB)
+
     # Add index on language column (used in non-English paper queries)
     op.create_index("ix_papers_language", "papers", ["language"])
 
@@ -98,5 +111,10 @@ def downgrade() -> None:
         ["id"],
     )
 
-    # Remove language index
+    # Remove language index and columns
     op.drop_index("ix_papers_language", table_name="papers")
+    for col_name in ["original_methods_section", "original_abstract", "original_title", "language"]:
+        try:
+            op.drop_column("papers", col_name)
+        except Exception:
+            pass
