@@ -97,9 +97,7 @@ async function getStats() {
     LIMIT 10
   `;
 
-  // --- High-score papers this week ---
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  // --- High-score papers (last 30 days) ---
   const highScorePapers = await prisma.$queryRaw<
     { id: string; title: string; risk_tier: string; aggregate_score: number | null; top_dimension: string; posted_date: string }[]
   >`
@@ -119,7 +117,7 @@ async function getStats() {
     WHERE is_duplicate_of IS NULL
       AND coarse_filter_passed = true
       AND risk_tier IN ('critical', 'high')
-      AND posted_date >= ${sevenDaysAgo}
+      AND posted_date >= ${thirtyDaysAgo}
       AND stage2_result IS NOT NULL
     ORDER BY
       CASE risk_tier WHEN 'critical' THEN 2 WHEN 'high' THEN 1 ELSE 0 END DESC,

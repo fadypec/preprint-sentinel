@@ -120,6 +120,18 @@ export const AnalyticsCharts = memo(function AnalyticsCharts({
   const countryChartData = countryView === "rate" ? toRateData(countryData) : toCountData(countryData);
   const instChartData = instView === "rate" ? toRateData(institutionData) : toCountData(institutionData);
 
+  // Pre-compute category rates and max for relative bar scaling
+  const catRates = emergingCategories.map((cat) => {
+    const recentRate = cat.recent_total > 0
+      ? Math.round((cat.recent_flagged / cat.recent_total) * 1000) / 10
+      : 0;
+    const priorRate = cat.prior_total > 0
+      ? Math.round((cat.prior_flagged / cat.prior_total) * 1000) / 10
+      : 0;
+    return { ...cat, recentRate, priorRate, change: Math.round((recentRate - priorRate) * 10) / 10 };
+  });
+  const maxCatRate = Math.max(...catRates.map((c) => c.recentRate), 1);
+
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       {/* Countries — with Count/Rate toggle */}
@@ -199,45 +211,36 @@ export const AnalyticsCharts = memo(function AnalyticsCharts({
         <h3 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
           Category Trends (30d vs prior 30d)
         </h3>
-        {emergingCategories.length > 0 ? (
+        {catRates.length > 0 ? (
           <div className="space-y-2">
-            {emergingCategories.map((cat) => {
-              const recentRate = cat.recent_total > 0
-                ? Math.round((cat.recent_flagged / cat.recent_total) * 100)
-                : 0;
-              const priorRate = cat.prior_total > 0
-                ? Math.round((cat.prior_flagged / cat.prior_total) * 100)
-                : 0;
-              const change = recentRate - priorRate;
-              return (
-                <div key={cat.name} className="flex items-center gap-2 text-xs">
-                  <span className="w-28 truncate text-slate-700 dark:text-slate-300" title={cat.name}>
-                    {cat.name}
-                  </span>
-                  <div className="flex-1">
-                    <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-700">
-                      <div
-                        className="h-2 rounded-full bg-purple-500"
-                        style={{ width: `${Math.min(recentRate, 100)}%` }}
-                      />
-                    </div>
+            {catRates.map((cat) => (
+              <div key={cat.name} className="flex items-center gap-2 text-xs">
+                <span className="w-28 truncate text-slate-700 dark:text-slate-300" title={cat.name}>
+                  {cat.name}
+                </span>
+                <div className="flex-1">
+                  <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-700">
+                    <div
+                      className="h-2 rounded-full bg-purple-500"
+                      style={{ width: `${(cat.recentRate / maxCatRate) * 100}%` }}
+                    />
                   </div>
-                  <span className="w-12 text-right tabular-nums text-slate-600 dark:text-slate-400">
-                    {recentRate}%
-                  </span>
-                  <span
-                    className={cn(
-                      "w-12 text-right tabular-nums text-xs",
-                      change > 5 ? "font-medium text-red-500" : change < -5 ? "text-green-500" : "text-slate-400",
-                    )}
-                  >
-                    {change > 0 ? "+" : ""}{change}pp
-                  </span>
                 </div>
-              );
-            })}
+                <span className="w-14 text-right tabular-nums text-slate-600 dark:text-slate-400">
+                  {cat.recentRate}%
+                </span>
+                <span
+                  className={cn(
+                    "w-14 text-right tabular-nums text-xs",
+                    cat.change > 2 ? "font-medium text-red-500" : cat.change < -2 ? "text-green-500" : "text-slate-400",
+                  )}
+                >
+                  {cat.change > 0 ? "+" : ""}{cat.change}pp
+                </span>
+              </div>
+            ))}
             <p className="mt-2 text-[10px] text-slate-500 dark:text-slate-400">
-              Flag rate by category. Red = increasing trend. &quot;pp&quot; = percentage points change.
+              Flag rate by category (bar scaled to max, not 0–100%). Red = rising trend. &quot;pp&quot; = percentage point change.
             </p>
           </div>
         ) : (
@@ -248,7 +251,7 @@ export const AnalyticsCharts = memo(function AnalyticsCharts({
       {/* High-score papers this week */}
       <Card className="p-4">
         <h3 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
-          Highest-Scoring Papers (Last 7 Days)
+          Highest-Scoring Papers (Last 30 Days)
         </h3>
         {highScorePapers.length > 0 ? (
           <div className="space-y-2">
@@ -284,7 +287,7 @@ export const AnalyticsCharts = memo(function AnalyticsCharts({
             })}
           </div>
         ) : (
-          <p className="py-8 text-center text-sm text-slate-500">No critical/high papers in the last 7 days.</p>
+          <p className="py-8 text-center text-sm text-slate-500">No critical/high papers in the last 30 days.</p>
         )}
       </Card>
     </div>
