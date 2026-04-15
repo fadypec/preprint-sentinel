@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState } from "react";
+import { memo, useState, useEffect } from "react";
 import {
   BarChart,
   Bar,
@@ -117,7 +117,27 @@ export const AnalyticsCharts = memo(function AnalyticsCharts({
   const [countryView, setCountryView] = useState<"count" | "rate">("rate");
   const [instView, setInstView] = useState<"count" | "rate">("rate");
 
-  const countryChartData = countryView === "rate" ? toRateData(countryData) : toCountData(countryData);
+  // Fetch OpenAlex per-country biomedical output for normalised flag rate
+  const [countryBaseline, setCountryBaseline] = useState<Record<string, number>>({});
+  useEffect(() => {
+    fetch("/api/analytics/country-baseline")
+      .then((r) => r.json())
+      .then((d: Record<string, number>) => setCountryBaseline(d))
+      .catch(() => {});
+  }, []);
+
+  // Country flag rate: flagged / OpenAlex total biomedical output
+  const countryRateData = countryData
+    .filter((r) => countryBaseline[r.name] && countryBaseline[r.name] > 0)
+    .map((r) => ({
+      name: r.name,
+      value: Math.round((r.flagged / countryBaseline[r.name]) * 10000) / 100,
+      label: `${r.flagged} flagged / ${countryBaseline[r.name].toLocaleString()} total`,
+    }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10);
+
+  const countryChartData = countryView === "rate" ? countryRateData : toCountData(countryData);
   const instChartData = instView === "rate" ? toRateData(institutionData) : toCountData(institutionData);
 
   // Pre-compute category rates and max for relative bar scaling
@@ -153,19 +173,27 @@ export const AnalyticsCharts = memo(function AnalyticsCharts({
               />
               <YAxis type="category" dataKey="name" tick={{ fill: textColor, fontSize: 10 }} width={40} />
               <Tooltip
-                formatter={(v) =>
-                  countryView === "rate" ? `${v}%` : String(v)
-                }
+                formatter={(v, _name, item) => {
+                  if (countryView === "rate") {
+                    const payload = item?.payload as { label?: string } | undefined;
+                    return [`${v}%`, payload?.label ?? "Flag rate"];
+                  }
+                  return [String(v), "Flagged"];
+                }}
               />
               <Bar dataKey="value" fill="#06b6d4" radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
         ) : (
-          <p className="py-8 text-center text-sm text-slate-500">No data yet.</p>
+          <p className="py-8 text-center text-sm text-slate-500">
+            {countryView === "rate" && Object.keys(countryBaseline).length === 0
+              ? "Loading baseline data from OpenAlex..."
+              : "No data yet."}
+          </p>
         )}
         {countryView === "rate" && (
           <p className="mt-2 text-[10px] text-slate-500 dark:text-slate-400">
-            % of papers from each country that were flagged. Min 5 papers.
+            % of each country&apos;s total biomedical output (from OpenAlex) that we flagged as potential DURC.
           </p>
         )}
       </Card>
