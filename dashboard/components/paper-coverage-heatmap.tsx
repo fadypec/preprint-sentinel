@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 type Coverage = Record<string, Record<string, number>>;
 type ApiResponse = { coverage: Coverage; runDates: string[] };
 
-// SSRN removed: not supported via Crossref (registers as journal-article)
 const ALL_SOURCES = [
   "biorxiv",
   "medrxiv",
@@ -16,6 +15,7 @@ const ALL_SOURCES = [
   "research_square",
   "chemrxiv",
   "zenodo",
+  "ssrn",
 ] as const;
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -27,6 +27,7 @@ const SOURCE_LABELS: Record<string, string> = {
   research_square: "ResSquare",
   chemrxiv: "ChemRxiv",
   zenodo: "Zenodo",
+  ssrn: "SSRN",
 };
 
 const DAY_LABELS = ["Mon", "", "Wed", "", "Fri", "", ""];

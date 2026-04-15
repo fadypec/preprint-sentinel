@@ -22,12 +22,15 @@ from pipeline.models import SourceServer
 
 log = structlog.get_logger()
 
-# SSRN excluded: registers as journal-article in Crossref (not posted-content),
-# requires different query parameters, and is primarily economics/social science.
+# SSRN uses from-created-date instead of from-posted-date (which returns 0).
 _DEFAULT_SOURCES: dict[str, str] = {
     "research_square": "10.21203",
     "chemrxiv": "10.26434",
+    "ssrn": "10.2139",
 }
+
+# Prefixes that need from-created-date instead of from-posted-date
+_CREATED_DATE_PREFIXES: set[str] = {"10.2139"}
 
 _SOURCE_SERVER_MAP: dict[str, SourceServer] = {
     "research_square": SourceServer.RESEARCH_SQUARE,
@@ -130,15 +133,15 @@ class CrossrefClient:
         if self._client is None:
             raise RuntimeError("Use CrossrefClient as async context manager")
 
-        # Note: sort/order params removed — Crossref returns 400 when
-        # combining cursor pagination with sort=posted on some prefixes.
+        # SSRN (10.2139) doesn't support from-posted-date but works with
+        # from-created-date. Other prefixes use from-posted-date.
+        if prefix in _CREATED_DATE_PREFIXES:
+            date_filter = f"from-created-date:{from_date},until-created-date:{to_date}"
+        else:
+            date_filter = f"from-posted-date:{from_date},until-posted-date:{to_date}"
+
         params: dict = {
-            "filter": (
-                f"prefix:{prefix},"
-                f"type:posted-content,"
-                f"from-posted-date:{from_date},"
-                f"until-posted-date:{to_date}"
-            ),
+            "filter": f"prefix:{prefix},type:posted-content,{date_filter}",
             "rows": self.PAGE_SIZE,
             "cursor": cursor,
         }
