@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
-// { "2026-04-08": { "biorxiv": 120, "pubmed": 45, ... } }
 type Coverage = Record<string, Record<string, number>>;
+type ApiResponse = { coverage: Coverage; runDates: string[] };
 
+// SSRN removed: not supported via Crossref (registers as journal-article)
 const ALL_SOURCES = [
   "biorxiv",
   "medrxiv",
@@ -15,7 +16,6 @@ const ALL_SOURCES = [
   "research_square",
   "chemrxiv",
   "zenodo",
-  "ssrn",
 ] as const;
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -27,7 +27,6 @@ const SOURCE_LABELS: Record<string, string> = {
   research_square: "ResSquare",
   chemrxiv: "ChemRxiv",
   zenodo: "Zenodo",
-  ssrn: "SSRN",
 };
 
 const DAY_LABELS = ["Mon", "", "Wed", "", "Fri", "", ""];
@@ -127,13 +126,15 @@ function lastNDays(n: number): string[] {
 
 export function PaperCoverageHeatmap() {
   const [coverage, setCoverage] = useState<Coverage>({});
+  const [runDatesSet, setRunDatesSet] = useState<Set<string>>(new Set());
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     fetch("/api/analytics/paper-coverage")
       .then((r) => r.json())
-      .then((data: Coverage) => {
-        setCoverage(data);
+      .then((data: ApiResponse) => {
+        setCoverage(data.coverage);
+        setRunDatesSet(new Set(data.runDates));
         setLoaded(true);
       })
       .catch(() => setLoaded(true));
@@ -290,12 +291,15 @@ export function PaperCoverageHeatmap() {
                     <td className="whitespace-nowrap px-2 py-1">{formatDateShort(d)}</td>
                     {orderedSources.map((src) => {
                       const count = day?.[src];
+                      const hadRun = runDatesSet.has(d);
                       return (
                         <td key={src} className="px-1.5 py-1 text-center tabular-nums">
                           {count ? (
                             <span className="text-green-600 dark:text-green-400">{count}</span>
+                          ) : hadRun ? (
+                            <span className="text-slate-500 dark:text-slate-400">0</span>
                           ) : (
-                            <span className="text-slate-300 dark:text-slate-600">&mdash;</span>
+                            <span className="text-slate-300 dark:text-slate-700">&mdash;</span>
                           )}
                         </td>
                       );

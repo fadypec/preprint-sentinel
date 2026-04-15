@@ -80,21 +80,20 @@ class ZenodoClient:
         if self._client is None:
             raise RuntimeError("Use ZenodoClient as async context manager")
 
-        # Build URL with q= directly to avoid httpx encoding [ ] which Zenodo rejects
+        # Build the full URL manually — httpx re-encodes brackets in q=
+        # which Zenodo rejects with 400. By constructing the complete URL
+        # and passing no params dict, we keep the brackets unencoded.
         q_value = f"created:[{from_date} TO {to_date}]"
-        url = f"{self.BASE_URL}?q={q_value}"
-        params = {
-            "type": "publication",
-            "subtype": "preprint",
-            "size": self.PAGE_SIZE,
-            "page": page,
-            "sort": "-created",
-        }
+        url = (
+            f"{self.BASE_URL}"
+            f"?type=publication&subtype=preprint"
+            f"&q={q_value}"
+            f"&size={self.PAGE_SIZE}&page={page}&sort=-created"
+        )
 
         resp = await request_with_retry(
             self._client,
             url,
-            params=params,
             timeout=30.0,
             request_delay=self.request_delay,
             max_retries=self.max_retries,
