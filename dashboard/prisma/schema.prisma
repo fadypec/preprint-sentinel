@@ -176,13 +176,14 @@ model PipelineRun {
 }
 
 model User {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email     String   @unique @db.VarChar(320)
-  name      String?  @db.VarChar(255)
-  image     String?
-  role      UserRole @default(analyst)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email         String    @unique @db.VarChar(320)
+  name          String?   @db.VarChar(255)
+  image         String?
+  emailVerified DateTime? @map("email_verified") @db.Timestamptz
+  role          UserRole  @default(analyst)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   accounts Account[]
   sessions Session[]
