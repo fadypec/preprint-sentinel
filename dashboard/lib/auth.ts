@@ -5,6 +5,10 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  // Trust the host header — required when deployed behind a reverse proxy
+  // (Railway, Vercel, Docker, etc.). Without this, NextAuth rejects
+  // requests because the forwarded host doesn't match the server's hostname.
+  trustHost: true,
   adapter: PrismaAdapter(prisma),
   providers: [GitHub, Google],
   pages: {
