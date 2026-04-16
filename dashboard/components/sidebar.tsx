@@ -55,9 +55,9 @@ export function Sidebar({ pipelineStatus, userName, userRole }: SidebarProps) {
           src="/logo-64.png"
           alt=""
           aria-hidden="true"
-          className="h-8 w-8 rounded-lg"
-          width={32}
-          height={32}
+          className="h-10 w-10 rounded-lg"
+          width={40}
+          height={40}
         />
         <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
           Preprint Sentinel
