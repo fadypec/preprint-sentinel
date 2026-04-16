@@ -1,16 +1,38 @@
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import { auth } from "@/lib/auth";
 
 /**
- * Proxy generates a per-request CSP nonce to replace `unsafe-inline`.
+ * Proxy handles two concerns:
+ * 1. CSP nonce generation (per-request nonce replaces unsafe-inline)
+ * 2. Auth enforcement (redirects unauthenticated users to /login)
  *
- * Auth is handled at the layout/page level via `requireAuth()` and
- * `apiRequireAuth()`, not in the proxy, to keep nonce propagation simple.
+ * In dev mode without OAuth providers, auth is skipped so the
+ * dashboard remains accessible for local development.
  */
 
 const isDev = process.env.NODE_ENV !== "production";
 
-export function proxy(request: NextRequest) {
+const PUBLIC_ROUTES = ["/login", "/api/auth", "/api/health"];
+
+function isPublicRoute(pathname: string): boolean {
+  return PUBLIC_ROUTES.some((route) => pathname.startsWith(route));
+}
+
+export const proxy = auth((req) => {
+  const { pathname } = req.nextUrl;
+
+  // --- Auth enforcement ---
+  if (!isPublicRoute(pathname)) {
+    const authRequired = !!(
+      process.env.AUTH_GITHUB_ID || process.env.AUTH_GOOGLE_ID
+    );
+
+    if (authRequired && !req.auth) {
+      return NextResponse.redirect(new URL("/login", req.url));
+    }
+  }
+
+  // --- CSP nonce ---
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const csp = [
     "default-src 'self'",
@@ -22,7 +44,7 @@ export function proxy(request: NextRequest) {
     "frame-ancestors 'none'",
   ].join("; ");
 
-  const requestHeaders = new Headers(request.headers);
+  const requestHeaders = new Headers(req.headers);
   requestHeaders.set("x-nonce", nonce);
 
   const response = NextResponse.next({
@@ -30,7 +52,7 @@ export function proxy(request: NextRequest) {
   });
   response.headers.set("Content-Security-Policy", csp);
   return response;
-}
+});
 
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
