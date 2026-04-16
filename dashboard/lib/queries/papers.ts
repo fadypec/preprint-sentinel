@@ -322,7 +322,23 @@ async function queryPapersRawSQL(filters: {
         totalPages: 0,
       };
     }
-    searchClause = Prisma.sql`AND search_vector @@ to_tsquery('english', ${tsquery})`;
+
+    // Try full-text search first, fall back to ILIKE if search_vector doesn't exist
+    try {
+      // Test if search_vector column exists by running a simple query
+      await prisma.$queryRaw`SELECT search_vector FROM papers LIMIT 1`;
+      searchClause = Prisma.sql`AND search_vector @@ to_tsquery('english', ${tsquery})`;
+    } catch (error) {
+      // search_vector column doesn't exist, fall back to ILIKE search
+      const searchTerms = filters.search.toLowerCase().split(/\s+/).filter(Boolean);
+      if (searchTerms.length > 0) {
+        const likePatterns = searchTerms.map(term => `%${term}%`);
+        searchClause = Prisma.sql`AND (
+          lower(title) LIKE ANY(ARRAY[${Prisma.join(likePatterns)}]) OR
+          lower(abstract) LIKE ANY(ARRAY[${Prisma.join(likePatterns)}])
+        )`;
+      }
+    }
   }
 
   const tierClause =

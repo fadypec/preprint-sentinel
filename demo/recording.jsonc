@@ -1,0 +1,115 @@
+// Preprint Sentinel — Demo Recording
+//
+// Prerequisites:
+//   1. cd demo
+//   2. npx testreel login https://durc.fady.phd --save-state ./auth-state.json
+//      (Complete OAuth login in the browser that opens, then close it)
+//   3. npx testreel recording.jsonc --output ./output --headed
+//
+// Output: ./output/ will contain the WebM video
+{
+  "url": "https://durc.fady.phd",
+  "storageState": "./auth-state.json",
+  "viewport": { "width": 1440, "height": 900 },
+  "colorScheme": "light",
+  "outputFormat": "mp4",
+  "speed": 1.0,
+  "chrome": {
+    "url": true,
+    "titleBarColor": "#f8fafc"
+  },
+  "background": {
+    "gradient": { "from": "#0f172a", "to": "#1e293b" },
+    "padding": 40,
+    "borderRadius": 12
+  },
+  "cursor": {
+    "size": 40,
+    "rippleColor": "rgba(59, 130, 246, 0.35)",
+    "rippleSize": 80
+  },
+
+  "steps": [
+    // ── Scene 1: Daily Feed overview ────────────────────────────
+    { "action": "wait", "ms": 1500 },
+
+    // Show the sidebar branding
+    { "action": "zoom", "selector": "img[src='/logo-64.png']", "scale": 2, "duration": 800 },
+    { "action": "wait", "ms": 1500 },
+    { "action": "zoom", "scale": 1, "duration": 600 },
+    { "action": "wait", "ms": 800 },
+
+    // Scroll down to see the paper feed
+    { "action": "scroll", "y": 400 },
+    { "action": "wait", "ms": 1200 },
+    { "action": "scroll", "y": 400 },
+    { "action": "wait", "ms": 1200 },
+
+    // Scroll back to top
+    { "action": "scroll", "y": -800 },
+    { "action": "wait", "ms": 800 },
+
+    // ── Scene 2: Filter by Critical tier ────────────────────────
+    // Click the Critical tier filter chip
+    { "action": "click", "selector": "text=Critical" },
+    { "action": "wait", "ms": 1500 },
+
+    // Clear filter — click Critical again to deselect
+    { "action": "click", "selector": "text=Critical" },
+    { "action": "wait", "ms": 1000 },
+
+    // ── Scene 3: Search for a paper ──────────────────────────────
+    { "action": "click", "selector": "[name='q']" },
+    { "action": "type", "selector": "[name='q']", "text": "H5N1", "delay": 60 },
+    { "action": "keyboard", "key": "Enter" },
+    { "action": "wait", "ms": 2000 },
+
+    // Clear search
+    { "action": "clear", "selector": "[name='q']" },
+    { "action": "keyboard", "key": "Enter" },
+    { "action": "wait", "ms": 1500 },
+
+    // ── Scene 4: Open a paper detail ─────────────────────────────
+    // Click the first paper card in the feed
+    { "action": "click", "selector": "[role='article']:first-child a" },
+    { "action": "wait", "ms": 2000 },
+
+    // Zoom into the risk dimensions panel on the right
+    { "action": "zoom", "selector": "[role='progressbar']", "scale": 1.8, "duration": 800 },
+    { "action": "wait", "ms": 2500 },
+    { "action": "zoom", "scale": 1, "duration": 600 },
+    { "action": "wait", "ms": 800 },
+
+    // Scroll down to see the AI assessment
+    { "action": "scroll", "y": 400 },
+    { "action": "wait", "ms": 2000 },
+
+    // Scroll further to methods section
+    { "action": "scroll", "y": 400 },
+    { "action": "wait", "ms": 2000 },
+
+    // ── Scene 5: Navigate to Analytics ───────────────────────────
+    { "action": "click", "selector": "a[href='/analytics']" },
+    { "action": "wait", "ms": 2500 },
+
+    // Scroll through analytics charts
+    { "action": "scroll", "y": 300 },
+    { "action": "wait", "ms": 1500 },
+    { "action": "scroll", "y": 300 },
+    { "action": "wait", "ms": 1500 },
+    { "action": "scroll", "y": 300 },
+    { "action": "wait", "ms": 1500 },
+
+    // Scroll back to top of analytics
+    { "action": "scroll", "y": -900 },
+    { "action": "wait", "ms": 1000 },
+
+    // ── Scene 6: Back to Daily Feed ──────────────────────────────
+    { "action": "click", "selector": "a[href='/']" },
+    { "action": "wait", "ms": 1500 },
+
+    // Final pause
+    { "action": "hideCursor" },
+    { "action": "wait", "ms": 2000 }
+  ]
+}

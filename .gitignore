@@ -38,3 +38,12 @@ logs/
 # Superpowers
 .superpowers/
 .worktrees/
+node_modules
+
+# Demo recordings
+demo/auth-state.json
+demo/output/
+demo/node_modules/
+
+# Database dumps
+*.dump
