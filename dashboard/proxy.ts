@@ -12,7 +12,7 @@ import { auth } from "@/lib/auth";
 
 const isDev = process.env.NODE_ENV !== "production";
 
-const PUBLIC_ROUTES = ["/login", "/api/auth", "/api/health"];
+const PUBLIC_ROUTES = ["/login", "/pending", "/api/auth", "/api/health"];
 
 function isPublicRoute(pathname: string): boolean {
   return PUBLIC_ROUTES.some((route) => pathname.startsWith(route));

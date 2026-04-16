@@ -45,13 +45,14 @@ export default async function RootLayout({
   const nonce = (await headers()).get("x-nonce") ?? "";
   const isAuthRequired = authConfigured();
   const session = isAuthRequired ? await auth() : null;
-  // Show dashboard only if: auth not required (dev), OR user is authenticated
-  const showDashboard = !isAuthRequired || !!session;
+  // Show dashboard only if: auth not required (dev), OR user is authenticated AND approved
+  const isApproved = !isAuthRequired || session?.user?.status === "approved";
+  const showDashboard = isApproved;
   const pipelineStatus = showDashboard ? await getPipelineStatusSafe() : null;
 
   const fontClasses = `${geistSans.variable} ${geistMono.variable} antialiased`;
 
-  // Login page renders without sidebar (only when auth is configured but user isn't logged in)
+  // Login/pending pages render without sidebar
   if (!showDashboard) {
     return (
       <html lang="en" suppressHydrationWarning className={fontClasses}>

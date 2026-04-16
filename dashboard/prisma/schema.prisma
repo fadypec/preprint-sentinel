@@ -66,6 +66,14 @@ enum UserRole {
   @@map("user_role")
 }
 
+enum UserStatus {
+  pending
+  approved
+  rejected
+
+  @@map("user_status")
+}
+
 enum DedupRelationship {
   duplicate
   published_version
@@ -176,14 +184,15 @@ model PipelineRun {
 }
 
 model User {
-  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email         String    @unique @db.VarChar(320)
-  name          String?   @db.VarChar(255)
+  id            String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email         String     @unique @db.VarChar(320)
+  name          String?    @db.VarChar(255)
   image         String?
-  emailVerified DateTime? @map("email_verified") @db.Timestamptz
-  role          UserRole  @default(analyst)
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  emailVerified DateTime?  @map("email_verified") @db.Timestamptz
+  role          UserRole   @default(analyst)
+  status        UserStatus @default(pending)
+  createdAt     DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   accounts Account[]
   sessions Session[]
