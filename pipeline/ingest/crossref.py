@@ -179,8 +179,9 @@ class CrossrefClient:
         abstract_raw = raw.get("abstract", "")
         abstract = _TAG_RE.sub("", abstract_raw).strip()
 
-        # Parse posted date — may be [year, month, day], [year, month], or [year]
-        date_parts = raw.get("posted", {}).get("date-parts", [[]])
+        # Parse date — try "posted" first, fall back to "created" (SSRN uses created)
+        date_obj = raw.get("posted") or raw.get("created") or {}
+        date_parts = date_obj.get("date-parts", [[]])
         parts = date_parts[0] if date_parts else []
         year = parts[0] if len(parts) >= 1 else 2000
         month = parts[1] if len(parts) >= 2 else 1
