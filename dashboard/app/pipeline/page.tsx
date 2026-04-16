@@ -97,6 +97,10 @@ async function getBacklogData(): Promise<BacklogData> {
 export const dynamic = "force-dynamic";
 
 export default async function PipelinePage() {
+  // Admin only — redirects non-admin users to home
+  const { requireAdmin } = await import("@/lib/auth-guard");
+  await requireAdmin();
+
   const [runs, settingsRow, backlog] = await Promise.all([
     prisma.pipelineRun.findMany({
       orderBy: { startedAt: "desc" },

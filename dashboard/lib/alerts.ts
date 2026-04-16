@@ -149,7 +149,7 @@ export async function testSlack(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      text: "DURC Triage Dashboard: Slack integration test successful.",
+      text: "Preprint Sentinel Dashboard: Slack integration test successful.",
     }),
   });
   if (!response.ok) {
@@ -208,7 +208,7 @@ function buildDigestHtml(papers: Paper[], dashboardUrl: string): string {
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;margin:0;padding:20px;background:#f8fafc">
   <div style="max-width:700px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1)">
     <div style="background:#1e293b;padding:20px 24px">
-      <h1 style="margin:0;color:#fff;font-size:18px">DURC Triage Digest</h1>
+      <h1 style="margin:0;color:#fff;font-size:18px">Preprint Sentinel Digest</h1>
       <p style="margin:4px 0 0;color:#94a3b8;font-size:14px">${papers.length} paper${papers.length !== 1 ? "s" : ""} flagged &middot; ${new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</p>
     </div>
     <table style="width:100%;border-collapse:collapse">
@@ -287,8 +287,8 @@ export async function testEmail(
     await transport.sendMail({
       from,
       to: recipients,
-      subject: "DURC Triage Dashboard: Email test",
-      text: "This is a test email from the DURC Triage Dashboard. If you received this, email alerts are configured correctly.",
+      subject: "Preprint Sentinel Dashboard: Email test",
+      text: "This is a test email from the Preprint Sentinel Dashboard. If you received this, email alerts are configured correctly.",
     });
     return { ok: true };
   } catch (err) {

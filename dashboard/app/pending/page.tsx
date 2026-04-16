@@ -32,7 +32,7 @@ export default async function PendingPage() {
           Account Pending Approval
         </h1>
         <p className="mb-6 text-sm text-slate-600 dark:text-slate-400">
-          Your account has been created, but access to the DURC Triage dashboard
+          Your account has been created, but access to Preprint Sentinel
           requires approval from an administrator. You&apos;ll be able to access
           the dashboard once your account is approved.
         </p>

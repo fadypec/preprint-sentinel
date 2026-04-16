@@ -6,11 +6,13 @@ import { BarChart3, FileText, Settings, Workflow } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
 
-const navItems = [
+type NavItem = { href: string; label: string; icon: typeof FileText; adminOnly?: boolean };
+
+const navItems: NavItem[] = [
   { href: "/", label: "Daily Feed", icon: FileText },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/pipeline", label: "Pipeline", icon: Workflow },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/pipeline", label: "Pipeline", icon: Workflow, adminOnly: true },
+  { href: "/settings", label: "Settings", icon: Settings, adminOnly: true },
 ];
 
 type SidebarProps = {
@@ -20,10 +22,14 @@ type SidebarProps = {
     next_run_time: string | null;
   } | null;
   userName?: string | null;
+  userRole?: string | null;
 };
 
-export function Sidebar({ pipelineStatus, userName }: SidebarProps) {
+export function Sidebar({ pipelineStatus, userName, userRole }: SidebarProps) {
   const pathname = usePathname();
+  const isAdmin = userRole === "admin";
+
+  const visibleItems = navItems.filter((item) => !item.adminOnly || isAdmin);
 
   const statusDot = pipelineStatus
     ? pipelineStatus.paused
@@ -46,17 +52,17 @@ export function Sidebar({ pipelineStatus, userName }: SidebarProps) {
       {/* Logo */}
       <div className="flex items-center gap-2 px-4 py-5">
         <div aria-hidden="true" className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white">
-          DT
+          PS
         </div>
         <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
-          DURC Triage
+          Preprint Sentinel
         </span>
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 px-2" aria-label="Main navigation">
         <ul className="flex flex-col gap-1">
-          {navItems.map((item) => {
+          {visibleItems.map((item) => {
             const isActive = item.href === "/"
               ? pathname === "/"
               : pathname.startsWith(item.href);
@@ -81,18 +87,20 @@ export function Sidebar({ pipelineStatus, userName }: SidebarProps) {
         </ul>
       </nav>
 
-      {/* Pipeline status */}
-      <div className="border-t border-slate-200 px-4 py-3 dark:border-slate-700">
-        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-          <div className={cn("h-2 w-2 rounded-full", statusDot)} aria-hidden="true" />
-          <span>Pipeline {statusLabel}</span>
-        </div>
-        {pipelineStatus?.next_run_time && (
-          <div className="mt-1 text-xs text-slate-400 dark:text-slate-500">
-            Next: {new Date(pipelineStatus.next_run_time).toLocaleTimeString()}
+      {/* Pipeline status — only show for admins */}
+      {isAdmin && (
+        <div className="border-t border-slate-200 px-4 py-3 dark:border-slate-700">
+          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+            <div className={cn("h-2 w-2 rounded-full", statusDot)} aria-hidden="true" />
+            <span>Pipeline {statusLabel}</span>
           </div>
-        )}
-      </div>
+          {pipelineStatus?.next_run_time && (
+            <div className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+              Next: {new Date(pipelineStatus.next_run_time).toLocaleTimeString()}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Footer */}
       <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 dark:border-slate-700">

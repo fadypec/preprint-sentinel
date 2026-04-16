@@ -12,7 +12,7 @@ const geistSans = Geist({ subsets: ["latin"], variable: "--font-sans" });
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" });
 
 export const metadata: Metadata = {
-  title: "DURC Triage Dashboard",
+  title: "Preprint Sentinel",
   description: "Biosecurity paper review and triage system",
 };
 
@@ -79,6 +79,7 @@ export default async function RootLayout({
               <Sidebar
                 pipelineStatus={pipelineStatus}
                 userName={session?.user?.name ?? "Dev User"}
+                userRole={session?.user?.role ?? null}
               />
               <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto p-6">
                 {children}

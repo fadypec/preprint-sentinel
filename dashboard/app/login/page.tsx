@@ -14,9 +14,9 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-blue-600 text-white font-bold">
-            DT
+            PS
           </div>
-          <CardTitle className="text-2xl">DURC Triage</CardTitle>
+          <CardTitle className="text-2xl">Preprint Sentinel</CardTitle>
           <CardDescription>
             Sign in to access the biosecurity paper review dashboard.
           </CardDescription>
