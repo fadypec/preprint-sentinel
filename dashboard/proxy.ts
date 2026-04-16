@@ -27,8 +27,18 @@ export const proxy = auth((req) => {
       process.env.AUTH_GITHUB_ID || process.env.AUTH_GOOGLE_ID
     );
 
-    if (authRequired && !req.auth) {
-      return NextResponse.redirect(new URL("/login", req.url));
+    if (authRequired) {
+      // Not logged in → login page
+      if (!req.auth) {
+        return NextResponse.redirect(new URL("/login", req.url));
+      }
+
+      // Logged in but not approved → pending page
+      const userStatus = (req.auth as { user?: { status?: string } })?.user
+        ?.status;
+      if (userStatus && userStatus !== "approved") {
+        return NextResponse.redirect(new URL("/pending", req.url));
+      }
     }
   }
 
