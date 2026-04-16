@@ -11,6 +11,11 @@ import { requireAdmin } from "@/lib/auth-guard";
  * They control pipeline execution and modify paper state.
  */
 
+/**
+ * Trigger a pipeline run. Uses Railway API when deployed (RAILWAY_API_TOKEN
+ * and RAILWAY_PIPELINE_SERVICE_ID set), falls back to local subprocess spawn
+ * for development.
+ */
 export async function triggerPipeline(
   fromDate: string,
   toDate: string,
@@ -44,6 +49,98 @@ export async function triggerPipeline(
       ? dashSettings.pubmed_query_mode
       : "mesh_filtered";
 
+  // --- Railway deployment: trigger via Railway API ---
+  const railwayToken = process.env.RAILWAY_API_TOKEN;
+  const railwayServiceId = process.env.RAILWAY_PIPELINE_SERVICE_ID;
+
+  if (railwayToken && railwayServiceId) {
+    return triggerViaRailway(railwayToken, railwayServiceId);
+  }
+
+  // --- Local development: spawn subprocess ---
+  return triggerViaSubprocess(fromDate, toDate, pubmedMode, includeBacklog);
+}
+
+/** Trigger pipeline by restarting the Railway pipeline service. */
+async function triggerViaRailway(
+  token: string,
+  serviceId: string,
+): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
+  try {
+    // Step 1: Get the latest deployment for this service
+    const query = `
+      query {
+        deployments(
+          input: { serviceId: "${serviceId}" }
+          first: 1
+        ) {
+          edges {
+            node { id status }
+          }
+        }
+      }
+    `;
+
+    const resp = await fetch("https://backboard.railway.com/graphql/v2", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ query }),
+    });
+
+    if (!resp.ok) {
+      return { ok: false, error: `Railway API error: ${resp.status}` };
+    }
+
+    const data = await resp.json();
+    const edges = data?.data?.deployments?.edges;
+    if (!edges || edges.length === 0) {
+      return { ok: false, error: "No deployments found for pipeline service" };
+    }
+
+    const deploymentId = edges[0].node.id;
+
+    // Step 2: Restart the deployment
+    const restartQuery = `
+      mutation {
+        deploymentRestart(id: "${deploymentId}")
+      }
+    `;
+
+    const restartResp = await fetch(
+      "https://backboard.railway.com/graphql/v2",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ query: restartQuery }),
+      },
+    );
+
+    if (!restartResp.ok) {
+      return { ok: false, error: `Railway restart failed: ${restartResp.status}` };
+    }
+
+    return { ok: true, message: "Pipeline triggered via Railway (restarting service)" };
+  } catch (err) {
+    return {
+      ok: false,
+      error: `Railway API error: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
+/** Trigger pipeline by spawning a local Python subprocess (dev mode). */
+function triggerViaSubprocess(
+  fromDate: string,
+  toDate: string,
+  pubmedMode: string,
+  includeBacklog: boolean,
+): { ok: true; message: string } | { ok: false; error: string } {
   const args = ["-m", "pipeline"];
   if (fromDate) args.push("--from-date", fromDate);
   if (toDate) args.push("--to-date", toDate);
@@ -79,14 +176,7 @@ export async function triggerPipeline(
     ) as NodeJS.ProcessEnv,
   });
 
-  const spawnOk = await new Promise<boolean>((resolve) => {
-    child.on("error", (err) => {
-      fs.writeSync(out, `SPAWN ERROR: ${err.message}\n`);
-      resolve(false);
-    });
-    setTimeout(() => resolve(true), 500);
-  });
-
+  const spawnOk = child.pid !== undefined;
   child.unref();
   fs.closeSync(out);
 
@@ -118,7 +208,7 @@ export async function cancelPipeline(): Promise<
 
   const run = rows[0];
 
-  // Try to kill the process
+  // Try to kill the process (only works locally)
   if (run.pid) {
     try {
       process.kill(run.pid, "SIGTERM");
