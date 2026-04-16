@@ -29,6 +29,19 @@ const VALID_DIMENSIONS = new Set<string>([
 ]);
 const VALID_DIM_MINS = new Set<number>([1, 2, 3]);
 
+/** Explicit paper columns for raw SQL (excludes generated search_vector). */
+const PAPER_COLUMNS = Prisma.raw(
+  "id, doi, title, authors, corresponding_author, corresponding_institution, " +
+  "abstract, source_server, posted_date, subject_category, version, " +
+  "language, original_title, original_abstract, original_methods_section, " +
+  "full_text_url, full_text_retrieved, full_text_content, methods_section, " +
+  "enrichment_data, pipeline_stage, coarse_filter_passed, " +
+  "stage1_result, stage2_result, stage3_result, " +
+  "risk_tier, recommended_action, aggregate_score, " +
+  "review_status, needs_manual_review, analyst_notes, " +
+  "is_duplicate_of, created_at, updated_at"
+);
+
 export type PaperQueryParams = {
   page: number;
   tier?: string | null;
@@ -323,12 +336,16 @@ async function queryPapersRawSQL(filters: {
       };
     }
 
-    // Try full-text search first, fall back to ILIKE if search_vector doesn't exist
-    try {
-      // Test if search_vector column exists by running a simple query
-      await prisma.$queryRaw`SELECT search_vector FROM papers LIMIT 1`;
+    // Check if search_vector column exists via information_schema (always succeeds,
+    // unlike SELECT search_vector which aborts the transaction on missing column)
+    const colCheck = await prisma.$queryRaw<{ column_name: string }[]>`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'papers' AND column_name = 'search_vector'
+    `;
+
+    if (colCheck.length > 0) {
       searchClause = Prisma.sql`AND search_vector @@ to_tsquery('english', ${tsquery})`;
-    } catch (error) {
+    } else {
       // search_vector column doesn't exist, fall back to ILIKE search
       const searchTerms = filters.search.toLowerCase().split(/\s+/).filter(Boolean);
       if (searchTerms.length > 0) {
@@ -477,7 +494,7 @@ async function queryPapersRawSQL(filters: {
       SELECT COUNT(*) as count FROM papers WHERE is_duplicate_of IS NULL
     `,
     prisma.$queryRaw<Record<string, unknown>[]>`
-      SELECT * FROM papers
+      SELECT ${PAPER_COLUMNS} FROM papers
       WHERE pipeline_stage != 'ingested'
         AND coarse_filter_passed = true
         AND is_duplicate_of IS NULL
