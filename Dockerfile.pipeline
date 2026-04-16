@@ -1,0 +1,21 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies for lxml and asyncpg
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc libpq-dev libxml2-dev libxslt-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY pyproject.toml ./
+RUN pip install --no-cache-dir .
+
+# Copy application code
+COPY pipeline/ ./pipeline/
+COPY scripts/ ./scripts/
+COPY alembic/ ./alembic/
+COPY alembic.ini ./
+
+# Default command — run the pipeline once (Railway cron will trigger this)
+CMD ["python", "-m", "pipeline"]
