@@ -13,7 +13,14 @@ const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono"
 
 export const metadata: Metadata = {
   title: "Preprint Sentinel",
-  description: "Biosecurity paper review and triage system",
+  description: "Biosecurity preprint monitoring and triage system",
+  icons: {
+    icon: [
+      { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-16.png", sizes: "16x16", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 async function getPipelineStatusSafe() {

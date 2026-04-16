@@ -51,9 +51,14 @@ export function Sidebar({ pipelineStatus, userName, userRole }: SidebarProps) {
     <aside suppressHydrationWarning className="relative z-50 flex h-screen w-56 flex-col border-r border-slate-200 bg-white pb-16 dark:border-slate-700 dark:bg-slate-800">
       {/* Logo */}
       <div className="flex items-center gap-2 px-4 py-5">
-        <div aria-hidden="true" className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white">
-          PS
-        </div>
+        <img
+          src="/logo-64.png"
+          alt=""
+          aria-hidden="true"
+          className="h-8 w-8 rounded-lg"
+          width={32}
+          height={32}
+        />
         <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
           Preprint Sentinel
         </span>

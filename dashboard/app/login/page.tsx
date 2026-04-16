@@ -13,9 +13,13 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-900">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-blue-600 text-white font-bold">
-            PS
-          </div>
+          <img
+            src="/logo-64.png"
+            alt="Preprint Sentinel"
+            className="mx-auto mb-4 h-12 w-12 rounded-lg"
+            width={48}
+            height={48}
+          />
           <CardTitle className="text-2xl">Preprint Sentinel</CardTitle>
           <CardDescription>
             Sign in to access the biosecurity paper review dashboard.
