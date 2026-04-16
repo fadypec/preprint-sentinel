@@ -43,8 +43,10 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const nonce = (await headers()).get("x-nonce") ?? "";
-  const session = authConfigured() ? await auth() : null;
-  const showDashboard = session || !authConfigured();
+  const isAuthRequired = authConfigured();
+  const session = isAuthRequired ? await auth() : null;
+  // Show dashboard only if: auth not required (dev), OR user is authenticated
+  const showDashboard = !isAuthRequired || !!session;
   const pipelineStatus = showDashboard ? await getPipelineStatusSafe() : null;
 
   const fontClasses = `${geistSans.variable} ${geistMono.variable} antialiased`;
