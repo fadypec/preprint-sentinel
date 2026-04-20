@@ -113,7 +113,7 @@ export function PaperCard({ paper }: PaperCardProps) {
           </p>
         )}
 
-        {(topDimensions.length > 0 || score != null) && (
+        {(topDimensions.length > 0 || score != null || paper.riskTier === "refused") && (
           <div className="mt-2 flex flex-wrap gap-1">
             {topDimensions.map(([name, dim]) => (
               <span
@@ -130,11 +130,15 @@ export function PaperCard({ paper }: PaperCardProps) {
                 {name.replace(/_/g, " ")}: {dim.score}
               </span>
             ))}
-            {score != null && (
+            {score != null ? (
               <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-700 dark:bg-slate-700 dark:text-slate-200">
                 Score: {score}/18
               </span>
-            )}
+            ) : paper.riskTier === "refused" ? (
+              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium italic text-slate-500 dark:bg-slate-700 dark:text-slate-400">
+                Score: Undefined
+              </span>
+            ) : null}
           </div>
         )}
       </a>

@@ -87,6 +87,7 @@ async function getBacklogData(): Promise<BacklogData> {
           ...(adjByTier["high"] ? [{ label: "High", count: adjByTier["high"], variant: "destructive" as const }] : []),
           ...(adjByTier["medium"] ? [{ label: "Medium", count: adjByTier["medium"], variant: "warning" as const }] : []),
           ...(adjByTier["low"] ? [{ label: "Low", count: adjByTier["low"], variant: "outline" as const }] : []),
+          ...(adjByTier["refused"] ? [{ label: "LLM Refusal", count: adjByTier["refused"], variant: "outline" as const }] : []),
           ...(adjByTier["none"] ? [{ label: "No tier", count: adjByTier["none"], variant: "destructive" as const }] : []),
         ],
       },

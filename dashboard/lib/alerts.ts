@@ -3,6 +3,7 @@ import type { Paper, RiskTier } from "@prisma/client";
 import nodemailer from "nodemailer";
 
 const TIER_ORDER: Record<string, number> = {
+  refused: -1,
   low: 0,
   medium: 1,
   high: 2,
@@ -69,6 +70,7 @@ const TIER_EMOJI: Record<string, string> = {
   high: ":orange_circle:",
   medium: ":large_yellow_circle:",
   low: ":white_circle:",
+  refused: ":black_circle:",
 };
 
 export async function sendSlack(
@@ -182,6 +184,7 @@ function buildDigestHtml(papers: Paper[], dashboardUrl: string): string {
     high: "#ea580c",
     medium: "#ca8a04",
     low: "#16a34a",
+    refused: "#6b7280",
   };
 
   const rows = papers

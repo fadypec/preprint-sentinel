@@ -32,10 +32,16 @@ const styles: Record<RiskTier, RiskStyle> = {
     dot: "bg-green-500",
     label: "LOW",
   },
+  [RiskTier.refused]: {
+    badge: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+    border: "border-l-slate-400",
+    dot: "bg-slate-400",
+    label: "LLM REFUSAL",
+  },
 };
 
 export function riskStyle(tier: RiskTier | null): RiskStyle {
-  if (!tier) return styles[RiskTier.low];
+  if (!tier) return styles[RiskTier.refused];
   return styles[tier];
 }
 

@@ -100,14 +100,15 @@ async function getStats() {
 
   // --- Risk tier distribution over time (last 30 days, bucketed by week) ---
   const tierOverTime = await prisma.$queryRaw<
-    { week: string; critical: number; high: number; medium: number; low: number }[]
+    { week: string; critical: number; high: number; medium: number; low: number; refused: number }[]
   >`
     SELECT
       DATE_TRUNC('week', posted_date)::date::text as week,
       COUNT(*) FILTER (WHERE risk_tier = 'critical')::int as critical,
       COUNT(*) FILTER (WHERE risk_tier = 'high')::int as high,
       COUNT(*) FILTER (WHERE risk_tier = 'medium')::int as medium,
-      COUNT(*) FILTER (WHERE risk_tier = 'low')::int as low
+      COUNT(*) FILTER (WHERE risk_tier = 'low')::int as low,
+      COUNT(*) FILTER (WHERE risk_tier = 'refused')::int as refused
     FROM papers
     WHERE is_duplicate_of IS NULL
       AND coarse_filter_passed = true

@@ -409,6 +409,7 @@ export const AnalyticsCharts = memo(function AnalyticsCharts({
               <Area type="monotone" dataKey="high" stackId="1" fill="#f97316" stroke="#f97316" name="High" />
               <Area type="monotone" dataKey="medium" stackId="1" fill="#eab308" stroke="#eab308" name="Medium" />
               <Area type="monotone" dataKey="low" stackId="1" fill="#22c55e" stroke="#22c55e" name="Low" />
+              <Area type="monotone" dataKey="refused" stackId="1" fill="#94a3b8" stroke="#94a3b8" name="LLM Refusal" />
             </AreaChart>
           </ResponsiveContainer>
           </div>

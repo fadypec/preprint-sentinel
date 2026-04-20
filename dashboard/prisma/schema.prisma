@@ -36,6 +36,7 @@ enum RiskTier {
   medium
   high
   critical
+  refused
 
   @@map("risk_tier")
 }

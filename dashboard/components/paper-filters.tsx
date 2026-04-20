@@ -33,6 +33,14 @@ const TIER_OPTIONS = [
     inactive:
       "border-green-300 text-green-700 hover:bg-green-50 dark:border-green-800 dark:text-green-400 dark:hover:bg-green-900/30",
   },
+  {
+    value: "refused",
+    label: "LLM Refusal",
+    active:
+      "bg-slate-600 text-white border-slate-600 dark:bg-slate-700 dark:border-slate-700",
+    inactive:
+      "border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800/30",
+  },
 ] as const;
 
 const selectClasses =

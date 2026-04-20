@@ -79,6 +79,7 @@ class RiskTier(enum.StrEnum):
     MEDIUM = "medium"
     HIGH = "high"
     CRITICAL = "critical"
+    REFUSED = "refused"
 
 
 class RecommendedAction(enum.StrEnum):

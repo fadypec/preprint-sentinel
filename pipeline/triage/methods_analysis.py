@@ -20,6 +20,7 @@ from pipeline.models import (
     AssessmentLog,
     Paper,
     PipelineStage,
+    RiskTier,
 )
 from pipeline.triage.llm import (
     ACTION_MAP,
@@ -209,6 +210,8 @@ async def _run_sync(
             paper.stage2_result = {"_error": llm_result.error, "_model": used_model}
             paper.pipeline_stage = PipelineStage.METHODS_ANALYSED
             paper.needs_manual_review = True
+            if paper.risk_tier is None:
+                paper.risk_tier = RiskTier.REFUSED
         else:
             validation_err = _validate_result(llm_result.tool_input)
             if validation_err:
@@ -224,6 +227,14 @@ async def _run_sync(
                 }
                 paper.pipeline_stage = PipelineStage.METHODS_ANALYSED
                 paper.needs_manual_review = True
+                # Try to recover tier from partial data; fall back to refused
+                if paper.risk_tier is None:
+                    tier_str = llm_result.tool_input.get("risk_tier", "")
+                    paper.risk_tier = _RISK_TIER_MAP.get(tier_str, RiskTier.REFUSED)
+                    try:
+                        paper.aggregate_score = int(llm_result.tool_input.get("aggregate_score", 0))
+                    except (ValueError, TypeError):
+                        paper.aggregate_score = None
             else:
                 # Enhanced error handling for malformed tool_input structure
                 try:
