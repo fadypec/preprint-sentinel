@@ -21,6 +21,13 @@ import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { riskStyle } from "@/lib/risk-colors";
 
+/** Shared dark-mode tooltip style for all Recharts charts */
+const tooltipStyle = {
+  contentStyle: { backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 6, color: "#e2e8f0" },
+  itemStyle: { color: "#e2e8f0" },
+  labelStyle: { color: "#94a3b8" },
+};
+
 type RateRow = { name: string; flagged: number; total: number };
 type EmergingRow = {
   name: string;
@@ -178,7 +185,8 @@ export const AnalyticsCharts = memo(function AnalyticsCharts({
       ? Math.round((cat.prior_flagged / cat.prior_total) * 1000) / 10
       : 0;
     return { ...cat, recentRate, priorRate, change: Math.round((recentRate - priorRate) * 10) / 10 };
-  });
+  })
+  .sort((a, b) => b.recentRate - a.recentRate);
   const maxCatRate = Math.max(...catRates.map((c) => c.recentRate), 1);
 
   return (
@@ -203,6 +211,7 @@ export const AnalyticsCharts = memo(function AnalyticsCharts({
               />
               <YAxis type="category" dataKey="name" tick={{ fill: textColor, fontSize: 10 }} width={40} />
               <Tooltip
+                {...tooltipStyle}
                 formatter={(v, _name, item) => {
                   if (countryView === "rate") {
                     const payload = item?.payload as { label?: string } | undefined;
@@ -249,6 +258,7 @@ export const AnalyticsCharts = memo(function AnalyticsCharts({
               />
               <YAxis type="category" dataKey="name" tick={{ fill: textColor, fontSize: 9 }} width={180} />
               <Tooltip
+                {...tooltipStyle}
                 formatter={(v) =>
                   instView === "rate" ? `${v}%` : String(v)
                 }
@@ -371,7 +381,7 @@ export const AnalyticsCharts = memo(function AnalyticsCharts({
               <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
               <XAxis dataKey="day" tick={{ fill: textColor, fontSize: 9 }} angle={-45} textAnchor="end" height={60} />
               <YAxis tick={{ fill: textColor, fontSize: 10 }} />
-              <Tooltip />
+              <Tooltip {...tooltipStyle} />
               <Bar dataKey="count" fill="#6366f1" radius={[4, 4, 0, 0]} name="Papers" />
             </BarChart>
           </ResponsiveContainer>
@@ -393,7 +403,7 @@ export const AnalyticsCharts = memo(function AnalyticsCharts({
               <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
               <XAxis dataKey="week" tick={{ fill: textColor, fontSize: 10 }} />
               <YAxis tick={{ fill: textColor, fontSize: 10 }} />
-              <Tooltip />
+              <Tooltip {...tooltipStyle} />
               <Legend />
               <Area type="monotone" dataKey="critical" stackId="1" fill="#ef4444" stroke="#ef4444" name="Critical" />
               <Area type="monotone" dataKey="high" stackId="1" fill="#f97316" stroke="#f97316" name="High" />
@@ -419,7 +429,7 @@ export const AnalyticsCharts = memo(function AnalyticsCharts({
               <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
               <XAxis dataKey="week" tick={{ fill: textColor, fontSize: 10 }} />
               <YAxis tick={{ fill: textColor, fontSize: 10 }} domain={[0, 3]} />
-              <Tooltip />
+              <Tooltip {...tooltipStyle} />
               <Legend />
               {Object.entries(DIMENSION_LABELS).map(([key, label]) => (
                 <Line

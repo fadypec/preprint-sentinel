@@ -33,9 +33,11 @@ class ZenodoClient:
         self,
         request_delay: float = 1.0,
         max_retries: int = 3,
+        max_pages: int = 10,
     ) -> None:
         self.request_delay = request_delay
         self.max_retries = max_retries
+        self.max_pages = max_pages
         self._client: httpx.AsyncClient | None = None
 
     async def __aenter__(self) -> ZenodoClient:
@@ -64,6 +66,15 @@ class ZenodoClient:
             if len(hits) < self.PAGE_SIZE:
                 break
             page += 1
+
+            if page > self.max_pages:
+                total = data.get("hits", {}).get("total", 0)
+                log.info(
+                    "zenodo_page_limit_reached",
+                    pages=page - 1,
+                    total=total,
+                )
+                break
 
             log.info(
                 "page_fetched",

@@ -54,11 +54,13 @@ class CrossrefClient:
         request_delay: float = 1.0,
         max_retries: int = 3,
         sources: dict[str, str] | None = None,
+        max_pages_per_source: int = 10,
     ) -> None:
         self.email = email
         self.request_delay = request_delay
         self.max_retries = max_retries
         self.sources = sources if sources is not None else _DEFAULT_SOURCES
+        self.max_pages_per_source = max_pages_per_source
         self._client: httpx.AsyncClient | None = None
 
     async def __aenter__(self) -> CrossrefClient:
@@ -97,9 +99,10 @@ class CrossrefClient:
         from_date: date,
         to_date: date,
     ) -> AsyncGenerator[dict, None]:
-        """Paginate through all results for a single DOI prefix."""
+        """Paginate through results for a single DOI prefix."""
         cursor = "*"
         total_fetched = 0
+        pages_fetched = 0
         while True:
             data = await self._fetch_page(prefix, from_date, to_date, cursor)
             items = data.get("message", {}).get("items", [])
@@ -109,18 +112,30 @@ class CrossrefClient:
             for item in items:
                 yield self._normalise(item, source_name)
             total_fetched += len(items)
+            pages_fetched += 1
 
             next_cursor = data.get("message", {}).get("next-cursor")
             if not next_cursor or next_cursor == cursor:
                 break
             cursor = next_cursor
 
+            total_results = data.get("message", {}).get("total-results", 0)
             log.info(
                 "page_fetched",
                 source=f"crossref:{source_name}",
                 fetched_so_far=total_fetched,
-                total=data.get("message", {}).get("total-results", 0),
+                total=total_results,
             )
+
+            if pages_fetched >= self.max_pages_per_source:
+                log.info(
+                    "crossref_page_limit_reached",
+                    source=source_name,
+                    pages=pages_fetched,
+                    fetched=total_fetched,
+                    total=total_results,
+                )
+                break
 
     async def _fetch_page(
         self,
