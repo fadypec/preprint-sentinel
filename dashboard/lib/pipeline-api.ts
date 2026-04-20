@@ -1,4 +1,13 @@
 const PIPELINE_URL = process.env.PIPELINE_API_URL ?? "http://localhost:8000";
+
+if (!process.env.PIPELINE_API_SECRET && process.env.NODE_ENV === "production") {
+  console.error(
+    "[SECURITY] PIPELINE_API_SECRET is not set in production. " +
+    "Pipeline API calls will be rejected.",
+  );
+  throw new Error("PIPELINE_API_SECRET must be set in production");
+}
+
 const PIPELINE_SECRET = process.env.PIPELINE_API_SECRET ?? "";
 
 async function pipelineFetch(path: string, options: RequestInit = {}) {

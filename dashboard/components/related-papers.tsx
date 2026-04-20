@@ -90,6 +90,7 @@ export async function RelatedPapers({
           <a
             key={p.id}
             href={`/paper/${p.id}`}
+            aria-label={`View related paper: ${p.title}`}
             className="block rounded-md border border-slate-200 p-3 text-sm no-underline transition-colors hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
           >
             <div className="flex items-start justify-between gap-2">

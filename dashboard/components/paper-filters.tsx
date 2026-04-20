@@ -50,6 +50,10 @@ type PaperFiltersProps = {
   author: string;
   institution: string;
   hasErrors: string;
+  dateFrom: string;
+  dateTo: string;
+  category: string;
+  country: string;
 };
 
 /** Build a clean URL with only non-default filter params. */
@@ -65,6 +69,10 @@ function buildUrl(filters: {
   author: string;
   institution: string;
   dimMin: string;
+  dateFrom: string;
+  dateTo: string;
+  category: string;
+  country: string;
 }): string {
   const p = new URLSearchParams();
   if (filters.tier && filters.tier !== "all") p.set("tier", filters.tier);
@@ -80,6 +88,10 @@ function buildUrl(filters: {
   if (filters.author) p.set("author", filters.author);
   if (filters.institution) p.set("institution", filters.institution);
   if (filters.hasErrors === "true") p.set("has_errors", "true");
+  if (filters.dateFrom) p.set("date_from", filters.dateFrom);
+  if (filters.dateTo) p.set("date_to", filters.dateTo);
+  if (filters.category && filters.category !== "all") p.set("category", filters.category);
+  if (filters.country) p.set("country", filters.country);
   const qs = p.toString();
   return qs ? `/?${qs}` : "/";
 }
@@ -95,7 +107,7 @@ function buildUrl(filters: {
  * parse, independent of React hydration). Falls back to the Go button
  * if JS never loads.
  */
-export function PaperFilters({ tier, source, status, q, needsReview, hasErrors, sort, dim, dimMin, author, institution }: PaperFiltersProps) {
+export function PaperFilters({ tier, source, status, q, needsReview, hasErrors, sort, dim, dimMin, author, institution, dateFrom, dateTo, category, country }: PaperFiltersProps) {
   const selectedTiers = new Set(
     !tier || tier === "all" ? [] : tier.split(","),
   );
@@ -117,6 +129,10 @@ export function PaperFilters({ tier, source, status, q, needsReview, hasErrors, 
       dimMin,
       author,
       institution,
+      dateFrom,
+      dateTo,
+      category,
+      country,
     });
   }
 
@@ -130,7 +146,11 @@ export function PaperFilters({ tier, source, status, q, needsReview, hasErrors, 
     (sort !== "date_desc" && sort !== "") ||
     (dim !== "all" && dim !== "") ||
     author !== "" ||
-    institution !== "";
+    institution !== "" ||
+    dateFrom !== "" ||
+    dateTo !== "" ||
+    (category !== "all" && category !== "") ||
+    country !== "";
 
   const tierValue =
     selectedTiers.size > 0 ? [...selectedTiers].join(",") : "";
@@ -156,7 +176,7 @@ export function PaperFilters({ tier, source, status, q, needsReview, hasErrors, 
               role="button"
               aria-pressed={isActive}
               className={cn(
-                "rounded-md border px-2.5 py-1 text-xs font-medium no-underline transition-colors",
+                "rounded-md border px-3 py-2 min-h-[44px] text-xs font-medium no-underline transition-colors",
                 isActive ? opt.active : opt.inactive,
               )}
             >
@@ -180,6 +200,10 @@ export function PaperFilters({ tier, source, status, q, needsReview, hasErrors, 
           dimMin,
           author,
           institution,
+          dateFrom,
+          dateTo,
+          category,
+          country,
         })}
         role="button"
         aria-pressed={needsReview === "true"}
@@ -207,6 +231,10 @@ export function PaperFilters({ tier, source, status, q, needsReview, hasErrors, 
           dimMin,
           author,
           institution,
+          dateFrom,
+          dateTo,
+          category,
+          country,
         })}
         role="button"
         aria-pressed={hasErrors === "true"}
@@ -237,6 +265,67 @@ export function PaperFilters({ tier, source, status, q, needsReview, hasErrors, 
         {hasErrors === "true" && (
           <input type="hidden" name="has_errors" value="true" />
         )}
+
+        <label htmlFor="filter-date-from" className="sr-only">From date</label>
+        <input
+          id="filter-date-from"
+          type="date"
+          name="date_from"
+          defaultValue={dateFrom}
+          aria-label="Filter from date"
+          className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30 dark:hover:bg-input/50"
+          data-auto-submit=""
+        />
+
+        <label htmlFor="filter-date-to" className="sr-only">To date</label>
+        <input
+          id="filter-date-to"
+          type="date"
+          name="date_to"
+          defaultValue={dateTo}
+          aria-label="Filter to date"
+          className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30 dark:hover:bg-input/50"
+          data-auto-submit=""
+        />
+
+        <label htmlFor="filter-category" className="sr-only">Filter by subject category</label>
+        <select
+          id="filter-category"
+          name="category"
+          defaultValue={category || "all"}
+          aria-label="Filter by subject category"
+          className={selectClasses}
+          data-auto-submit=""
+        >
+          <option value="all">All Categories</option>
+          <option value="microbiology">Microbiology</option>
+          <option value="bioinformatics">Bioinformatics</option>
+          <option value="neuroscience">Neuroscience</option>
+          <option value="genetics">Genetics</option>
+          <option value="immunology">Immunology</option>
+          <option value="cell biology">Cell Biology</option>
+          <option value="biochemistry">Biochemistry</option>
+          <option value="molecular biology">Molecular Biology</option>
+          <option value="genomics">Genomics</option>
+          <option value="synthetic biology">Synthetic Biology</option>
+          <option value="biophysics">Biophysics</option>
+          <option value="pathology">Pathology</option>
+          <option value="pharmacology and toxicology">Pharmacology</option>
+          <option value="epidemiology">Epidemiology</option>
+          <option value="evolutionary biology">Evolutionary Biology</option>
+        </select>
+
+        <label htmlFor="filter-country" className="sr-only">Filter by country code</label>
+        <input
+          id="filter-country"
+          type="text"
+          name="country"
+          defaultValue={country}
+          placeholder="Country..."
+          aria-label="Filter by country code (e.g. US, GB, CN)"
+          maxLength={2}
+          className="h-8 w-20 rounded-lg border border-input bg-transparent px-2.5 text-sm uppercase outline-none transition-colors placeholder:text-muted-foreground placeholder:normal-case focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30 dark:hover:bg-input/50"
+        />
 
         <label htmlFor="filter-author" className="sr-only">Filter by author</label>
         <input

@@ -23,7 +23,7 @@ export function KpiCard({ title, value, trend, subtitle }: KpiCardProps) {
         : "text-slate-400";
 
   return (
-    <Card className="p-4">
+    <Card className="p-4" role="group" aria-label={`${title}: ${value}`}>
       <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
         {title}
       </p>

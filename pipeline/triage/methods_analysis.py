@@ -11,6 +11,8 @@ models are tried in order before giving up.
 
 from __future__ import annotations
 
+import asyncio
+
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,10 +20,14 @@ from pipeline.models import (
     AssessmentLog,
     Paper,
     PipelineStage,
-    RecommendedAction,
-    RiskTier,
 )
-from pipeline.triage.llm import LLMClient, LLMResult
+from pipeline.triage.llm import (
+    ACTION_MAP,
+    RISK_TIER_MAP,
+    LLMClient,
+    LLMResult,
+    create_assessment_log,
+)
 from pipeline.triage.prompts import (
     ASSESS_DURC_RISK_TOOL,
     METHODS_ANALYSIS_SYSTEM_PROMPT,
@@ -31,45 +37,9 @@ from pipeline.triage.prompts import (
 
 log = structlog.get_logger()
 
-# Maps string values from LLM output to model enums
-_RISK_TIER_MAP = {
-    "low": RiskTier.LOW,
-    "medium": RiskTier.MEDIUM,
-    "high": RiskTier.HIGH,
-    "critical": RiskTier.CRITICAL,
-}
-
-_ACTION_MAP = {
-    "archive": RecommendedAction.ARCHIVE,
-    "monitor": RecommendedAction.MONITOR,
-    "review": RecommendedAction.REVIEW,
-    "escalate": RecommendedAction.ESCALATE,
-}
-
-
-def _create_assessment_log(
-    session: AsyncSession,
-    paper: Paper,
-    llm_result: LLMResult,
-    model: str,
-    user_message: str,
-) -> None:
-    """Create an AssessmentLog entry from an LLM result."""
-    session.add(
-        AssessmentLog(
-            paper_id=paper.id,
-            stage="methods_analysis",
-            model_used=model,
-            prompt_version=METHODS_ANALYSIS_VERSION,
-            prompt_text=user_message,
-            raw_response=llm_result.raw_response,
-            parsed_result=llm_result.tool_input if not llm_result.error else None,
-            input_tokens=llm_result.input_tokens,
-            output_tokens=llm_result.output_tokens,
-            cost_estimate_usd=llm_result.cost_estimate_usd,
-            error=llm_result.error,
-        )
-    )
+# Local aliases for backward compatibility
+_RISK_TIER_MAP = RISK_TIER_MAP
+_ACTION_MAP = ACTION_MAP
 
 
 _REQUIRED_KEYS = {"aggregate_score", "risk_tier", "recommended_action", "summary", "dimensions"}
@@ -175,13 +145,18 @@ async def _run_sync(
     papers: list[Paper],
     model: str,
     fallback_models: list[str],
+    concurrency: int = 10,
 ) -> None:
-    """Process papers one at a time, with cascading model fallback on refusal."""
+    """Process papers concurrently with a semaphore, with cascading model fallback on refusal."""
     total = len(papers)
     models_chain = [model] + fallback_models
+    processed = 0
     escalated = 0
+    sem = asyncio.Semaphore(concurrency)
 
-    for i, paper in enumerate(papers, 1):
+    async def _analyse(paper: Paper) -> None:
+        nonlocal processed, escalated
+
         user_msg = format_methods_analysis_message(
             paper.title, paper.abstract or "", methods=paper.methods_section
         )
@@ -189,33 +164,40 @@ async def _run_sync(
         # Try each model in the chain; stop on first non-refusal
         llm_result: LLMResult | None = None
         used_model = model
-        for m in models_chain:
-            llm_result = await llm_client.call_tool(
-                model=m,
-                system_prompt=METHODS_ANALYSIS_SYSTEM_PROMPT,
-                user_message=user_msg,
-                tool=ASSESS_DURC_RISK_TOOL,
-            )
-            used_model = m
-            if llm_result.error != _REFUSAL_ERROR:
-                break
-            # Log the refusal and try next model
-            _create_assessment_log(session, paper, llm_result, m, user_msg)
-            next_idx = models_chain.index(m) + 1
-            if next_idx < len(models_chain):
-                log.info(
-                    "methods_analysis_refusal_escalating",
-                    paper_id=str(paper.id),
-                    refused_by=m,
-                    escalating_to=models_chain[next_idx],
+        async with sem:
+            for m in models_chain:
+                llm_result = await llm_client.call_tool(
+                    model=m,
+                    system_prompt=METHODS_ANALYSIS_SYSTEM_PROMPT,
+                    user_message=user_msg,
+                    tool=ASSESS_DURC_RISK_TOOL,
                 )
-                escalated += 1
+                used_model = m
+                if llm_result.error != _REFUSAL_ERROR:
+                    break
+                # Log the refusal and try next model
+                create_assessment_log(
+                    session, paper, llm_result, m, user_msg,
+                    stage="methods_analysis", prompt_version=METHODS_ANALYSIS_VERSION,
+                )
+                next_idx = models_chain.index(m) + 1
+                if next_idx < len(models_chain):
+                    log.info(
+                        "methods_analysis_refusal_escalating",
+                        paper_id=str(paper.id),
+                        refused_by=m,
+                        escalating_to=models_chain[next_idx],
+                    )
+                    escalated += 1
 
         assert llm_result is not None  # models_chain is always non-empty
 
         # Log the final attempt (skip if already logged as refusal above)
         if llm_result.error != _REFUSAL_ERROR or used_model == models_chain[-1]:
-            _create_assessment_log(session, paper, llm_result, used_model, user_msg)
+            create_assessment_log(
+                session, paper, llm_result, used_model, user_msg,
+                stage="methods_analysis", prompt_version=METHODS_ANALYSIS_VERSION,
+            )
 
         if llm_result.error:
             log.warning(
@@ -254,7 +236,6 @@ async def _run_sync(
                         risk_tier=paper.risk_tier,
                         aggregate_score=paper.aggregate_score,
                         model=used_model,
-                        progress=f"{i}/{total}",
                     )
                 except (ValueError, TypeError) as e:
                     # Catch structural issues with tool_input
@@ -278,10 +259,16 @@ async def _run_sync(
                     }
                     paper.pipeline_stage = PipelineStage.METHODS_ANALYSED
                     paper.needs_manual_review = True
-        await session.flush()
 
-        if i % 10 == 0 or i == total:
-            log.info("methods_analysis_progress", processed=i, total=total)
+        processed += 1
+        if processed % 10 == 0 or processed == total:
+            log.info("methods_analysis_progress", processed=processed, total=total)
+
+    await asyncio.wait_for(
+        asyncio.gather(*[_analyse(p) for p in papers]),
+        timeout=600,  # 10 min aggregate timeout
+    )
+    await session.flush()
 
     log.info("methods_analysis_sync_complete", total=total, escalated=escalated)
 
@@ -334,7 +321,10 @@ async def _run_batch(
             )
             continue
 
-        _create_assessment_log(session, paper, llm_result, model, user_msg)
+        create_assessment_log(
+            session, paper, llm_result, model, user_msg,
+            stage="methods_analysis", prompt_version=METHODS_ANALYSIS_VERSION,
+        )
 
         if llm_result.error:
             log.warning("methods_analysis_error", paper_id=custom_id, error=llm_result.error)

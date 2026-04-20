@@ -165,6 +165,10 @@ class Paper(Base):
     aggregate_score: Mapped[int | None] = mapped_column(Integer)
 
     # Analyst workflow
+    # TODO: Add reviewed_by (user ID) and status change audit log for analyst attribution.
+    #       This should be a ForeignKey to users.id recording which analyst changed the
+    #       review_status, plus a separate review_status_history table or JSONB column
+    #       tracking all status transitions with timestamps and user IDs.
     review_status: Mapped[ReviewStatus] = mapped_column(
         SQLEnum(ReviewStatus, name="review_status", create_constraint=True),
         default=ReviewStatus.UNREVIEWED,
@@ -190,7 +194,13 @@ class Paper(Base):
         onupdate=func.now(),
     )
 
-    __table_args__ = (Index("ix_papers_posted_date_stage", "posted_date", "pipeline_stage"),)
+    __table_args__ = (
+        Index("ix_papers_posted_date_stage", "posted_date", "pipeline_stage"),
+        Index(
+            "ix_papers_feed_query",
+            "coarse_filter_passed", "is_duplicate_of", "risk_tier", "posted_date",
+        ),
+    )
 
 
 class PaperGroup(Base):

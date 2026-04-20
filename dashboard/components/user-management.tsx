@@ -50,7 +50,7 @@ export function UserManagement() {
   }
 
   if (loading) {
-    return <div className="h-20 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />;
+    return <div className="h-20 motion-safe:animate-pulse rounded bg-slate-200 dark:bg-slate-700" />;
   }
 
   const pending = users.filter((u) => u.status === "pending");
@@ -108,6 +108,7 @@ export function UserManagement() {
                   disabled={updating === user.id}
                   onClick={() => updateStatus(user.id, "approved")}
                   className="h-7 text-xs text-green-700 hover:bg-green-50 dark:text-green-400"
+                  aria-label={`Approve ${user.name || user.email}`}
                 >
                   Approve
                 </Button>
@@ -119,6 +120,7 @@ export function UserManagement() {
                   disabled={updating === user.id}
                   onClick={() => updateStatus(user.id, "rejected")}
                   className="h-7 text-xs text-red-700 hover:bg-red-50 dark:text-red-400"
+                  aria-label={`Reject ${user.name || user.email}`}
                 >
                   Reject
                 </Button>

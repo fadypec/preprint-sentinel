@@ -5,6 +5,33 @@ import path from "path";
 import { prisma } from "@/lib/prisma";
 import { apiRequireAuth, apiRequireAdmin, csrfCheck } from "@/lib/auth-guard";
 
+/** Env var prefixes the pipeline child process needs. */
+const PIPELINE_ENV_ALLOWLIST = [
+  "ANTHROPIC_API_KEY",
+  "NCBI_API_KEY",
+  "UNPAYWALL_EMAIL",
+  "OPENALEX_EMAIL",
+  "SEMANTIC_SCHOLAR_API_KEY",
+  "PIPELINE_",
+  "STAGE1_MODEL",
+  "STAGE2_MODEL",
+  "STAGE3_MODEL",
+  "DAILY_RUN_HOUR",
+  "COARSE_FILTER_THRESHOLD",
+  "SLACK_WEBHOOK_URL",
+  "SMTP_",
+  "ALERT_",
+  // System vars needed for process execution
+  "PATH",
+  "HOME",
+  "USER",
+  "LANG",
+  "LC_",
+  "PYTHONPATH",
+  "VIRTUAL_ENV",
+  "SENTRY_DSN",
+];
+
 /**
  * Derive pipeline status from the pipeline_runs table.
  * No sidecar needed.
@@ -114,11 +141,11 @@ export async function POST(request: NextRequest) {
       cwd: projectRoot,
       detached: true,
       stdio: ["ignore", out, out],
-      // Strip dashboard-specific DATABASE_URL so the pipeline loads its
-      // own (postgresql+asyncpg://...) from the project-root .env file.
+      // Allowlist: only pass env vars the pipeline actually needs.
+      // Prevents leaking dashboard secrets (AUTH_SECRET, OAuth creds) to child.
       env: Object.fromEntries(
-        Object.entries(process.env).filter(
-          ([k]) => k !== "DATABASE_URL",
+        Object.entries(process.env).filter(([k]) =>
+          PIPELINE_ENV_ALLOWLIST.some((prefix) => k.startsWith(prefix)),
         ),
       ) as NodeJS.ProcessEnv,
     });
@@ -146,8 +173,6 @@ export async function POST(request: NextRequest) {
 
     return Response.json({
       started: true,
-      pid: child.pid,
-      logFile,
       fromDate: fromDate ?? "default (2 days ago)",
       toDate: toDate ?? "default (today)",
     });

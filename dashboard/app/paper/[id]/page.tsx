@@ -22,7 +22,23 @@ export default async function PaperDetailPage({ params }: Props) {
   const paper = await prisma.paper.findUnique({
     where: { id },
     include: {
-      assessmentLogs: { orderBy: { createdAt: "desc" } },
+      assessmentLogs: {
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          stage: true,
+          modelUsed: true,
+          promptVersion: true,
+          inputTokens: true,
+          outputTokens: true,
+          costEstimateUsd: true,
+          createdAt: true,
+          parsedResult: true,
+          error: true,
+          // Exclude prompt_text and raw_response from initial load
+          // (heavy fields fetched on demand by AuditTrail component)
+        },
+      },
     },
   });
 
@@ -113,7 +129,7 @@ export default async function PaperDetailPage({ params }: Props) {
       </div>
 
       {/* Two-column layout */}
-      <div className="flex gap-6">
+      <div className="flex flex-col lg:flex-row gap-6">
         {/* Left column -- scrollable content */}
         <div className="min-w-0 space-y-6" style={{ flex: "7" }}>
           {/* Metadata */}
@@ -290,7 +306,7 @@ export default async function PaperDetailPage({ params }: Props) {
             <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Audit Trail
             </h2>
-            <AuditTrail logs={paper.assessmentLogs} />
+            <AuditTrail logs={paper.assessmentLogs as any} />
           </section>
         </div>
 

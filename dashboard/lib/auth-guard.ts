@@ -48,6 +48,10 @@ export async function requireAuth() {
   if (!session?.user) {
     redirect("/login");
   }
+  // Redirect pending/rejected users to the pending approval page
+  if (session.user.status !== "approved") {
+    redirect("/pending");
+  }
   return session;
 }
 
@@ -64,7 +68,14 @@ export async function requireAdmin() {
 // API guards (return Response on failure — never redirect)
 // ---------------------------------------------------------------------------
 
-/** Get client IP for rate limiting. */
+/**
+ * Get client IP for rate limiting.
+ *
+ * TRUST ASSUMPTION: x-forwarded-for is trusted because the deployment
+ * platform (Railway) strips and re-sets this header at its edge proxy.
+ * If the deployment platform changes, verify that the new proxy also
+ * overwrites x-forwarded-for to prevent client spoofing.
+ */
 async function getClientIp(): Promise<string> {
   const h = await headers();
   return h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
@@ -110,7 +121,7 @@ export async function csrfCheck(request: Request): Promise<Response | null> {
   );
 }
 
-/** Returns null if the request is authorised, or a 401/429 Response if not. */
+/** Returns null if the request is authorised, or a 401/403/429 Response if not. */
 export async function apiRequireAuth(): Promise<Response | null> {
   const rateLimited = checkRateLimit(await getClientIp());
   if (rateLimited) return rateLimited;
@@ -118,6 +129,13 @@ export async function apiRequireAuth(): Promise<Response | null> {
   const session = await auth();
   if (!session?.user) {
     return Response.json({ error: "Authentication required" }, { status: 401 });
+  }
+  // Enforce user approval — pending/rejected users cannot access the app
+  if (session.user.status !== "approved") {
+    return Response.json(
+      { error: "Account pending approval" },
+      { status: 403 },
+    );
   }
   return null;
 }
@@ -130,6 +148,13 @@ export async function apiRequireAdmin(): Promise<Response | null> {
   const session = await auth();
   if (!session?.user) {
     return Response.json({ error: "Authentication required" }, { status: 401 });
+  }
+  // Enforce user approval before checking role
+  if (session.user.status !== "approved") {
+    return Response.json(
+      { error: "Account pending approval" },
+      { status: 403 },
+    );
   }
   if (session.user.role !== UserRole.admin) {
     return Response.json({ error: "Admin access required" }, { status: 403 });

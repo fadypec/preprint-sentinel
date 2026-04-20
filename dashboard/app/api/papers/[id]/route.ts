@@ -46,6 +46,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         );
       }
       data.reviewStatus = body.reviewStatus;
+      // TODO: Record reviewed_by (user ID from session) and timestamp when
+      //       the reviewed_by field is added to the schema. Should also
+      //       append to a status change audit log for analyst attribution.
     }
 
     if (Object.keys(data).length === 0) {

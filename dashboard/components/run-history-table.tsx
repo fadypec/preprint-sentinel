@@ -10,6 +10,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ClientTimestamp } from "@/components/client-timestamp";
@@ -33,6 +40,7 @@ export function RunHistoryTable({ runs, clearAction }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [clearMsg, setClearMsg] = useState<string | null>(null);
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
 
   if (runs.length === 0) {
     return (
@@ -58,6 +66,10 @@ export function RunHistoryTable({ runs, clearAction }: Props) {
         key={run.id}
         className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50"
         onClick={() => toggle(run.id)}
+        tabIndex={0}
+        role="button"
+        aria-expanded={isExpanded}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(run.id); } }}
       >
         <TableCell className="w-6 px-2">
           {isExpanded ? (
@@ -100,7 +112,11 @@ export function RunHistoryTable({ runs, clearAction }: Props) {
   }
 
   function handleClear() {
-    if (!confirm("Clear all pipeline run history? This cannot be undone.")) return;
+    setConfirmClearOpen(true);
+  }
+
+  function confirmClear() {
+    setConfirmClearOpen(false);
     startTransition(async () => {
       const res = await clearAction();
       if (res.ok) {
@@ -115,14 +131,15 @@ export function RunHistoryTable({ runs, clearAction }: Props) {
   return (
     <div className="space-y-3">
       <Table>
+        <caption className="sr-only">Pipeline run history</caption>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-6" />
-            <TableHead>Started</TableHead>
-            <TableHead>Date Range</TableHead>
-            <TableHead>Duration</TableHead>
-            <TableHead>Ingested</TableHead>
-            <TableHead>Errors</TableHead>
+            <TableHead scope="col" className="w-6" />
+            <TableHead scope="col">Started</TableHead>
+            <TableHead scope="col">Date Range</TableHead>
+            <TableHead scope="col">Duration</TableHead>
+            <TableHead scope="col">Ingested</TableHead>
+            <TableHead scope="col">Errors</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>{rows}</TableBody>
@@ -143,6 +160,23 @@ export function RunHistoryTable({ runs, clearAction }: Props) {
           <span className="text-xs text-slate-500">{clearMsg}</span>
         )}
       </div>
+
+      <Dialog open={confirmClearOpen} onOpenChange={setConfirmClearOpen}>
+        <DialogContent>
+          <DialogTitle>Clear Pipeline History</DialogTitle>
+          <DialogDescription>
+            Clear all pipeline run history? This cannot be undone.
+          </DialogDescription>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmClearOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmClear}>
+              Clear History
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

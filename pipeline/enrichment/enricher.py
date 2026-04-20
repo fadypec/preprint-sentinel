@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+import httpx
 import structlog
 
 from pipeline.enrichment.crossref import CrossrefEnrichmentClient
@@ -30,11 +31,16 @@ class EnrichmentResult:
     partial: bool = False
 
 
-async def enrich_paper(paper: Paper, settings) -> EnrichmentResult:
+async def enrich_paper(
+    paper: Paper, settings, http: httpx.AsyncClient | None = None
+) -> EnrichmentResult:
     """Fetch enrichment data from all configured sources.
 
     Each source is wrapped in try/except -- individual failures are recorded
     but do not prevent other sources from being queried.
+
+    If *http* is provided, it is shared across all enrichment clients to avoid
+    creating 4 new AsyncClient instances per paper.
     """
     doi = paper.doi or ""
     corresponding_author = paper.corresponding_author or ""
@@ -51,6 +57,7 @@ async def enrich_paper(paper: Paper, settings) -> EnrichmentResult:
         async with OpenAlexClient(
             email=settings.openalex_email,
             request_delay=settings.openalex_request_delay,
+            http=http,
         ) as oa_client:
             oa_data = await oa_client.lookup(doi)
         if oa_data is not None:
@@ -71,6 +78,7 @@ async def enrich_paper(paper: Paper, settings) -> EnrichmentResult:
         async with SemanticScholarClient(
             api_key=s2_api_key,
             request_delay=settings.semantic_scholar_request_delay,
+            http=http,
         ) as s2_client:
             s2_data = await s2_client.lookup(doi)
         if s2_data is not None:
@@ -92,6 +100,7 @@ async def enrich_paper(paper: Paper, settings) -> EnrichmentResult:
         if author_name:
             async with OrcidClient(
                 request_delay=settings.orcid_request_delay,
+                http=http,
             ) as orcid_client:
                 orcid_data = await orcid_client.lookup(author_name, known_orcid=known_orcid)
             if orcid_data is not None:
@@ -107,6 +116,7 @@ async def enrich_paper(paper: Paper, settings) -> EnrichmentResult:
         async with CrossrefEnrichmentClient(
             email=crossref_email,
             request_delay=getattr(settings, "crossref_request_delay", 1.0),
+            http=http,
         ) as cr_client:
             cr_data = await cr_client.lookup(doi)
         if cr_data is not None:

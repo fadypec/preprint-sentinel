@@ -156,7 +156,9 @@ export function CoverageHeatmap() {
                         ? getCellColor(status)
                         : "bg-slate-800/50 dark:bg-slate-700/50",
                   )}
-                  title={isFuture ? "" : getCellTitle(dateStr, status)}
+                  role={isFuture ? undefined : "img"}
+                  title={isFuture ? undefined : getCellTitle(dateStr, status)}
+                  aria-label={isFuture ? undefined : getCellTitle(dateStr, status)}
                   style={di >= 7 ? { display: "none" } : undefined}
                 />
               );

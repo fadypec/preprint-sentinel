@@ -11,6 +11,7 @@ type Props = {
 export function Markdown({ children }: Props) {
   return (
     <ReactMarkdown
+      disallowedElements={['script', 'iframe', 'object', 'embed', 'form']}
       components={{
         p: (props) => <p className="mb-2 last:mb-0">{props.children}</p>,
         strong: (props) => <strong className="font-semibold">{props.children}</strong>,

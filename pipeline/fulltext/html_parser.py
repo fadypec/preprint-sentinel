@@ -10,22 +10,7 @@ import re
 
 from lxml import html as lxml_html
 
-# Same heading patterns as the JATS parser
-# Optional leading section number: "4 Methods", "4. Methods", "IV. Methods", etc.
-_SECTION_NUM_PREFIX = r"(?:[\dIVXivx]+\.?\s+)?"
-_METHODS_CORE = (
-    r"materials?\s*(?:and|&)\s*methods"
-    r"|methods?\s*(?:details|summary|section)?"
-    r"|experimental\s*(?:procedures|methods|model\s*details|design)"
-    r"|study\s*methods"
-    r"|star\s*methods"
-    r"|online\s*methods"
-    r"|supplementa(?:l|ry)\s*experimental\s*procedures"
-)
-_METHODS_HEADINGS = re.compile(
-    _SECTION_NUM_PREFIX + r"(" + _METHODS_CORE + r")$",
-    re.IGNORECASE,
-)
+from pipeline.fulltext.patterns import METHODS_HEADINGS_RE as _METHODS_HEADINGS
 
 # Elements to strip before text extraction
 _STRIP_TAGS = {"script", "style", "nav", "header", "footer"}

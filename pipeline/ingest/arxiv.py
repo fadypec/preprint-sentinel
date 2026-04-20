@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import AsyncGenerator
-from datetime import date
+from datetime import UTC, date, datetime
 
 import httpx
 import structlog
@@ -29,12 +29,24 @@ _NS = {
 }
 
 
+# Biology-related terms for filtering cs.AI papers
+_BIO_TERMS = re.compile(
+    r"\b(?:protein|gene|pathogen|virus|bacteria|biological|genome|molecular|"
+    r"drug|pharmaceutical|genomic|proteomic|biomedical|biosecurity|toxin|"
+    r"microbial|viral|bacterial|epidemi|zoonotic|prion|virulence|"
+    r"transmissib|antibiotic|antimicrobial|plasmid|ribosom|nucleotide|"
+    r"peptide|enzyme|receptor|mutation|sequenc(?:e|ing)|crispr|"
+    r"synthetic biology|gain.of.function|dual.use)\b",
+    re.IGNORECASE,
+)
+
+
 class ArxivClient:
-    """Async client for arXiv preprint search (q-bio categories)."""
+    """Async client for arXiv preprint search (q-bio + cs.AI with bio terms)."""
 
     BASE_URL = "https://export.arxiv.org/api/query"
     PAGE_SIZE = 100
-    CATEGORIES = ["q-bio"]
+    CATEGORIES = ["q-bio", "cs.AI"]
 
     def __init__(
         self,
@@ -57,9 +69,14 @@ class ArxivClient:
     # -- Public API ----------------------------------------------------------
 
     async def fetch_papers(self, from_date: date, to_date: date) -> AsyncGenerator[dict, None]:
-        """Yield normalised paper dicts from arXiv q-bio categories."""
+        """Yield normalised paper dicts from arXiv q-bio + filtered cs.AI categories."""
         for category in self.CATEGORIES:
             async for paper in self._fetch_category(category, from_date, to_date):
+                # For cs.AI, only include papers with biology-related terms
+                if category == "cs.AI":
+                    text = (paper.get("title", "") + " " + paper.get("abstract", "")).lower()
+                    if not _BIO_TERMS.search(text):
+                        continue
                 yield paper
 
     # -- Internal ------------------------------------------------------------
@@ -185,7 +202,10 @@ class ArxivClient:
     def _normalise(self, entry: dict) -> dict:
         """Map a parsed Atom entry to the common metadata schema."""
         published_str = entry.get("published", "")
-        posted_date = date.fromisoformat(published_str[:10]) if published_str else date.today()
+        if published_str:
+            posted_date = date.fromisoformat(published_str[:10])
+        else:
+            posted_date = datetime.now(UTC).date()
 
         arxiv_id = entry.get("arxiv_id", "")
         version = 1

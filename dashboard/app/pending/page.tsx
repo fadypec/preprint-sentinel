@@ -27,7 +27,7 @@ export default async function PendingPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-900">
       <div className="mx-4 max-w-md rounded-lg border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-700 dark:bg-slate-800">
-        <div className="mb-4 text-4xl">&#128274;</div>
+        <div className="mb-4 text-4xl" role="img" aria-hidden="true">&#128274;</div>
         <h1 className="mb-2 text-xl font-bold text-slate-900 dark:text-slate-100">
           Account Pending Approval
         </h1>

@@ -26,12 +26,16 @@ type Props = {
     author?: string;
     institution?: string;
     has_errors?: string;
+    date_from?: string;
+    date_to?: string;
+    category?: string;
+    country?: string;
   }>;
 };
 
 function buildPaginationHref(
   targetPage: number,
-  filters: { tier?: string; source?: string; status?: string; q?: string; sort?: string; dim?: string; dimMin?: string; author?: string; institution?: string; hasErrors?: string },
+  filters: { tier?: string; source?: string; status?: string; q?: string; sort?: string; dim?: string; dimMin?: string; author?: string; institution?: string; hasErrors?: string; dateFrom?: string; dateTo?: string; category?: string; country?: string },
 ): string {
   const p = new URLSearchParams();
   p.set("page", String(targetPage));
@@ -45,6 +49,10 @@ function buildPaginationHref(
   if (filters.author) p.set("author", filters.author);
   if (filters.institution) p.set("institution", filters.institution);
   if (filters.hasErrors === "true") p.set("has_errors", "true");
+  if (filters.dateFrom) p.set("date_from", filters.dateFrom);
+  if (filters.dateTo) p.set("date_to", filters.dateTo);
+  if (filters.category && filters.category !== "all") p.set("category", filters.category);
+  if (filters.country) p.set("country", filters.country);
   return `/?${p.toString()}`;
 }
 
@@ -62,6 +70,10 @@ export default async function DailyFeedPage({ searchParams }: Props) {
   const author = params.author?.trim();
   const institution = params.institution?.trim();
   const hasErrors = params.has_errors;
+  const dateFrom = params.date_from?.trim();
+  const dateTo = params.date_to?.trim();
+  const category = params.category?.trim();
+  const country = params.country?.trim();
 
   const { papers, total, totalIngested, totalPages } = await queryPapers({
     page,
@@ -76,9 +88,13 @@ export default async function DailyFeedPage({ searchParams }: Props) {
     dimMin,
     author,
     institution,
+    dateFrom,
+    dateTo,
+    category,
+    country,
   });
 
-  const filterState = { tier, source, status, q: search, needsReview, hasErrors, sort, dim, dimMin, author, institution };
+  const filterState = { tier, source, status, q: search, needsReview, hasErrors, sort, dim, dimMin, author, institution, dateFrom, dateTo, category, country };
   const flaggedPct = totalIngested > 0 ? ((total / totalIngested) * 100).toFixed(1) : "0";
 
   return (
@@ -112,6 +128,10 @@ export default async function DailyFeedPage({ searchParams }: Props) {
           author={author ?? ""}
           institution={institution ?? ""}
           hasErrors={hasErrors ?? ""}
+          dateFrom={dateFrom ?? ""}
+          dateTo={dateTo ?? ""}
+          category={category ?? "all"}
+          country={country ?? ""}
         />
       </div>
 

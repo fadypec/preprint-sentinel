@@ -8,7 +8,10 @@ Falls back gracefully if all sources fail — the paper still advances.
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import re
+import socket
+from urllib.parse import urlparse
 
 import httpx
 import pymupdf
@@ -18,36 +21,76 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from pipeline.fulltext.html_parser import extract_methods as html_extract
 from pipeline.fulltext.jats_parser import extract_methods as jats_extract
+from pipeline.fulltext.patterns import METHODS_HEADING_MULTILINE_RE as _METHODS_HEADING_RE
 from pipeline.fulltext.unpaywall import UnpaywallClient
 from pipeline.models import Paper, PipelineStage, SourceServer
 
 log = structlog.get_logger()
 
-_PMC_ID_PATTERN = re.compile(r"(?:PMC)?(\d+)")
+_PMC_ID_PATTERN = re.compile(r"(?:/|^)(?:PMC)?(\d{5,10})(?:/|$)")
+
+# Hostnames/domains that should never be fetched via SSRF
+_BLOCKED_HOSTS = {"localhost", "127.0.0.1", "169.254.169.254", "metadata.google.internal", "[::1]"}
+
+
+def _is_safe_url(url: str) -> bool:
+    """Validate that a URL is safe to fetch (not an internal/cloud metadata endpoint)."""
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return False
+
+    if parsed.scheme not in ("http", "https"):
+        return False
+
+    hostname = parsed.hostname or ""
+    if hostname in _BLOCKED_HOSTS:
+        return False
+
+    # Block private/reserved IP ranges
+    try:
+        addr = ipaddress.ip_address(hostname)
+        if addr.is_private or addr.is_reserved or addr.is_loopback or addr.is_link_local:
+            return False
+    except ValueError:
+        # Not an IP literal — try DNS resolution to catch internal names
+        try:
+            resolved = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
+            for _, _, _, _, sockaddr in resolved:
+                addr = ipaddress.ip_address(sockaddr[0])
+                if addr.is_private or addr.is_reserved or addr.is_loopback or addr.is_link_local:
+                    return False
+        except (socket.gaierror, OSError):
+            pass  # DNS failure — allow (external host may be temporarily unreachable)
+
+    return True
 
 
 async def fetch_full_text_content(
     paper: Paper,
     settings,
+    http: httpx.AsyncClient | None = None,
 ) -> tuple[str, str] | None:
     """Run the full-text retrieval cascade for a single paper.
 
     Returns (full_text, methods_section) or None if no full text found.
     Pure HTTP — does not touch the database.
-    """
-    result = None
 
+    If *http* is provided, uses the shared client instead of creating a new one.
+    """
     is_preprint = paper.source_server in (SourceServer.BIORXIV, SourceServer.MEDRXIV)
     if paper.source_server == SourceServer.MEDRXIV:
         base_url = "https://www.medrxiv.org"
     else:
         base_url = "https://www.biorxiv.org"
 
-    async with httpx.AsyncClient() as http:
+    async def _run_cascade(_http: httpx.AsyncClient) -> tuple[str, str] | None:
+        result = None
+
         # Source 1: bioRxiv/medRxiv TDM XML
         if paper.doi and is_preprint:
             result = await _try_preprint_xml(
-                http,
+                _http,
                 base_url,
                 paper.doi,
                 settings.fulltext_request_delay,
@@ -56,7 +99,7 @@ async def fetch_full_text_content(
         # Source 1b: bioRxiv/medRxiv HTML fallback
         if result is None and paper.doi and is_preprint:
             result = await _try_preprint_html(
-                http,
+                _http,
                 base_url,
                 paper.doi,
                 settings.fulltext_request_delay,
@@ -64,30 +107,36 @@ async def fetch_full_text_content(
 
         # Source 2: Europe PMC full text
         if result is None and paper.doi:
-            result = await _try_europepmc(http, paper.doi, settings.fulltext_request_delay)
+            result = await _try_europepmc(_http, paper.doi, settings.fulltext_request_delay)
 
         # Source 3: PubMed Central OA
         if result is None and paper.full_text_url:
             pmc_id = _extract_pmc_id(paper.full_text_url)
             if pmc_id:
                 result = await _try_pmc(
-                    http, pmc_id, settings.fulltext_request_delay, settings.ncbi_api_key
+                    _http, pmc_id, settings.fulltext_request_delay, settings.ncbi_api_key
                 )
 
         # Source 4: Unpaywall (XML/HTML, then PDF fallback)
         if result is None and paper.doi and settings.unpaywall_email:
-            result = await _try_unpaywall(http, paper.doi, settings)
+            result = await _try_unpaywall(_http, paper.doi, settings)
 
         # Source 5: bioRxiv/medRxiv PDF as last resort
         if result is None and paper.doi and is_preprint:
             result = await _try_preprint_pdf(
-                http,
+                _http,
                 base_url,
                 paper.doi,
                 settings.fulltext_request_delay,
             )
 
-    return result
+        return result
+
+    if http is not None:
+        return await _run_cascade(http)
+
+    async with httpx.AsyncClient() as _http:
+        return await _run_cascade(_http)
 
 
 async def retrieve_full_text(
@@ -290,6 +339,11 @@ async def _try_unpaywall(http: httpx.AsyncClient, doi: str, settings) -> tuple[s
         if result is None:
             return None
 
+        # SSRF protection: validate the URL returned by Unpaywall
+        if not _is_safe_url(result.url):
+            log.warning("unpaywall_ssrf_blocked", doi=doi, url=result.url)
+            return None
+
         timeout = 60.0 if result.content_type == "pdf" else 30.0
         resp = await http.get(result.url, timeout=timeout, follow_redirects=True)
         if resp.status_code != 200:
@@ -324,19 +378,6 @@ def _extract_from_pdf(pdf_bytes: bytes, doi: str) -> tuple[str, str] | None:
         log.warning("pdf_extract_error", doi=doi, error=str(exc), exc_type=type(exc).__name__)
         return None
 
-
-_METHODS_HEADING_RE = re.compile(
-    r"^(?:[\dIVXivx]+\.?\s+)?"
-    r"(materials?\s*(?:and|&)\s*methods"
-    r"|methods?\s*(?:details|summary|section)?"
-    r"|experimental\s*(?:procedures|methods|model\s*details|design)"
-    r"|study\s*methods"
-    r"|star\s*methods"
-    r"|online\s*methods"
-    r"|supplementa(?:l|ry)\s*experimental\s*procedures"
-    r")\s*$",
-    re.IGNORECASE | re.MULTILINE,
-)
 
 _SECTION_HEADING_RE = re.compile(
     r"^(results|discussion|acknowledgements?|references|conclusions?|data\s*(?:and\s*code\s*)?availability|supplementary|funding|author\s*contributions?|declaration\s*of\s*interests?|resource\s*availability|supporting\s*information)\s*$",

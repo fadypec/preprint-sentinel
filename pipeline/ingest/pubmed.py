@@ -9,7 +9,7 @@ Usage:
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from datetime import date
+from datetime import UTC, date, datetime
 
 import httpx
 import structlog
@@ -271,4 +271,4 @@ class PubmedClient:
                 day = int(pub_date.findtext("Day", "1"))
                 return date(year, month, day)
         log.warning("pubmed_date_fallback", msg="No PubMedPubDate with PubStatus=pubmed found")
-        return date.today()
+        return datetime.now(UTC).date()

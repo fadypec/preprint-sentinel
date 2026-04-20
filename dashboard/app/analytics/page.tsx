@@ -4,7 +4,8 @@ import { AnalyticsCharts } from "@/components/analytics-charts";
 import { PaperCoverageHeatmap } from "@/components/paper-coverage-heatmap";
 import { Card } from "@/components/ui/card";
 
-export const dynamic = "force-dynamic";
+// Revalidate every 5 minutes (ISR) instead of force-dynamic
+export const revalidate = 300;
 
 async function getStats() {
   const sixtyDaysAgo = new Date();
@@ -97,6 +98,68 @@ async function getStats() {
     LIMIT 10
   `;
 
+  // --- Risk tier distribution over time (last 30 days, bucketed by week) ---
+  const tierOverTime = await prisma.$queryRaw<
+    { week: string; critical: number; high: number; medium: number; low: number }[]
+  >`
+    SELECT
+      DATE_TRUNC('week', posted_date)::date::text as week,
+      COUNT(*) FILTER (WHERE risk_tier = 'critical')::int as critical,
+      COUNT(*) FILTER (WHERE risk_tier = 'high')::int as high,
+      COUNT(*) FILTER (WHERE risk_tier = 'medium')::int as medium,
+      COUNT(*) FILTER (WHERE risk_tier = 'low')::int as low
+    FROM papers
+    WHERE is_duplicate_of IS NULL
+      AND coarse_filter_passed = true
+      AND posted_date >= ${thirtyDaysAgo}
+      AND risk_tier IS NOT NULL
+    GROUP BY DATE_TRUNC('week', posted_date)
+    ORDER BY week ASC
+  `;
+
+  // --- Average dimension scores over last 4 weeks ---
+  const dimensionTrendsRaw = await prisma.$queryRaw<
+    { week: string; dimension: string; avg_score: number }[]
+  >`
+    SELECT
+      DATE_TRUNC('week', posted_date)::date::text as week,
+      dim.key as dimension,
+      ROUND(AVG((dim.value->>'score')::numeric), 2)::float as avg_score
+    FROM papers,
+      LATERAL jsonb_each(stage2_result->'dimensions') AS dim(key, value)
+    WHERE is_duplicate_of IS NULL
+      AND coarse_filter_passed = true
+      AND posted_date >= ${thirtyDaysAgo} - INTERVAL '7 days'
+      AND stage2_result IS NOT NULL
+      AND stage2_result->'dimensions' IS NOT NULL
+      AND dim.key IN ('pathogen_enhancement','synthesis_barrier_lowering','select_agent_relevance','novel_technique','information_hazard','defensive_framing')
+    GROUP BY week, dim.key
+    ORDER BY week ASC, dim.key
+  `;
+
+  // Pivot dimension trends into per-week objects: { week, pathogen_enhancement, ... }
+  const dimTrendMap = new Map<string, Record<string, string | number>>();
+  for (const row of dimensionTrendsRaw) {
+    if (!dimTrendMap.has(row.week)) dimTrendMap.set(row.week, { week: row.week });
+    const entry = dimTrendMap.get(row.week)!;
+    entry[row.dimension] = row.avg_score;
+  }
+  const dimensionTrends = Array.from(dimTrendMap.values()) as { week: string; [key: string]: string | number }[];
+
+  // --- Papers processed per day (last 30 days) ---
+  const volumePerDay = await prisma.$queryRaw<
+    { day: string; count: number }[]
+  >`
+    SELECT
+      posted_date::date::text as day,
+      COUNT(*)::int as count
+    FROM papers
+    WHERE is_duplicate_of IS NULL
+      AND posted_date >= ${thirtyDaysAgo}
+    GROUP BY posted_date::date
+    ORDER BY day ASC
+  `;
+
   // --- High-score papers (last 30 days) ---
   const highScorePapers = await prisma.$queryRaw<
     { id: string; title: string; risk_tier: string; aggregate_score: number | null; top_dimension: string; posted_date: string }[]
@@ -134,6 +197,9 @@ async function getStats() {
     institutionData,
     emergingCategories,
     highScorePapers,
+    tierOverTime,
+    dimensionTrends,
+    volumePerDay,
   };
 }
 
@@ -183,6 +249,9 @@ export default async function AnalyticsPage() {
         institutionData={stats.institutionData}
         emergingCategories={stats.emergingCategories}
         highScorePapers={stats.highScorePapers}
+        tierOverTime={stats.tierOverTime}
+        dimensionTrends={stats.dimensionTrends}
+        volumePerDay={stats.volumePerDay}
       />
     </div>
   );

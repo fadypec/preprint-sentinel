@@ -110,7 +110,7 @@ export function PipelineProgress({ initialRunning }: Props) {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+          <Loader2 className="h-4 w-4 motion-safe:animate-spin text-blue-500" />
           <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
             Pipeline running
           </span>
@@ -130,7 +130,7 @@ export function PipelineProgress({ initialRunning }: Props) {
               {isComplete ? (
                 <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
               ) : isCurrent ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />
+                <Loader2 className="h-3.5 w-3.5 motion-safe:animate-spin text-blue-500" />
               ) : (
                 <Circle className="h-3.5 w-3.5 text-slate-300 dark:text-slate-600" />
               )}

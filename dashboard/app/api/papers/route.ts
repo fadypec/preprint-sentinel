@@ -19,6 +19,10 @@ export async function GET(request: NextRequest) {
     const author = params.get("author")?.trim();
     const institution = params.get("institution")?.trim();
     const hasErrors = params.get("has_errors");
+    const dateFrom = params.get("date_from");
+    const dateTo = params.get("date_to");
+    const category = params.get("category");
+    const country = params.get("country")?.trim();
 
     // Validate enum filter values -- return 400 for invalid input
     const errors = invalidFilters({ tier, source, status, sort, dim, dimMin });
@@ -26,7 +30,7 @@ export async function GET(request: NextRequest) {
       return Response.json({ error: errors.join("; ") }, { status: 400 });
     }
 
-    const result = await queryPapers({ page, tier, source, status, search, needsReview, hasErrors, sort, dim, dimMin, author, institution });
+    const result = await queryPapers({ page, tier, source, status, search, needsReview, hasErrors, sort, dim, dimMin, author, institution, dateFrom, dateTo, category, country });
 
     return Response.json(result);
   } catch (err) {

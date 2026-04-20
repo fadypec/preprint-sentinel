@@ -16,6 +16,9 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     if (notes !== null && typeof notes !== "string") {
       return Response.json({ error: "notes must be a string or null" }, { status: 400 });
     }
+    if (typeof notes === "string" && notes.length > 50000) {
+      return Response.json({ error: "notes must not exceed 50000 characters" }, { status: 400 });
+    }
     const paper = await prisma.paper.update({
       where: { id },
       data: { analystNotes: notes },

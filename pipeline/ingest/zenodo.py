@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import AsyncGenerator
-from datetime import date
+from datetime import UTC, date, datetime
 
 import httpx
 import structlog
@@ -118,7 +118,7 @@ class ZenodoClient:
         abstract = _TAG_RE.sub("", description_raw).strip()
 
         pub_date_str = metadata.get("publication_date", "")
-        posted_date = date.fromisoformat(pub_date_str) if pub_date_str else date.today()
+        posted_date = date.fromisoformat(pub_date_str) if pub_date_str else datetime.now(UTC).date()
 
         subjects = metadata.get("subjects", [])
         subject_category = subjects[0].get("term") if subjects else None

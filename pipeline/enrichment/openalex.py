@@ -27,18 +27,21 @@ class OpenAlexClient:
         email: str,
         request_delay: float = 0.1,
         max_retries: int = 3,
+        http: httpx.AsyncClient | None = None,
     ) -> None:
         self.email = email
         self.request_delay = request_delay
         self.max_retries = max_retries
-        self._client: httpx.AsyncClient | None = None
+        self._external_client = http
+        self._client: httpx.AsyncClient | None = http
 
     async def __aenter__(self) -> OpenAlexClient:
-        self._client = httpx.AsyncClient()
+        if self._external_client is None:
+            self._client = httpx.AsyncClient()
         return self
 
     async def __aexit__(self, *exc: object) -> None:
-        if self._client:
+        if self._external_client is None and self._client:
             await self._client.aclose()
         self._client = None
 
@@ -71,23 +74,31 @@ class OpenAlexClient:
         primary_institution = None
         primary_institution_country = None
 
+        # Batch-fetch author details: collect all author IDs, then request in
+        # batches of up to 50 via the /authors?filter=openalex:ID1|ID2|... endpoint.
+        author_ids: list[str] = []
         for authorship in authorships:
+            author_data = authorship.get("author", {})
+            aid = self._extract_id(author_data.get("id", ""))
+            author_ids.append(aid)
+
+        author_details_map = await self._fetch_authors_batch(author_ids)
+
+        for authorship, author_id in zip(authorships, author_ids):
             author_data = authorship.get("author", {})
             institutions = authorship.get("institutions", [])
             first_inst = institutions[0] if institutions else {}
 
-            author_id = self._extract_id(author_data.get("id", ""))
             orcid_raw = author_data.get("orcid")
             orcid = self._extract_orcid(orcid_raw) if orcid_raw else None
 
-            # Fetch detailed author stats
+            # Look up pre-fetched author stats
             works_count = None
             author_cited = None
-            if author_id:
-                author_detail = await self._fetch_author(author_id)
-                if author_detail is not None:
-                    works_count = author_detail.get("works_count")
-                    author_cited = author_detail.get("cited_by_count")
+            if author_id and author_id in author_details_map:
+                author_detail = author_details_map[author_id]
+                works_count = author_detail.get("works_count")
+                author_cited = author_detail.get("cited_by_count")
 
             author_entry = {
                 "name": author_data.get("display_name", ""),
@@ -141,6 +152,63 @@ class OpenAlexClient:
         data = resp.json()
         results = data.get("results", [])
         return results[0] if results else None
+
+    async def _fetch_authors_batch(self, author_ids: list[str]) -> dict[str, dict]:
+        """Batch-fetch author details from OpenAlex.
+
+        Requests up to 50 authors per API call using the filter pipe syntax.
+        Returns a dict mapping author_id -> author record.
+        """
+        # Deduplicate and filter empty IDs
+        unique_ids = [aid for aid in dict.fromkeys(author_ids) if aid]
+        if not unique_ids:
+            return {}
+
+        result_map: dict[str, dict] = {}
+        batch_size = 50
+
+        for start in range(0, len(unique_ids), batch_size):
+            batch = unique_ids[start : start + batch_size]
+            filter_value = "|".join(batch)
+            url = f"{BASE_URL}/authors"
+            params = {
+                "filter": f"openalex:{filter_value}",
+                "per_page": str(len(batch)),
+                "mailto": self.email,
+            }
+            try:
+                assert self._client is not None
+                resp = await request_with_retry(
+                    self._client,
+                    url,
+                    params=params,
+                    timeout=30.0,
+                    request_delay=self.request_delay,
+                    max_retries=self.max_retries,
+                    none_on_404=True,
+                    source="openalex",
+                )
+                if resp is None:
+                    continue
+                data = resp.json()
+                for author in data.get("results", []):
+                    aid = self._extract_id(author.get("id", ""))
+                    if aid:
+                        result_map[aid] = author
+            except Exception as exc:
+                log.debug(
+                    "openalex_batch_author_error",
+                    batch_size=len(batch),
+                    error=str(exc),
+                )
+                # Fall back to individual lookups for this batch
+                for aid in batch:
+                    if aid not in result_map:
+                        detail = await self._fetch_author(aid)
+                        if detail is not None:
+                            result_map[aid] = detail
+
+        return result_map
 
     async def _fetch_author(self, author_id: str) -> dict | None:
         """Fetch author detail from OpenAlex. Returns None on any error."""

@@ -21,7 +21,7 @@ const styles: Record<RiskTier, RiskStyle> = {
     label: "HIGH",
   },
   [RiskTier.medium]: {
-    badge: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-200",
+    badge: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-100",
     border: "border-l-yellow-500",
     dot: "bg-yellow-500",
     label: "MEDIUM",

@@ -33,6 +33,7 @@ class PipelineScheduler:
         self._scheduler: AsyncIOScheduler | None = None
         self._paused = False
         self._running = False
+        self._stop_event = asyncio.Event()
         self._last_run_stats: PipelineRunStats | None = None
         self._last_run_time: datetime | None = None
 
@@ -53,16 +54,16 @@ class PipelineScheduler:
             minute=self._minute,
         )
 
-        # Block forever (until stop is called or process exits)
+        # Block until stop is called or process exits
         try:
-            while self._running:
-                await asyncio.sleep(1)
+            await self._stop_event.wait()
         except (KeyboardInterrupt, SystemExit):
             await self.stop()
 
     async def stop(self) -> None:
         """Gracefully shut down the scheduler."""
         self._running = False
+        self._stop_event.set()
         if self._scheduler:
             self._scheduler.shutdown(wait=False)
             self._scheduler = None

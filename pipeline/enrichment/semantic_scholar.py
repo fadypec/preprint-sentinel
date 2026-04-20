@@ -27,21 +27,24 @@ class SemanticScholarClient:
         api_key: str = "",
         request_delay: float = 1.0,
         max_retries: int = 3,
+        http: httpx.AsyncClient | None = None,
     ) -> None:
         self.api_key = api_key
         self.request_delay = request_delay
         self.max_retries = max_retries
-        self._client: httpx.AsyncClient | None = None
+        self._external_client = http
+        self._client: httpx.AsyncClient | None = http
 
     async def __aenter__(self) -> SemanticScholarClient:
-        headers = {}
-        if self.api_key:
-            headers["x-api-key"] = self.api_key
-        self._client = httpx.AsyncClient(headers=headers)
+        if self._external_client is None:
+            headers = {}
+            if self.api_key:
+                headers["x-api-key"] = self.api_key
+            self._client = httpx.AsyncClient(headers=headers)
         return self
 
     async def __aexit__(self, *exc: object) -> None:
-        if self._client:
+        if self._external_client is None and self._client:
             await self._client.aclose()
         self._client = None
 

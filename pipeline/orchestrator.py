@@ -162,14 +162,18 @@ async def run_daily_pipeline(
             return []
         return [Paper.posted_date >= from_date, Paper.posted_date <= to_date]
 
+    # Track IDs across sessions to avoid detached-object issues.
+    # Each stage re-queries papers within its own session.
+    ingested_paper_ids: list = []
+
     async with session_factory() as session:
         # Stage 1: Ingest
         current_stage = "ingest"
         await _flush_progress()
         log.info("stage_starting", stage="ingest", description="Fetching papers from data sources")
-        ingested_papers: list[Paper] = []
         try:
             ingested_papers = await _run_ingest(session, settings, from_date, to_date)
+            ingested_paper_ids = [p.id for p in ingested_papers]
             stats.papers_ingested = len(ingested_papers)
             await session.commit()
             await _flush_progress()
@@ -180,12 +184,17 @@ async def run_daily_pipeline(
             await session.rollback()
 
     async with session_factory() as session:
-        # Stage 2: Dedup
+        # Stage 2: Dedup — re-load ingested papers in this session
         current_stage = "dedup"
         await _flush_progress()
-        log.info("stage_starting", stage="dedup", papers_to_process=len(ingested_papers))
-        non_dup_papers: list[Paper] = []
+        log.info("stage_starting", stage="dedup", papers_to_process=len(ingested_paper_ids))
         try:
+            if ingested_paper_ids:
+                stmt = select(Paper).where(Paper.id.in_(ingested_paper_ids))
+                result = await session.execute(stmt)
+                ingested_papers = list(result.scalars().all())
+            else:
+                ingested_papers = []
             non_dup_papers, dup_count = await _run_dedup(session, ingested_papers, settings)
             stats.papers_after_dedup = len(non_dup_papers)
             await session.commit()
@@ -199,7 +208,6 @@ async def run_daily_pipeline(
         except Exception as exc:
             stats.errors.append(f"Dedup: {_exc_str(exc)}")
             log.error("pipeline_dedup_error", error=str(exc), exc_info=True)
-            non_dup_papers = ingested_papers
             await session.rollback()
 
     async with session_factory() as session:
@@ -883,12 +891,11 @@ async def _run_fulltext_translation(
 
     total = len(papers)
     sem = asyncio.Semaphore(concurrency)
-    translated = 0
 
-    async def _translate(paper: Paper) -> None:
-        nonlocal translated
+    async def _translate(paper: Paper) -> bool:
+        """Returns True if translation succeeded."""
         if not paper.methods_section:
-            return
+            return False
 
         prompt = (
             f"Translate the following scientific methods section from {paper.language} to English. "
@@ -912,19 +919,21 @@ async def _run_fulltext_translation(
 
         if result.error:
             log.warning("fulltext_translation_error", paper_id=str(paper.id), error=result.error)
-            return
+            return False
 
         raw = result.raw_response.strip()
         if raw:
             paper.original_methods_section = paper.methods_section
             paper.methods_section = raw
-            translated += 1
             log.info("fulltext_translated", paper_id=str(paper.id), language=paper.language)
+            return True
+        return False
 
-    await asyncio.wait_for(
+    results = await asyncio.wait_for(
         asyncio.gather(*[_translate(p) for p in papers]),
         timeout=600,
     )
+    translated = sum(1 for r in results if r)
     await session.flush()
     log.info("fulltext_translation_complete", total=total, translated=translated)
 
@@ -942,10 +951,9 @@ async def _run_translation(
 
     total = len(papers)
     sem = asyncio.Semaphore(concurrency)
-    translated = 0
 
-    async def _translate(paper: Paper) -> None:
-        nonlocal translated
+    async def _translate(paper: Paper) -> bool:
+        """Returns True if translation succeeded."""
         parts_to_translate = []
         if paper.title:
             parts_to_translate.append(f"Title: {paper.title}")
@@ -953,7 +961,7 @@ async def _run_translation(
             parts_to_translate.append(f"Abstract: {paper.abstract}")
 
         if not parts_to_translate:
-            return
+            return False
 
         text = "\n\n".join(parts_to_translate)
         prompt = (
@@ -974,7 +982,7 @@ async def _run_translation(
 
         if result.error:
             log.warning("translation_error", paper_id=str(paper.id), error=result.error)
-            return
+            return False
 
         try:
             raw = result.raw_response.strip()
@@ -991,13 +999,15 @@ async def _run_translation(
                 paper.title = parsed["title"]
             if parsed.get("abstract"):
                 paper.abstract = parsed["abstract"]
-            translated += 1
+            return True
         except (json.JSONDecodeError, KeyError) as exc:
             log.warning("translation_parse_error", paper_id=str(paper.id), error=str(exc))
+            return False
 
-    await asyncio.wait_for(
+    results = await asyncio.wait_for(
         asyncio.gather(*[_translate(p) for p in papers]),
         timeout=600,
     )
+    translated = sum(1 for r in results if r)
     await session.flush()
     log.info("translation_complete", total=total, translated=translated)

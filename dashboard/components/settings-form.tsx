@@ -111,9 +111,9 @@ export function SettingsForm({ initialSettings }: Props) {
     <div className="space-y-6">
       {/* Model Selection */}
       <Card className="p-4">
-        <h2 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
+        <h3 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
           Model Selection
-        </h2>
+        </h3>
         <div className="grid gap-4 sm:grid-cols-3">
           {(["stage1_model", "stage2_model", "stage3_model"] as const).map(
             (key) => (
@@ -137,9 +137,9 @@ export function SettingsForm({ initialSettings }: Props) {
 
       {/* Pipeline Tuning */}
       <Card className="p-4">
-        <h2 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
+        <h3 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
           Pipeline Tuning
-        </h2>
+        </h3>
         <div className="space-y-4">
           <div>
             <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">
@@ -155,6 +155,7 @@ export function SettingsForm({ initialSettings }: Props) {
               min={0}
               max={1}
               step={0.05}
+              aria-label="Coarse filter threshold"
             />
           </div>
           <div>
@@ -167,7 +168,7 @@ export function SettingsForm({ initialSettings }: Props) {
                 if (v != null) update("adjudication_min_tier", v);
               }}
             >
-              <SelectTrigger className="w-40">
+              <SelectTrigger className="w-40" aria-label="Adjudication minimum tier">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -201,7 +202,7 @@ export function SettingsForm({ initialSettings }: Props) {
                 if (v != null) update("pubmed_query_mode", v);
               }}
             >
-              <SelectTrigger className="w-40">
+              <SelectTrigger className="w-40" aria-label="PubMed query mode">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -215,9 +216,9 @@ export function SettingsForm({ initialSettings }: Props) {
 
       {/* Rate Limits */}
       <Card className="p-4">
-        <h2 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
+        <h3 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
           Rate Limits (seconds)
-        </h2>
+        </h3>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {(
             [
@@ -249,9 +250,9 @@ export function SettingsForm({ initialSettings }: Props) {
 
       {/* Alerts */}
       <Card className="p-4">
-        <h2 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
+        <h3 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
           Alerts
-        </h2>
+        </h3>
         <div className="space-y-3">
           <div>
             <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">
@@ -284,7 +285,7 @@ export function SettingsForm({ initialSettings }: Props) {
                   if (v != null) update("alert_digest_frequency", v);
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger aria-label="Digest frequency">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -303,7 +304,7 @@ export function SettingsForm({ initialSettings }: Props) {
                   if (v != null) update("alert_tier_threshold", v);
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger aria-label="Alert tier threshold">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

@@ -6,26 +6,9 @@ Falls back to the full body text if no methods section is found.
 
 from __future__ import annotations
 
-import re
-
 from lxml import etree
 
-# Heading patterns that indicate a methods section (case-insensitive)
-# Optional leading section number: "4 Methods", "4. Methods", "IV. Methods", etc.
-_SECTION_NUM_PREFIX = r"(?:[\dIVXivx]+\.?\s+)?"
-_METHODS_CORE = (
-    r"materials?\s*(?:and|&)\s*methods"
-    r"|methods?\s*(?:details|summary|section)?"
-    r"|experimental\s*(?:procedures|methods|model\s*details|design)"
-    r"|study\s*methods"
-    r"|star\s*methods"
-    r"|online\s*methods"
-    r"|supplementa(?:l|ry)\s*experimental\s*procedures"
-)
-_METHODS_HEADINGS = re.compile(
-    _SECTION_NUM_PREFIX + r"(" + _METHODS_CORE + r")$",
-    re.IGNORECASE,
-)
+from pipeline.fulltext.patterns import METHODS_HEADINGS_RE as _METHODS_HEADINGS
 
 # sec-type attribute values that indicate methods
 _METHODS_SEC_TYPES = {"methods", "materials|methods", "materials"}

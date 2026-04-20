@@ -60,6 +60,7 @@ function highlightPassages(
           className="bg-red-100 px-0.5 text-red-900 dark:bg-red-900/30 dark:text-red-200"
           title={`Flagged: ${originalTerm}`}
         >
+          <span className="sr-only">Flagged for: {originalTerm}. </span>
           {sentence}
         </mark>,
       );

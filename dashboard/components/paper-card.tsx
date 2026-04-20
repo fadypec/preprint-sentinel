@@ -1,4 +1,6 @@
-import Link from "next/link";
+"use client";
+
+import { useState } from "react";
 import type { Paper } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -6,6 +8,16 @@ import { cn, parseDimensions, computeAggregateScore, languageName } from "@/lib/
 import { riskStyle } from "@/lib/risk-colors";
 import { formatDate, sourceServerLabel } from "@/lib/utils";
 import { AlertTriangle } from "lucide-react";
+import { DimensionBar } from "@/components/dimension-bar";
+
+const DIMENSION_LABELS: Record<string, string> = {
+  pathogen_enhancement: "Pathogen Enhancement",
+  synthesis_barrier_lowering: "Synthesis Barrier Lowering",
+  select_agent_relevance: "Select Agent Relevance",
+  novel_technique: "Novel Technique",
+  information_hazard: "Information Hazard",
+  defensive_framing: "Defensive Framing",
+};
 
 type PaperCardProps = {
   paper: Paper;
@@ -52,16 +64,19 @@ export function PaperCard({ paper }: PaperCardProps) {
         .join(", ") + (authorList.length > 3 ? " et al." : "")
     : paper.correspondingAuthor ?? "Unknown authors";
 
+  const [expanded, setExpanded] = useState(false);
+  const allDimensions = Object.entries(dimensions);
+
   return (
-    <Link href={`/paper/${paper.id}`} className="block">
-      <Card
-        className={cn(
-          "border-l-4 p-4 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800",
-          style.border
-        )}
-        role="article"
-        aria-label={`${paper.title}. Risk tier: ${style.label}, score ${paper.aggregateScore ?? 0} out of 18`}
-      >
+    <Card
+      className={cn(
+        "border-l-4 p-4 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800",
+        style.border
+      )}
+      role="article"
+      aria-label={`${paper.title}. Risk tier: ${style.label}, score ${paper.aggregateScore ?? 0} out of 18`}
+    >
+      <a href={`/paper/${paper.id}`} className="block no-underline">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
@@ -80,10 +95,10 @@ export function PaperCard({ paper }: PaperCardProps) {
           <div className="flex shrink-0 items-center gap-1.5">
             {hasError && (
               <span
-                title="Processing errors — assessment may be incomplete"
                 className="text-amber-500 dark:text-amber-400"
+                aria-label="Processing errors — assessment may be incomplete"
               >
-                <AlertTriangle className="h-4 w-4" />
+                <AlertTriangle className="h-4 w-4" aria-hidden="true" />
               </span>
             )}
             <Badge className={cn(style.badge)} aria-label={`Risk tier: ${style.label}`}>
@@ -122,7 +137,36 @@ export function PaperCard({ paper }: PaperCardProps) {
             )}
           </div>
         )}
-      </Card>
-    </Link>
+      </a>
+
+      {allDimensions.length > 0 && (
+        <div className="mt-2">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded(!expanded);
+            }}
+            aria-expanded={expanded}
+            aria-controls={`dimensions-${paper.id}`}
+            className="text-[11px] font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+          >
+            {expanded ? "Hide dimensions" : "Show dimensions"}
+          </button>
+          {expanded && (
+            <div id={`dimensions-${paper.id}`} className="mt-2 rounded-lg border border-slate-200 bg-slate-50/50 p-3 dark:border-slate-700 dark:bg-slate-800/50">
+              {allDimensions.map(([name, dim]) => (
+                <DimensionBar
+                  key={name}
+                  label={DIMENSION_LABELS[name] ?? name.replace(/_/g, " ")}
+                  score={dim.score}
+                  justification={dim.justification}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
   );
 }

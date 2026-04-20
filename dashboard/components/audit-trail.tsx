@@ -1,12 +1,28 @@
 "use client";
 
 import { useState } from "react";
-import type { AssessmentLog } from "@prisma/client";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { formatCost } from "@/lib/utils";
 
+// Partial type: prompt_text and raw_response are excluded from initial load
+// to reduce page weight. They can be fetched on demand if needed.
+type AuditLogEntry = {
+  id: string;
+  stage: string;
+  modelUsed: string;
+  promptVersion: string;
+  inputTokens: number;
+  outputTokens: number;
+  costEstimateUsd: number;
+  createdAt: Date;
+  parsedResult: unknown;
+  error: string | null;
+  promptText?: string;
+  rawResponse?: string;
+};
+
 type Props = {
-  logs: AssessmentLog[];
+  logs: AuditLogEntry[];
 };
 
 export function AuditTrail({ logs }: Props) {
@@ -55,7 +71,7 @@ export function AuditTrail({ logs }: Props) {
                     Prompt
                   </summary>
                   <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap text-[10px] text-slate-500 dark:text-slate-400">
-                    {log.promptText}
+                    {log.promptText ?? "(Load full audit log to view prompt)"}
                   </pre>
                 </details>
                 <details>
@@ -63,7 +79,7 @@ export function AuditTrail({ logs }: Props) {
                     Response
                   </summary>
                   <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap text-[10px] text-slate-500 dark:text-slate-400">
-                    {log.rawResponse}
+                    {log.rawResponse ?? "(Load full audit log to view response)"}
                   </pre>
                 </details>
               </div>

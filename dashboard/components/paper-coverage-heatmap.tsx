@@ -154,7 +154,7 @@ export function PaperCoverageHeatmap() {
   const orderedSources = ALL_SOURCES;
 
   if (!loaded) {
-    return <div className="h-48 animate-pulse rounded bg-slate-800/30" />;
+    return <div className="h-48 motion-safe:animate-pulse rounded bg-slate-800/30" />;
   }
 
   return (
@@ -257,20 +257,22 @@ export function PaperCoverageHeatmap() {
         </p>
         <div className="max-h-72 overflow-auto rounded border border-slate-200 dark:border-slate-700">
           <table className="w-full text-xs">
+            <caption className="sr-only">Paper ingestion counts by source for the last 30 days</caption>
             <thead className="sticky top-0 bg-white dark:bg-slate-900">
               <tr className="border-b border-slate-200 dark:border-slate-700">
-                <th className="px-2 py-1.5 text-left font-medium text-slate-500 dark:text-slate-400">
+                <th scope="col" className="px-2 py-1.5 text-left font-medium text-slate-500 dark:text-slate-400">
                   Date
                 </th>
                 {orderedSources.map((src) => (
                   <th
                     key={src}
+                    scope="col"
                     className="px-1.5 py-1.5 text-center font-medium text-slate-500 dark:text-slate-400"
                   >
                     {SOURCE_LABELS[src]}
                   </th>
                 ))}
-                <th className="px-2 py-1.5 text-right font-medium text-slate-500 dark:text-slate-400">
+                <th scope="col" className="px-2 py-1.5 text-right font-medium text-slate-500 dark:text-slate-400">
                   Total
                 </th>
               </tr>

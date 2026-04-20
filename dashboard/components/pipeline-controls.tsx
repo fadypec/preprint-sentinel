@@ -97,7 +97,7 @@ export function PipelineControls({
 
   const isRunning = status?.running ?? false;
 
-  const statusDot = isRunning ? "bg-green-500 animate-pulse" : "bg-slate-400";
+  const statusDot = isRunning ? "bg-green-500 motion-safe:animate-pulse" : "bg-slate-400";
   const statusLabel = isRunning ? "Running" : "Idle";
 
   return (
@@ -121,7 +121,7 @@ export function PipelineControls({
       {/* Date range */}
       <div>
         <p className="mb-1 flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
-          <Calendar className="h-3 w-3" />
+          <Calendar className="h-3 w-3" aria-hidden="true" />
           Date Range
         </p>
         <div className="flex items-center gap-2">
@@ -163,6 +163,8 @@ export function PipelineControls({
           }}
           disabled={toggling || pending || isRunning}
           className="cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+          aria-label={`Toggle PubMed query mode, currently ${currentPubmedMode}`}
+          aria-pressed={currentPubmedMode === "all"}
         >
           <Badge variant={currentPubmedMode === "all" ? "default" : "outline"}>
             {currentPubmedMode === "all" ? "Full" : "MeSH Filtered"}
@@ -185,6 +187,8 @@ export function PipelineControls({
           onClick={() => setIncludeBacklog((v) => !v)}
           disabled={pending || isRunning}
           className="cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+          aria-label={`Toggle backlog processing, currently ${includeBacklog ? "Include" : "Skip"}`}
+          aria-pressed={includeBacklog}
         >
           <Badge variant={includeBacklog ? "default" : "outline"}>
             {includeBacklog ? "Include" : "Skip"}
@@ -208,12 +212,12 @@ export function PipelineControls({
           >
             {cancelling ? (
               <>
-                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                <Loader2 className="mr-1 h-3 w-3 motion-safe:animate-spin" aria-hidden="true" />
                 Stopping...
               </>
             ) : (
               <>
-                <Square className="mr-1 h-3 w-3" />
+                <Square className="mr-1 h-3 w-3" aria-hidden="true" />
                 Stop Pipeline
               </>
             )}
@@ -227,12 +231,12 @@ export function PipelineControls({
             >
               {pending ? (
                 <>
-                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                  <Loader2 className="mr-1 h-3 w-3 motion-safe:animate-spin" aria-hidden="true" />
                   Starting...
                 </>
               ) : (
                 <>
-                  <Play className="mr-1 h-3 w-3" />
+                  <Play className="mr-1 h-3 w-3" aria-hidden="true" />
                   Run Pipeline
                 </>
               )}
@@ -258,12 +262,12 @@ export function PipelineControls({
             >
               {reprocessing ? (
                 <>
-                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                  <Loader2 className="mr-1 h-3 w-3 motion-safe:animate-spin" aria-hidden="true" />
                   Resetting...
                 </>
               ) : (
                 <>
-                  <RefreshCw className="mr-1 h-3 w-3" />
+                  <RefreshCw className="mr-1 h-3 w-3" aria-hidden="true" />
                   Fix Errors
                 </>
               )}
@@ -274,12 +278,12 @@ export function PipelineControls({
 
       {/* Feedback */}
       {error && (
-        <p className="rounded bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-900/30 dark:text-red-400">
+        <p role="alert" className="rounded bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-900/30 dark:text-red-400">
           {error}
         </p>
       )}
       {success && (
-        <p className="rounded bg-green-50 px-3 py-2 text-xs text-green-700 dark:bg-green-900/30 dark:text-green-400">
+        <p aria-live="polite" className="rounded bg-green-50 px-3 py-2 text-xs text-green-700 dark:bg-green-900/30 dark:text-green-400">
           {success}
         </p>
       )}

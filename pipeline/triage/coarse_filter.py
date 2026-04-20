@@ -12,8 +12,8 @@ import asyncio
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pipeline.models import AssessmentLog, Paper, PipelineStage
-from pipeline.triage.llm import LLMClient, LLMResult
+from pipeline.models import Paper, PipelineStage
+from pipeline.triage.llm import LLMClient, create_assessment_log
 from pipeline.triage.prompts import (
     CLASSIFY_PAPER_TOOL,
     COARSE_FILTER_SYSTEM_PROMPT,
@@ -46,31 +46,6 @@ def _paper_passes(result: dict, threshold: float) -> bool:
     if result.get("relevant", True):
         return True
     return result.get("confidence", 0.0) <= threshold
-
-
-def _create_assessment_log(
-    session: AsyncSession,
-    paper: Paper,
-    llm_result: LLMResult,
-    model: str,
-    user_message: str,
-) -> None:
-    """Create an AssessmentLog entry from an LLM result."""
-    session.add(
-        AssessmentLog(
-            paper_id=paper.id,
-            stage="coarse_filter",
-            model_used=model,
-            prompt_version=COARSE_FILTER_VERSION,
-            prompt_text=user_message,
-            raw_response=llm_result.raw_response,
-            parsed_result=llm_result.tool_input if not llm_result.error else None,
-            input_tokens=llm_result.input_tokens,
-            output_tokens=llm_result.output_tokens,
-            cost_estimate_usd=llm_result.cost_estimate_usd,
-            error=llm_result.error,
-        )
-    )
 
 
 async def run_coarse_filter(
@@ -127,7 +102,10 @@ async def _run_sync(
             processed += 1
             return
 
-        _create_assessment_log(session, paper, llm_result, model, user_msg)
+        create_assessment_log(
+            session, paper, llm_result, model, user_msg,
+            stage="coarse_filter", prompt_version=COARSE_FILTER_VERSION,
+        )
 
         if llm_result.error:
             log.warning("coarse_filter_error", paper_id=str(paper.id), error=llm_result.error)
@@ -206,7 +184,10 @@ async def _run_batch(
             log.warning("coarse_filter_missing_result", paper_id=custom_id)
             continue
 
-        _create_assessment_log(session, paper, llm_result, model, user_msg)
+        create_assessment_log(
+            session, paper, llm_result, model, user_msg,
+            stage="coarse_filter", prompt_version=COARSE_FILTER_VERSION,
+        )
 
         if llm_result.error:
             log.warning("coarse_filter_error", paper_id=custom_id, error=llm_result.error)

@@ -9,11 +9,15 @@
  * Response: { "CN": 48000, "US": 46000, "GB": 10500, ... }
  */
 
+import { apiRequireAuth } from "@/lib/auth-guard";
+
 // In-memory cache: { data, fetchedAt }
 let cache: { data: Record<string, number>; fetchedAt: number } | null = null;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export async function GET() {
+  const denied = await apiRequireAuth();
+  if (denied) return denied;
   const now = Date.now();
 
   // Return cached data if fresh

@@ -11,13 +11,16 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pipeline.models import (
-    AssessmentLog,
     Paper,
     PipelineStage,
-    RecommendedAction,
     RiskTier,
 )
-from pipeline.triage.llm import LLMClient, LLMResult
+from pipeline.triage.llm import (
+    ACTION_MAP,
+    RISK_TIER_MAP,
+    LLMClient,
+    create_assessment_log,
+)
 from pipeline.triage.prompts import (
     ADJUDICATE_PAPER_TOOL,
     ADJUDICATION_SYSTEM_PROMPT,
@@ -27,20 +30,9 @@ from pipeline.triage.prompts import (
 
 log = structlog.get_logger()
 
-# Maps string values from LLM output to model enums
-_RISK_TIER_MAP = {
-    "low": RiskTier.LOW,
-    "medium": RiskTier.MEDIUM,
-    "high": RiskTier.HIGH,
-    "critical": RiskTier.CRITICAL,
-}
-
-_ACTION_MAP = {
-    "archive": RecommendedAction.ARCHIVE,
-    "monitor": RecommendedAction.MONITOR,
-    "review": RecommendedAction.REVIEW,
-    "escalate": RecommendedAction.ESCALATE,
-}
+# Local aliases for backward compatibility
+_RISK_TIER_MAP = RISK_TIER_MAP
+_ACTION_MAP = ACTION_MAP
 
 # Tier ordering for threshold comparison
 _TIER_ORDER = {
@@ -63,31 +55,6 @@ def _tier_meets_threshold(tier: RiskTier | None, min_tier: str) -> bool:
     tier_val = _TIER_ORDER.get(tier.value, 0)
     min_val = _TIER_ORDER.get(min_tier, 0)
     return tier_val >= min_val
-
-
-def _create_assessment_log(
-    session: AsyncSession,
-    paper: Paper,
-    llm_result: LLMResult,
-    model: str,
-    user_message: str,
-) -> None:
-    """Create an AssessmentLog entry from an LLM result."""
-    session.add(
-        AssessmentLog(
-            paper_id=paper.id,
-            stage="adjudication",
-            model_used=model,
-            prompt_version=ADJUDICATION_VERSION,
-            prompt_text=user_message,
-            raw_response=llm_result.raw_response,
-            parsed_result=llm_result.tool_input if not llm_result.error else None,
-            input_tokens=llm_result.input_tokens,
-            output_tokens=llm_result.output_tokens,
-            cost_estimate_usd=llm_result.cost_estimate_usd,
-            error=llm_result.error,
-        )
-    )
 
 
 _REQUIRED_KEYS = {"adjusted_risk_tier", "adjusted_action", "confidence", "summary"}
@@ -137,7 +104,6 @@ async def run_adjudication(
             # Auto-advance below-threshold papers
             paper.pipeline_stage = PipelineStage.ADJUDICATED
             auto_advanced_count += 1
-            await session.flush()
             continue
 
         # Extract enrichment metadata
@@ -161,7 +127,10 @@ async def run_adjudication(
             tool=ADJUDICATE_PAPER_TOOL,
         )
 
-        _create_assessment_log(session, paper, llm_result, model, user_msg)
+        create_assessment_log(
+            session, paper, llm_result, model, user_msg,
+            stage="adjudication", prompt_version=ADJUDICATION_VERSION,
+        )
 
         if llm_result.error:
             log.warning(
@@ -194,7 +163,8 @@ async def run_adjudication(
                     confidence=llm_result.tool_input.get("confidence"),
                     progress=f"{i}/{total}",
                 )
-        await session.flush()
+
+    await session.flush()
 
     log.info(
         "adjudication_run_complete",

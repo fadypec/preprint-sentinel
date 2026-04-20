@@ -29,8 +29,21 @@ const VALID_DIMENSIONS = new Set<string>([
 ]);
 const VALID_DIM_MINS = new Set<number>([1, 2, 3]);
 
-/** Explicit paper columns for raw SQL (excludes generated search_vector). */
-const PAPER_COLUMNS = Prisma.raw(
+/** List columns for feed queries — excludes heavy TEXT columns (full_text_content, methods_section, original_*). */
+const PAPER_LIST_COLUMNS = Prisma.raw(
+  "id, doi, title, authors, corresponding_author, corresponding_institution, " +
+  "abstract, source_server, posted_date, subject_category, version, " +
+  "language, " +
+  "full_text_url, full_text_retrieved, " +
+  "enrichment_data, pipeline_stage, coarse_filter_passed, " +
+  "stage1_result, stage2_result, stage3_result, " +
+  "risk_tier, recommended_action, aggregate_score, " +
+  "review_status, needs_manual_review, analyst_notes, " +
+  "is_duplicate_of, created_at, updated_at"
+);
+
+/** All columns for detail queries (includes full text). */
+const PAPER_ALL_COLUMNS = Prisma.raw(
   "id, doi, title, authors, corresponding_author, corresponding_institution, " +
   "abstract, source_server, posted_date, subject_category, version, " +
   "language, original_title, original_abstract, original_methods_section, " +
@@ -41,6 +54,27 @@ const PAPER_COLUMNS = Prisma.raw(
   "review_status, needs_manual_review, analyst_notes, " +
   "is_duplicate_of, created_at, updated_at"
 );
+
+/** Cached check for whether the search_vector column exists. Checked once at module load. */
+let _hasSearchVector: boolean | null = null;
+async function hasSearchVectorColumn(): Promise<boolean> {
+  if (_hasSearchVector !== null) return _hasSearchVector;
+  const colCheck = await prisma.$queryRaw<{ column_name: string }[]>`
+    SELECT column_name FROM information_schema.columns
+    WHERE table_name = 'papers' AND column_name = 'search_vector'
+  `;
+  _hasSearchVector = colCheck.length > 0;
+  return _hasSearchVector;
+}
+
+/** Validate a YYYY-MM-DD date string. Returns the string if valid, undefined otherwise. */
+function validDateStr(v?: string | null): string | undefined {
+  if (!v) return undefined;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return undefined;
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return undefined;
+  return v;
+}
 
 export type PaperQueryParams = {
   page: number;
@@ -55,6 +89,10 @@ export type PaperQueryParams = {
   dimMin?: string | null;
   author?: string | null;
   institution?: string | null;
+  dateFrom?: string | null;
+  dateTo?: string | null;
+  category?: string | null;
+  country?: string | null;
 };
 
 export type PaperQueryResult = {
@@ -224,11 +262,15 @@ export async function queryPapers(
   const author = params.author?.trim() || undefined;
   const institution = params.institution?.trim() || undefined;
   const hasErrors = params.hasErrors === "true" ? true : undefined;
+  const dateFrom = validDateStr(params.dateFrom);
+  const dateTo = validDateStr(params.dateTo);
+  const category = params.category?.trim() || undefined;
+  const country = params.country?.trim().toUpperCase() || undefined;
 
   // Dimension filtering, author/institution ILIKE, full-text search,
-  // and error filtering all require raw SQL.
-  if (search || dim || author || institution || hasErrors) {
-    return queryPapersRawSQL({ page, tiers, source, status, search, needsReview, hasErrors, sort: sort!, dim, dimMin, author, institution });
+  // date range, category, country, and error filtering all require raw SQL.
+  if (search || dim || author || institution || hasErrors || dateFrom || dateTo || category || country) {
+    return queryPapersRawSQL({ page, tiers, source, status, search, needsReview, hasErrors, sort: sort!, dim, dimMin, author, institution, dateFrom, dateTo, category, country });
   }
 
   return queryPapersPrisma({ page, tiers, source, status, needsReview, sort: sort! });
@@ -293,7 +335,15 @@ async function queryPapersPrisma(filters: {
       orderBy,
       take: PAGE_SIZE,
       skip: (filters.page - 1) * PAGE_SIZE,
-    }),
+      // Exclude heavy TEXT columns from list queries (multi-MB per row)
+      omit: {
+        fullTextContent: true,
+        methodsSection: true,
+        originalTitle: true,
+        originalAbstract: true,
+        originalMethodsSection: true,
+      },
+    }) as Promise<Paper[]>,
   ]);
 
   return {
@@ -306,7 +356,7 @@ async function queryPapersPrisma(filters: {
   };
 }
 
-/** Raw SQL path — used for full-text search, dimension filtering, author/institution ILIKE, and error filtering. */
+/** Raw SQL path — used for full-text search, dimension filtering, author/institution ILIKE, date range, category, country, and error filtering. */
 async function queryPapersRawSQL(filters: {
   page: number;
   tiers?: RiskTier[];
@@ -320,6 +370,10 @@ async function queryPapersRawSQL(filters: {
   dimMin?: number;
   author?: string;
   institution?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  category?: string;
+  country?: string;
 }): Promise<PaperQueryResult> {
   // Full-text search clause (optional)
   let searchClause = Prisma.empty;
@@ -336,14 +390,8 @@ async function queryPapersRawSQL(filters: {
       };
     }
 
-    // Check if search_vector column exists via information_schema (always succeeds,
-    // unlike SELECT search_vector which aborts the transaction on missing column)
-    const colCheck = await prisma.$queryRaw<{ column_name: string }[]>`
-      SELECT column_name FROM information_schema.columns
-      WHERE table_name = 'papers' AND column_name = 'search_vector'
-    `;
-
-    if (colCheck.length > 0) {
+    // Cached check — avoids information_schema query on every search
+    if (await hasSearchVectorColumn()) {
       searchClause = Prisma.sql`AND search_vector @@ to_tsquery('english', ${tsquery})`;
     } else {
       // search_vector column doesn't exist, fall back to ILIKE search
@@ -375,7 +423,7 @@ async function queryPapersRawSQL(filters: {
       ? Prisma.sql`AND needs_manual_review = true`
       : Prisma.empty;
 
-  // Dimension score clause (JSONB path query — dim is validated against a whitelist)
+  // SECURITY: filters.dim is validated against VALID_DIMENSIONS whitelist — do not remove that check
   const dimClause =
     filters.dim && filters.dimMin != null
       ? Prisma.sql`AND (stage2_result->'dimensions'->${filters.dim}->>'score')::int >= ${filters.dimMin}`
@@ -397,6 +445,28 @@ async function queryPapersRawSQL(filters: {
   const errorsClause =
     filters.hasErrors
       ? Prisma.sql`AND (needs_manual_review = true OR stage2_result::text LIKE '%_error%' OR stage3_result::text LIKE '%_error%')`
+      : Prisma.empty;
+
+  // Date range clauses
+  const dateFromClause =
+    filters.dateFrom
+      ? Prisma.sql`AND posted_date >= ${filters.dateFrom}::date`
+      : Prisma.empty;
+  const dateToClause =
+    filters.dateTo
+      ? Prisma.sql`AND posted_date <= ${filters.dateTo}::date`
+      : Prisma.empty;
+
+  // Subject category clause
+  const categoryClause =
+    filters.category && filters.category !== "all"
+      ? Prisma.sql`AND subject_category ILIKE ${filters.category}`
+      : Prisma.empty;
+
+  // Country clause (from OpenAlex enrichment data)
+  const countryClause =
+    filters.country
+      ? Prisma.sql`AND enrichment_data->'openalex'->'institution'->>'country_code' = ${filters.country}`
       : Prisma.empty;
 
   // Computed score expression: falls back to sum of dimension scores
@@ -489,12 +559,16 @@ async function queryPapersRawSQL(filters: {
         ${authorClause}
         ${institutionClause}
         ${errorsClause}
+        ${dateFromClause}
+        ${dateToClause}
+        ${categoryClause}
+        ${countryClause}
     `,
     prisma.$queryRaw<[{ count: bigint }]>`
       SELECT COUNT(*) as count FROM papers WHERE is_duplicate_of IS NULL
     `,
     prisma.$queryRaw<Record<string, unknown>[]>`
-      SELECT ${PAPER_COLUMNS} FROM papers
+      SELECT ${PAPER_LIST_COLUMNS} FROM papers
       WHERE pipeline_stage != 'ingested'
         AND coarse_filter_passed = true
         AND is_duplicate_of IS NULL
@@ -507,6 +581,10 @@ async function queryPapersRawSQL(filters: {
         ${authorClause}
         ${institutionClause}
         ${errorsClause}
+        ${dateFromClause}
+        ${dateToClause}
+        ${categoryClause}
+        ${countryClause}
       ${orderByClause}
       LIMIT ${PAGE_SIZE} OFFSET ${(filters.page - 1) * PAGE_SIZE}
     `,

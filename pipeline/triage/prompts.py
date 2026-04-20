@@ -2,6 +2,26 @@
 
 Every prompt has a version string stored alongside each AssessmentLog entry,
 enabling prompt regression tracking.
+
+VERSION TRACKING PROCESS
+========================
+1. Every change to the prompts below MUST increment the corresponding version
+   constant (COARSE_FILTER_VERSION, METHODS_ANALYSIS_VERSION, or
+   ADJUDICATION_VERSION).  Use semantic versioning: bump the minor version for
+   criteria adjustments, bump the major version for structural changes to the
+   prompt or tool schema.
+
+2. Every version change MUST be documented in CHANGELOG.md at the project root.
+   Include what changed, why, and whether re-scoring of recent papers is
+   recommended.
+
+3. After changing a prompt, consider re-running recent assessments (at least
+   the last 7 days) to check for regressions.  The assessment_logs table
+   preserves the prompt_version used for each assessment, so old and new
+   results can be compared side-by-side.
+
+4. The human-readable scoring rubric in docs/SCORING-RUBRIC.md must also be
+   updated to match any changes made here.
 """
 
 # ---------------------------------------------------------------------------

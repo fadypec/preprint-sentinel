@@ -9,6 +9,11 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  AreaChart,
+  Area,
+  LineChart,
+  Line,
+  Legend,
 } from "recharts";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -32,12 +37,21 @@ type HighScorePaper = {
   top_dimension: string;
   posted_date: string;
 };
+type TierWeek = { week: string; critical: number; high: number; medium: number; low: number };
+type DimensionTrendWeek = {
+  week: string;
+  [key: string]: string | number;
+};
+type VolumeDay = { day: string; count: number };
 
 type Props = {
   countryData: RateRow[];
   institutionData: RateRow[];
   emergingCategories: EmergingRow[];
   highScorePapers: HighScorePaper[];
+  tierOverTime: TierWeek[];
+  dimensionTrends: DimensionTrendWeek[];
+  volumePerDay: VolumeDay[];
 };
 
 /** Small toggle for switching between Count and Rate views */
@@ -49,9 +63,10 @@ function ViewToggle({
   onChange: (v: "count" | "rate") => void;
 }) {
   return (
-    <div className="inline-flex rounded-md border border-slate-200 text-[10px] dark:border-slate-700">
+    <div role="group" aria-label="Chart view mode" className="inline-flex rounded-md border border-slate-200 text-[10px] dark:border-slate-700">
       <button
         onClick={() => onChange("count")}
+        aria-pressed={value === "count"}
         className={cn(
           "rounded-l-md px-2 py-0.5 transition-colors",
           value === "count"
@@ -63,6 +78,7 @@ function ViewToggle({
       </button>
       <button
         onClick={() => onChange("rate")}
+        aria-pressed={value === "rate"}
         className={cn(
           "rounded-r-md px-2 py-0.5 transition-colors",
           value === "rate"
@@ -104,11 +120,24 @@ const DIMENSION_LABELS: Record<string, string> = {
   defensive_framing: "Defensive framing",
 };
 
+// Colors for dimension trend lines
+const DIMENSION_COLORS: Record<string, string> = {
+  pathogen_enhancement: "#ef4444",
+  synthesis_barrier_lowering: "#f97316",
+  select_agent_relevance: "#eab308",
+  novel_technique: "#3b82f6",
+  information_hazard: "#8b5cf6",
+  defensive_framing: "#06b6d4",
+};
+
 export const AnalyticsCharts = memo(function AnalyticsCharts({
   countryData,
   institutionData,
   emergingCategories,
   highScorePapers,
+  tierOverTime,
+  dimensionTrends,
+  volumePerDay,
 }: Props) {
   const { resolvedTheme } = useTheme();
   const textColor = resolvedTheme === "dark" ? "#94a3b8" : "#64748b";
@@ -157,12 +186,13 @@ export const AnalyticsCharts = memo(function AnalyticsCharts({
       {/* Countries — with Count/Rate toggle */}
       <Card className="p-4">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
             {countryView === "rate" ? "Country Flag Rate" : "Flagged Papers by Country"}
-          </h3>
+          </h2>
           <ViewToggle value={countryView} onChange={setCountryView} />
         </div>
         {countryChartData.length > 0 ? (
+          <div role="img" aria-label="Bar chart showing flagged papers by country">
           <ResponsiveContainer width="100%" height={320}>
             <BarChart data={countryChartData} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
@@ -184,6 +214,7 @@ export const AnalyticsCharts = memo(function AnalyticsCharts({
               <Bar dataKey="value" fill="#06b6d4" radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
+          </div>
         ) : (
           <p className="py-8 text-center text-sm text-slate-500">
             {countryView === "rate" && Object.keys(countryBaseline).length === 0
@@ -201,12 +232,13 @@ export const AnalyticsCharts = memo(function AnalyticsCharts({
       {/* Institutions — with Count/Rate toggle */}
       <Card className="p-4">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
             {instView === "rate" ? "Institution Flag Rate" : "Flagged Papers by Institution"}
-          </h3>
+          </h2>
           <ViewToggle value={instView} onChange={setInstView} />
         </div>
         {instChartData.length > 0 ? (
+          <div role="img" aria-label="Bar chart showing top flagged institutions">
           <ResponsiveContainer width="100%" height={320}>
             <BarChart data={instChartData} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
@@ -224,6 +256,7 @@ export const AnalyticsCharts = memo(function AnalyticsCharts({
               <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
+          </div>
         ) : (
           <p className="py-8 text-center text-sm text-slate-500">No data yet.</p>
         )}
@@ -236,9 +269,9 @@ export const AnalyticsCharts = memo(function AnalyticsCharts({
 
       {/* Emerging categories — flag rate change */}
       <Card className="p-4">
-        <h3 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
+        <h2 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
           Category Trends (30d vs prior 30d)
-        </h3>
+        </h2>
         {catRates.length > 0 ? (
           <div className="space-y-2">
             {catRates.map((cat) => (
@@ -247,7 +280,14 @@ export const AnalyticsCharts = memo(function AnalyticsCharts({
                   {cat.name}
                 </span>
                 <div className="flex-1">
-                  <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-700">
+                  <div
+                    className="h-2 rounded-full bg-slate-200 dark:bg-slate-700"
+                    role="meter"
+                    aria-valuenow={cat.recentRate}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label={`${cat.name} flag rate`}
+                  >
                     <div
                       className="h-2 rounded-full bg-purple-500"
                       style={{ width: `${(cat.recentRate / maxCatRate) * 100}%` }}
@@ -278,9 +318,9 @@ export const AnalyticsCharts = memo(function AnalyticsCharts({
 
       {/* High-score papers this week */}
       <Card className="p-4">
-        <h3 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
+        <h2 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
           Highest-Scoring Papers (Last 30 Days)
-        </h3>
+        </h2>
         {highScorePapers.length > 0 ? (
           <div className="space-y-2">
             {highScorePapers.map((paper) => {
@@ -316,6 +356,88 @@ export const AnalyticsCharts = memo(function AnalyticsCharts({
           </div>
         ) : (
           <p className="py-8 text-center text-sm text-slate-500">No critical/high papers in the last 30 days.</p>
+        )}
+      </Card>
+
+      {/* Papers processed per day (F-S7) */}
+      <Card className="p-4">
+        <h2 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
+          Papers Processed Per Day (Last 30 Days)
+        </h2>
+        {volumePerDay.length > 0 ? (
+          <div role="img" aria-label="Bar chart showing papers processed per day">
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={volumePerDay}>
+              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+              <XAxis dataKey="day" tick={{ fill: textColor, fontSize: 9 }} angle={-45} textAnchor="end" height={60} />
+              <YAxis tick={{ fill: textColor, fontSize: 10 }} />
+              <Tooltip />
+              <Bar dataKey="count" fill="#6366f1" radius={[4, 4, 0, 0]} name="Papers" />
+            </BarChart>
+          </ResponsiveContainer>
+          </div>
+        ) : (
+          <p className="py-8 text-center text-sm text-slate-500">No data yet.</p>
+        )}
+      </Card>
+
+      {/* Risk tier distribution over time (F-I3) */}
+      <Card className="p-4">
+        <h2 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
+          Risk Tier Distribution Over Time
+        </h2>
+        {tierOverTime.length > 0 ? (
+          <div role="img" aria-label="Stacked area chart showing risk tier distribution over time">
+          <ResponsiveContainer width="100%" height={280}>
+            <AreaChart data={tierOverTime}>
+              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+              <XAxis dataKey="week" tick={{ fill: textColor, fontSize: 10 }} />
+              <YAxis tick={{ fill: textColor, fontSize: 10 }} />
+              <Tooltip />
+              <Legend />
+              <Area type="monotone" dataKey="critical" stackId="1" fill="#ef4444" stroke="#ef4444" name="Critical" />
+              <Area type="monotone" dataKey="high" stackId="1" fill="#f97316" stroke="#f97316" name="High" />
+              <Area type="monotone" dataKey="medium" stackId="1" fill="#eab308" stroke="#eab308" name="Medium" />
+              <Area type="monotone" dataKey="low" stackId="1" fill="#22c55e" stroke="#22c55e" name="Low" />
+            </AreaChart>
+          </ResponsiveContainer>
+          </div>
+        ) : (
+          <p className="py-8 text-center text-sm text-slate-500">No data yet.</p>
+        )}
+      </Card>
+
+      {/* Dimension trend lines (F-S5) */}
+      <Card className="p-4 lg:col-span-2">
+        <h2 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
+          Average Dimension Scores Over Time
+        </h2>
+        {dimensionTrends.length > 0 ? (
+          <div role="img" aria-label="Line chart showing average risk dimension scores over time">
+          <ResponsiveContainer width="100%" height={320}>
+            <LineChart data={dimensionTrends}>
+              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+              <XAxis dataKey="week" tick={{ fill: textColor, fontSize: 10 }} />
+              <YAxis tick={{ fill: textColor, fontSize: 10 }} domain={[0, 3]} />
+              <Tooltip />
+              <Legend />
+              {Object.entries(DIMENSION_LABELS).map(([key, label]) => (
+                <Line
+                  key={key}
+                  type="monotone"
+                  dataKey={key}
+                  stroke={DIMENSION_COLORS[key] ?? "#94a3b8"}
+                  name={label}
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
+                  connectNulls
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+          </div>
+        ) : (
+          <p className="py-8 text-center text-sm text-slate-500">Not enough data for dimension trends yet.</p>
         )}
       </Card>
     </div>

@@ -57,39 +57,41 @@ export function EnrichmentCard({ data }: Props) {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
         {data.s2?.first_author_h_index != null && (
           <>
-            <span className="text-slate-500 dark:text-slate-400">h-index</span>
-            <span className="text-slate-700 dark:text-slate-300">{data.s2.first_author_h_index}</span>
+            <dt className="text-slate-500 dark:text-slate-400">h-index</dt>
+            <dd className="text-slate-700 dark:text-slate-300">{data.s2.first_author_h_index}</dd>
           </>
         )}
         {data.openalex?.cited_by_count != null && (
           <>
-            <span className="text-slate-500 dark:text-slate-400">Citations</span>
-            <span className="text-slate-700 dark:text-slate-300">{data.openalex.cited_by_count.toLocaleString()}</span>
+            <dt className="text-slate-500 dark:text-slate-400">Citations</dt>
+            <dd className="text-slate-700 dark:text-slate-300">{data.openalex.cited_by_count.toLocaleString()}</dd>
           </>
         )}
         {data.orcid?.orcid_id && (
           <>
-            <span className="text-slate-500 dark:text-slate-400">ORCID</span>
-            <a
-              href={`https://orcid.org/${data.orcid.orcid_id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 underline dark:text-blue-400"
-            >
-              {data.orcid.orcid_id}
-            </a>
+            <dt className="text-slate-500 dark:text-slate-400">ORCID</dt>
+            <dd>
+              <a
+                href={`https://orcid.org/${data.orcid.orcid_id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 underline dark:text-blue-400"
+              >
+                {data.orcid.orcid_id}
+              </a>
+            </dd>
           </>
         )}
         {data.openalex?.primary_institution && (
           <>
-            <span className="text-slate-500 dark:text-slate-400">Institution</span>
-            <span className="text-slate-700 dark:text-slate-300">{data.openalex.primary_institution}</span>
+            <dt className="text-slate-500 dark:text-slate-400">Institution</dt>
+            <dd className="text-slate-700 dark:text-slate-300">{data.openalex.primary_institution}</dd>
           </>
         )}
-      </div>
+      </dl>
 
       {data.openalex?.topics && data.openalex.topics.length > 0 && (
         <div>
