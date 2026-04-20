@@ -46,8 +46,7 @@ function isWeekday(dateStr: string): boolean {
 }
 
 function formatDateShort(dateStr: string): string {
-  const d = new Date(dateStr + "T12:00:00");
-  return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+  return dateStr;
 }
 
 function sourceCount(day: Record<string, number> | undefined): number {

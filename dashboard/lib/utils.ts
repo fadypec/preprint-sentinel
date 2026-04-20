@@ -6,11 +6,11 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatDate(date: Date | string): string {
-  return new Date(date).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  return new Date(date).toISOString().slice(0, 10);
+}
+
+export function formatDateTime(date: Date | string): string {
+  return new Date(date).toISOString();
 }
 
 export function formatDuration(start: Date | string, end: Date | string | null): string {

@@ -61,7 +61,7 @@ export function AuditTrail({ logs }: Props) {
                 {formatCost(log.costEstimateUsd)}
               </span>
               <span className="ml-auto text-slate-400">
-                {new Date(log.createdAt).toLocaleString()}
+                {new Date(log.createdAt).toISOString()}
               </span>
             </button>
             {isExpanded && (

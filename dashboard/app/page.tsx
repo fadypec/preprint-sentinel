@@ -106,11 +106,7 @@ export default async function DailyFeedPage({ searchParams }: Props) {
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
             {total} flagged of {totalIngested.toLocaleString()} ingested ({flaggedPct}%) &middot;{" "}
-            {new Date().toLocaleDateString("en-US", {
-              month: "long",
-              day: "numeric",
-              year: "numeric",
-            })}
+            {new Date().toISOString().slice(0, 10)}
           </p>
         </div>
       </div>

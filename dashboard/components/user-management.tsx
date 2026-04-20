@@ -96,7 +96,7 @@ export function UserManagement() {
                 </Badge>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                {user.email} &middot; joined {new Date(user.createdAt).toLocaleDateString()}
+                {user.email} &middot; joined {new Date(user.createdAt).toISOString().slice(0, 10)}
               </p>
             </div>
 

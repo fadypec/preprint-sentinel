@@ -209,7 +209,7 @@ function buildDigestHtml(papers: Paper[], dashboardUrl: string): string {
   <div style="max-width:700px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1)">
     <div style="background:#1e293b;padding:20px 24px">
       <h1 style="margin:0;color:#fff;font-size:18px">Preprint Sentinel Digest</h1>
-      <p style="margin:4px 0 0;color:#94a3b8;font-size:14px">${papers.length} paper${papers.length !== 1 ? "s" : ""} flagged &middot; ${new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</p>
+      <p style="margin:4px 0 0;color:#94a3b8;font-size:14px">${papers.length} paper${papers.length !== 1 ? "s" : ""} flagged &middot; ${new Date().toISOString().slice(0, 10)}</p>
     </div>
     <table style="width:100%;border-collapse:collapse">
       <thead>
@@ -267,6 +267,55 @@ export async function sendEmail(
     return {
       ok: false,
       error: `Email send failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
+export async function sendApprovalNotification(
+  email: string,
+  status: "approved" | "rejected",
+  dashboardUrl: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!email) return { ok: false, error: "No email address" };
+
+  const transport = getMailTransport();
+  if (!transport)
+    return { ok: false, error: "SMTP not configured (set SMTP_HOST env var)" };
+
+  const from = process.env.SMTP_FROM || "alerts@durc-triage.local";
+  const isApproved = status === "approved";
+
+  const subject = isApproved
+    ? "Your Preprint Sentinel account has been approved"
+    : "Your Preprint Sentinel account request update";
+
+  const html = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;margin:0;padding:20px;background:#f8fafc">
+  <div style="max-width:500px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1)">
+    <div style="background:#1e293b;padding:20px 24px">
+      <h1 style="margin:0;color:#fff;font-size:18px">Preprint Sentinel</h1>
+    </div>
+    <div style="padding:24px">
+      ${
+        isApproved
+          ? `<p style="margin:0 0 16px;color:#1e293b;font-size:14px">Your account has been <strong style="color:#16a34a">approved</strong>. You now have access to the dashboard.</p>
+      <a href="${escapeHtml(dashboardUrl)}" style="display:inline-block;padding:8px 20px;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none;font-size:14px">Open Dashboard</a>`
+          : `<p style="margin:0;color:#1e293b;font-size:14px">Your account request has been <strong style="color:#dc2626">declined</strong>. Contact your administrator if you believe this is an error.</p>`
+      }
+    </div>
+  </div>
+</body>
+</html>`;
+
+  try {
+    await transport.sendMail({ from, to: email, subject, html });
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      error: `Approval email failed: ${err instanceof Error ? err.message : String(err)}`,
     };
   }
 }

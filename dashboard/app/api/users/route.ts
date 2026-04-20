@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { apiRequireAdmin, csrfCheck } from "@/lib/auth-guard";
+import { sendApprovalNotification } from "@/lib/alerts";
 
 /**
  * GET /api/users — list all users (admin only)
@@ -48,6 +49,16 @@ export async function PATCH(request: NextRequest) {
     data: { status },
     select: { id: true, email: true, status: true },
   });
+
+  // Send email notification for approval/rejection (fire-and-forget)
+  if (user.email && (status === "approved" || status === "rejected")) {
+    const dashboardUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000";
+    sendApprovalNotification(user.email, status, dashboardUrl).catch(() => {
+      // Silently ignore — email is best-effort
+    });
+  }
 
   return Response.json(user);
 }

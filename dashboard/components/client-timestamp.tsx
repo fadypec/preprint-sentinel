@@ -10,7 +10,7 @@ export function ClientTimestamp({ date, className }: Props) {
 
   return (
     <time dateTime={iso} className={className} suppressHydrationWarning>
-      {new Date(iso).toLocaleString()}
+      {iso}
     </time>
   );
 }
