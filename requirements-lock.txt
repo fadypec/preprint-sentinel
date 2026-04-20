@@ -37,7 +37,7 @@ platformdirs==4.9.6
 pluggy==1.6.0
 pre_commit==4.5.1
 psycopg2-binary==2.9.11
-pydantic==2.12.5
+pydantic==2.13.2
 pydantic-settings==2.13.1
 pydantic_core==2.41.5
 Pygments==2.20.0
